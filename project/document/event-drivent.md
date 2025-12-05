@@ -6,19 +6,18 @@
 
 ## 1. Thiết kế Hạ tầng Sự kiện (Event Infrastructure)
 
-
 Để Choreography hoạt động, chúng ta cần một **Message Broker (RabbitMQ)** được cấu hình đúng chuẩn **Topic Exchange**.
 
 ### Cấu trúc Exchange & Routing Key
 
 Chúng ta sẽ sử dụng 1 Exchange chính: `smap.events` (Type: `topic`).
 
-| Routing Key | Ý nghĩa | Producer (Người gửi) | Consumers (Người nhận) |
-| :--- | :--- | :--- | :--- |
-| `project.created` | Có dự án mới cần chạy | Project Service | Collector Service |
-| `data.collected` | Dữ liệu thô đã nằm trên MinIO | Collector Service | Analytics Service |
-| `analysis.finished` | Phân tích xong 1 bài | Analytics Service | Insight Service / Notification |
-| `job.completed` | Toàn bộ dự án đã xong | Analytics Service (Logic Redis) | Notification Service |
+| Routing Key         | Ý nghĩa                       | Producer (Người gửi)            | Consumers (Người nhận)         |
+| :------------------ | :---------------------------- | :------------------------------ | :----------------------------- |
+| `project.created`   | Có dự án mới cần chạy         | Project Service                 | Collector Service              |
+| `data.collected`    | Dữ liệu thô đã nằm trên MinIO | Collector Service               | Analytics Service              |
+| `analysis.finished` | Phân tích xong 1 bài          | Analytics Service               | Insight Service / Notification |
+| `job.completed`     | Toàn bộ dự án đã xong         | Analytics Service (Logic Redis) | Notification Service           |
 
 ---
 
@@ -30,27 +29,28 @@ Vì không có ông Nhạc trưởng cầm sổ theo dõi, chúng ta dùng **Red
 
 Để tránh việc cơ chế "dọn dẹp bộ nhớ" (Cache Eviction) của Redis vô tình xóa mất bộ đếm tiến độ, hãy tách biệt DB:
 
-* **DB 0:** Dùng cho Cache (Session, API Response...).
-* **DB 1:** Dùng riêng cho **SMAP State Management**.
-  * *Lý do:* Dữ liệu này cần sống dai cho đến khi Project xong. Nếu dùng chung DB 0, khi RAM đầy, Redis có thể xóa nhầm key tracking → Hệ thống mất khả năng theo dõi.
+- **DB 0:** Dùng cho Cache (Session, API Response...).
+- **DB 1:** Dùng riêng cho **SMAP State Management**.
+  - _Lý do:_ Dữ liệu này cần sống dai cho đến khi Project xong. Nếu dùng chung DB 0, khi RAM đầy, Redis có thể xóa nhầm key tracking → Hệ thống mất khả năng theo dõi.
 
 ### 2.2. Thiết kế Data Structure & Key
 
 Thay vì dùng nhiều key rời rạc (`proj:{id}:status`, `proj:{id}:total`...), sử dụng **Redis HASH** để gom nhóm dữ liệu của 1 Project vào 1 key duy nhất.
 
 **Tại sao dùng Hash?**
+
 - Gọn gàng hơn khi đọc/ghi
 - Dễ set TTL (hạn sử dụng) cho toàn bộ project
 - Atomic operations trên nhiều fields
 
 **Cấu trúc:**
 
-| Key | Field | Kiểu | Mô tả | Ai Ghi? |
-| :--- | :--- | :--- | :--- | :--- |
+| Key              | Field    | Kiểu   | Mô tả                                            | Ai Ghi?                         |
+| :--------------- | :------- | :----- | :----------------------------------------------- | :------------------------------ |
 | `smap:proj:{id}` | `status` | String | `INITIALIZING`, `CRAWLING`, `PROCESSING`, `DONE` | Project / Collector / Analytics |
-| | `total` | Int | Tổng số bài cần xử lý (VD: 1000) | Collector |
-| | `done` | Int | Số bài đã xong (Atomic Counter) | Analytics |
-| | `errors` | Int | Số bài bị lỗi | Analytics |
+|                  | `total`  | Int    | Tổng số bài cần xử lý (VD: 1000)                 | Collector                       |
+|                  | `done`   | Int    | Số bài đã xong (Atomic Counter)                  | Analytics                       |
+|                  | `errors` | Int    | Số bài bị lỗi                                    | Analytics                       |
 
 ### 2.3. Kiến trúc Phân lớp cho Redis State Management
 
@@ -62,18 +62,18 @@ Redis state management phải tuân theo kiến trúc **4 lớp** để tách bi
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                    Project UseCase Layer (Orchestration)                    │
 │  internal/project/usecase/project.go                                        │
-│  - Orchestrate flow: PostgreSQL → Redis State → RabbitMQ                   │
-│  - Quyết định WHEN gọi state operations                                    │
-│  - Gọi state.UseCase để thao tác state                                     │
+│  - Orchestrate flow: PostgreSQL → Redis State → RabbitMQ                    │
+│  - Quyết định WHEN gọi state operations                                     │
+│  - Gọi state.UseCase để thao tác state                                      │
 └─────────────────┬───────────────────────────────────────────────────────────┘
                   │ depends on
                   ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                    State UseCase Layer (Business Logic)                     │
 │  internal/state/usecase/state.go                                            │
-│  - Business logic: completion check (done >= total && total > 0)           │
-│  - Status transitions: INITIALIZING → CRAWLING → PROCESSING → DONE        │
-│  - Progress calculation: done/total * 100                                  │
+│  - Business logic: completion check (done >= total && total > 0)            │
+│  - Status transitions: INITIALIZING → CRAWLING → PROCESSING → DONE          │
+│  - Progress calculation: done/total * 100                                   │
 │  - Duplicate completion prevention                                          │
 └─────────────────┬───────────────────────────────────────────────────────────┘
                   │ depends on
@@ -81,33 +81,34 @@ Redis state management phải tuân theo kiến trúc **4 lớp** để tách bi
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │               State Repository Layer (Data Access ONLY)                     │
 │  internal/state/repository/redis/state_repo.go                              │
-│  - CHỈ chứa Redis CRUD operations                                          │
-│  - Biết về key schema: smap:proj:{id}                                      │
-│  - Biết về Hash fields: status, total, done, errors                        │
-│  - KHÔNG chứa business logic (completion check, status transitions)        │
+│  - CHỈ chứa Redis CRUD operations                                           │
+│  - Biết về key schema: smap:proj:{id}                                       │
+│  - Biết về Hash fields: status, total, done, errors                         │
+│  - KHÔNG chứa business logic (completion check, status transitions)         │
 └─────────────────┬───────────────────────────────────────────────────────────┘
                   │ uses
                   ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                pkg/redis (Infrastructure Layer)                             │
 │  pkg/redis/client.go                                                        │
-│  - CHỈ chứa Redis connection logic                                         │
-│  - Generic operations: HSet, HGet, HIncrBy, HGetAll, Pipeline, Expire      │
-│  - KHÔNG biết về business domain (project, state, etc)                     │
-│  - KHÔNG biết về key naming conventions                                    │
+│  - CHỈ chứa Redis connection logic                                          │
+│  - Generic operations: HSet, HGet, HIncrBy, HGetAll, Pipeline, Expire       │
+│  - KHÔNG biết về business domain (project, state, etc)                      │
+│  - KHÔNG biết về key naming conventions                                     │
 └─────────────────────────────────────────────────────────────────────────────┘
 
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                Domain Types (Model Layer)                                   │
-│  internal/model/state.go                                                    │
-│  - ProjectState struct (Status, Total, Done, Errors)                       │
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                Domain Types (Model Layer)                                    │
+│  internal/model/state.go                                                     │
+│  - ProjectState struct (Status, Total, Done, Errors)                         │
 │  - ProjectStatus constants (INITIALIZING, CRAWLING, PROCESSING, DONE, FAILED)│
-└─────────────────────────────────────────────────────────────────────────────┘
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 **Ví dụ Phân chia Trách nhiệm:**
 
 ❌ **SAI - Business logic trong Repository:**
+
 ```go
 // internal/state/repository/redis/state_repo.go - KHÔNG NÊN LÀM NHƯ NÀY
 func (r *redisStateRepository) IncrementDone(ctx context.Context, projectID string) (IncrementResult, error) {
@@ -124,6 +125,7 @@ func (r *redisStateRepository) IncrementDone(ctx context.Context, projectID stri
 ```
 
 ✅ **ĐÚNG - Business logic trong UseCase, Repository chỉ CRUD:**
+
 ```go
 // internal/state/repository/redis/state_repo.go - Data Access ONLY
 func (r *redisStateRepository) IncrementDone(ctx context.Context, projectID string) (int64, error) {
@@ -174,6 +176,7 @@ func (uc *stateUseCase) IncrementDone(ctx context.Context, projectID string) (st
 ```
 
 **Lợi ích của kiến trúc 4 lớp:**
+
 1. **Separation of Concerns**: Mỗi layer có 1 trách nhiệm duy nhất
 2. **Testability**: Mock Repository trong UseCase tests, không cần Redis thật
 3. **Flexibility**: Đổi từ Redis sang DynamoDB chỉ cần viết Repository mới
@@ -183,6 +186,7 @@ func (uc *stateUseCase) IncrementDone(ctx context.Context, projectID string) (st
 ### 2.4. Cấu hình kết nối Redis
 
 **Go Implementation (Project Service):**
+
 ```go
 // pkg/redis/redis.go - Core connection logic only
 func Connect(opts ClientOptions) (Client, error) {
@@ -206,9 +210,9 @@ Dưới đây là kịch bản chi tiết cho một vòng đời dữ liệu.
 
 ### BƯỚC 1: KÍCH HOẠT (The Trigger)
 
-* **Tại:** `Project Service`
-* **Hành động:** User bấm "Create Project".
-* **Logic:**
+- **Tại:** `Project Service`
+- **Hành động:** User bấm "Create Project".
+- **Logic:**
   1. Lưu thông tin dự án vào PostgreSQL (`projects` table).
   2. Khởi tạo trạng thái trên Redis với TTL để tránh rác hệ thống.
   3. **Publish Event:** `project.created`.
@@ -279,7 +283,7 @@ func (u *projectUseCase) Create(ctx context.Context, input CreateInput) (*Output
   "payload": {
     "project_id": "proj_abc",
     "keywords": ["VinFast", "VF3"],
-    "targets": [{"platform": "tiktok", "url": "..."}],
+    "targets": [{ "platform": "tiktok", "url": "..." }],
     "date_range": ["2025-01-01", "2025-02-01"]
   }
 }
@@ -287,8 +291,8 @@ func (u *projectUseCase) Create(ctx context.Context, input CreateInput) (*Output
 
 ### BƯỚC 2: THU THẬP & SẢN XUẤT (The Producer)
 
-* **Tại:** `Collector Service` (Collector Manager)
-* **Hành động:**
+- **Tại:** `Collector Service` (Collector Manager)
+- **Hành động:**
   1. Lắng nghe `project.created`.
   2. Phân rã thành các Job con. Ví dụ: Tìm thấy 1000 bài viết cần crawl.
   3. Cập nhật Redis với tổng số items.
@@ -343,8 +347,8 @@ def handle_project_created_event(event):
 
 ### BƯỚC 3: XỬ LÝ & KIỂM TRA ĐÍCH (The Processor) - **QUAN TRỌNG NHẤT**
 
-* **Tại:** `Analytics Service`
-* **Hành động:**
+- **Tại:** `Analytics Service`
+- **Hành động:**
   1. Lắng nghe `data.collected`. (Queue này nên set `prefetch_count` để không bị quá tải).
   2. Tải JSON từ MinIO dựa trên `minio_path`.
   3. Chạy Pipeline (5 Modules AI).
@@ -407,10 +411,10 @@ def process_post(post_data):
 
 ### BƯỚC 4: HIỂN THỊ & THÔNG BÁO (The View)
 
-* **Tại:** `Insight Service` (hoặc Notification Service)
-* **Hành động:**
-  * **Real-time:** Frontend gọi API polling vào Redis để hiện Progress Bar.
-  * **Hoàn thành:** Notification Service nghe `job.completed` → Gửi Email/Zalo cho User.
+- **Tại:** `Insight Service` (hoặc Notification Service)
+- **Hành động:**
+  - **Real-time:** Frontend gọi API polling vào Redis để hiện Progress Bar.
+  - **Hoàn thành:** Notification Service nghe `job.completed` → Gửi Email/Zalo cho User.
 
 **Implementation (Go - Project Service):**
 
@@ -510,17 +514,19 @@ func (h *Handler) GetProgress(c *gin.Context) {
 **Tình huống:** Collector mới tìm được 10 bài, update `total=10`. Analytics chạy nhanh quá, xử lý xong 10 bài → Redis thấy `done=10, total=10` → Bắn event `job.completed`. Nhưng thực tế Collector vẫn đang tìm tiếp và sau đó update `total=100`.
 
 **Giải pháp:**
-* Collector chỉ update trạng thái là `CRAWLING` khi đang tìm.
-* Khi Collector tìm xong HẾT, nó update trạng thái sang `PROCESSING_WAIT`.
-* Analytics chỉ bắn event `job.completed` khi: `done == total` **VÀ** `status != CRAWLING`.
+
+- Collector chỉ update trạng thái là `CRAWLING` khi đang tìm.
+- Khi Collector tìm xong HẾT, nó update trạng thái sang `PROCESSING_WAIT`.
+- Analytics chỉ bắn event `job.completed` khi: `done == total` **VÀ** `status != CRAWLING`.
 
 ### 4.2. Vấn đề Dead Letter (Bài lỗi)
 
 **Quan trọng:** Dù bài viết bị lỗi (crash, file hỏng), bạn **vẫn phải gọi `mark_item_done(..., is_error=True)`**.
 
-*Lý do:* Nếu không tăng biến `done`, tổng số `done` sẽ mãi mãi nhỏ hơn `total` (ví dụ 999/1000) và hệ thống không bao giờ Finish được.
+_Lý do:_ Nếu không tăng biến `done`, tổng số `done` sẽ mãi mãi nhỏ hơn `total` (ví dụ 999/1000) và hệ thống không bao giờ Finish được.
 
 **Cơ chế xử lý:**
+
 1. Analytics bắt lỗi (`try...except`).
 2. **Ack** message đó (để xóa khỏi hàng đợi chính, tránh block các bài sau).
 3. Gửi message đó vào **Dead Letter Queue (DLQ)**: `analytics.errors`.
@@ -531,9 +537,10 @@ func (h *Handler) GetProgress(c *gin.Context) {
 **Tình huống:** RabbitMQ gửi 1 bài viết 2 lần.
 
 **Cơ chế:**
-* Analytics Service kiểm tra DB trước khi Insert.
-* Sử dụng `INSERT ... ON CONFLICT DO UPDATE`.
-* Redis `INCR` vẫn có thể bị tăng 2 lần. Chấp nhận sai số nhỏ này hoặc dùng `SET` trong Redis để lưu list ID đã làm (tốn RAM hơn).
+
+- Analytics Service kiểm tra DB trước khi Insert.
+- Sử dụng `INSERT ... ON CONFLICT DO UPDATE`.
+- Redis `INCR` vẫn có thể bị tăng 2 lần. Chấp nhận sai số nhỏ này hoặc dùng `SET` trong Redis để lưu list ID đã làm (tốn RAM hơn).
 
 ### 4.4. Analytics Service bị sập (Crash)
 

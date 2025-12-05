@@ -40,6 +40,7 @@ func ToProjectCreatedEvent(project model.Project) ProjectCreatedEvent {
 		Timestamp: time.Now().UTC(),
 		Payload: ProjectCreatedPayload{
 			ProjectID:             project.ID,
+			UserID:                project.CreatedBy, // For progress notifications via WebSocket
 			BrandName:             project.BrandName,
 			BrandKeywords:         project.BrandKeywords,
 			CompetitorNames:       project.CompetitorNames,

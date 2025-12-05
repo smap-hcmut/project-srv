@@ -17,3 +17,15 @@ func (h handler) processCallbackReq(c *gin.Context) (webhook.CallbackRequest, er
 
 	return req.toInput(), nil
 }
+
+func (h handler) processProgressCallbackReq(c *gin.Context) (webhook.ProgressCallbackRequest, error) {
+	ctx := c.Request.Context()
+	// Bind request body
+	var req webhook.ProgressCallbackRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.l.Errorf(ctx, "webhook.http.processProgressCallbackReq.ShouldBindJSON: %v", err)
+		return webhook.ProgressCallbackRequest{}, errWrongBody
+	}
+
+	return req, nil
+}

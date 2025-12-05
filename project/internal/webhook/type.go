@@ -2,6 +2,13 @@ package webhook
 
 import "time"
 
+// WebSocket message types
+const (
+	MessageTypeProjectProgress  = "project_progress"
+	MessageTypeProjectCompleted = "project_completed"
+	MessageTypeDryRunResult     = "dryrun_result"
+)
+
 // CallbackRequest represents the webhook callback from collector service
 type CallbackRequest struct {
 	JobID    string          `json:"job_id" binding:"required"`
@@ -121,6 +128,16 @@ type Error struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
 	Keyword string `json:"keyword,omitempty"`
+}
+
+// ProgressCallbackRequest represents the webhook callback for progress updates from collector
+type ProgressCallbackRequest struct {
+	ProjectID string `json:"project_id" binding:"required"`
+	UserID    string `json:"user_id" binding:"required"`
+	Status    string `json:"status" binding:"required"` // INITIALIZING, CRAWLING, PROCESSING, DONE, FAILED
+	Total     int64  `json:"total"`
+	Done      int64  `json:"done"`
+	Errors    int64  `json:"errors"`
 }
 
 // JobMappingData represents the data stored in Redis for job mappings

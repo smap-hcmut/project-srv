@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"smap-project/internal/model"
 	"smap-project/internal/webhook"
 )
 
@@ -27,7 +28,7 @@ func (uc *usecase) HandleDryRunCallback(ctx context.Context, req webhook.Callbac
 	// Note: job_id, platform, status must be inside payload because
 	// websocket subscriber only extracts "type" and "payload" fields
 	message := map[string]interface{}{
-		"type": "dryrun_result",
+		"type": webhook.MessageTypeDryRunResult,
 		"payload": map[string]interface{}{
 			"job_id":   req.JobID,
 			"platform": req.Platform,
@@ -51,6 +52,54 @@ func (uc *usecase) HandleDryRunCallback(ctx context.Context, req webhook.Callbac
 	}
 
 	uc.l.Infof(ctx, "Published dry-run result to Redis: channel=%s, job_id=%s, platform=%s, status=%s", channel, req.JobID, req.Platform, req.Status)
+
+	return nil
+}
+
+// HandleProgressCallback handles progress updates from collector service
+// and publishes to WebSocket via Redis Pub/Sub
+func (uc *usecase) HandleProgressCallback(ctx context.Context, req webhook.ProgressCallbackRequest) error {
+	// Format Redis channel as user_noti:{user_id}
+	channel := fmt.Sprintf("user_noti:%s", req.UserID)
+
+	// Calculate progress percentage
+	var progressPercent float64
+	if req.Total > 0 {
+		progressPercent = float64(req.Done) / float64(req.Total) * 100
+	}
+
+	// Determine message type based on status
+	messageType := webhook.MessageTypeProjectProgress
+	status := model.ProjectStatus(req.Status)
+	if status == model.ProjectStatusDone || status == model.ProjectStatusFailed {
+		messageType = webhook.MessageTypeProjectCompleted
+	}
+
+	// Construct message
+	message := map[string]interface{}{
+		"type": messageType,
+		"payload": map[string]interface{}{
+			"project_id":       req.ProjectID,
+			"status":           req.Status,
+			"total":            req.Total,
+			"done":             req.Done,
+			"errors":           req.Errors,
+			"progress_percent": progressPercent,
+		},
+	}
+
+	// Marshal message to JSON
+	body, err := json.Marshal(message)
+	if err != nil {
+		uc.l.Errorf(ctx, "internal.webhook.usecase.HandleProgressCallback.Marshal: %v", err)
+		return err
+	}
+
+	// Publish to Redis
+	if err := uc.redisClient.Publish(ctx, channel, body); err != nil {
+		uc.l.Errorf(ctx, "internal.webhook.usecase.HandleProgressCallback.Publish: %v", err)
+		return err
+	}
 
 	return nil
 }

@@ -12,6 +12,7 @@ type ProjectCreatedEvent struct {
 // ProjectCreatedPayload includes details for the created project.
 type ProjectCreatedPayload struct {
 	ProjectID             string              `json:"project_id"`
+	UserID                string              `json:"user_id"` // For progress notifications via WebSocket
 	BrandName             string              `json:"brand_name"`
 	BrandKeywords         []string            `json:"brand_keywords"`
 	CompetitorNames       []string            `json:"competitor_names"`
