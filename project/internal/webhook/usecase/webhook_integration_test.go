@@ -3,14 +3,15 @@ package usecase
 import (
 	"context"
 	"encoding/json"
+	"smap-project/internal/webhook"
+	"smap-project/pkg/log"
 	"testing"
 	"time"
 
-	"smap-project/internal/webhook"
-	"smap-project/pkg/log"
+	"github.com/redis/go-redis/v9"
 )
 
-// mockRedisClient implements a simple in-memory Redis client for testing
+// mockRedisClient implements redis.Client interface for testing
 type mockRedisClient struct {
 	data map[string][]byte
 }
@@ -21,12 +22,28 @@ func newMockRedisClient() *mockRedisClient {
 	}
 }
 
+// Connection methods
 func (m *mockRedisClient) Disconnect() error {
 	return nil
 }
 
-func (m *mockRedisClient) Set(ctx context.Context, key string, value interface{}, expirationSeconds int) error {
-	// Convert value to bytes
+func (m *mockRedisClient) Ping(ctx context.Context) error {
+	return nil
+}
+
+func (m *mockRedisClient) IsReady(ctx context.Context) bool {
+	return true
+}
+
+// Basic Key-Value Operations
+func (m *mockRedisClient) Get(ctx context.Context, key string) ([]byte, error) {
+	if val, ok := m.data[key]; ok {
+		return val, nil
+	}
+	return nil, context.DeadlineExceeded
+}
+
+func (m *mockRedisClient) Set(ctx context.Context, key string, value interface{}, expiration int) error {
 	var bytes []byte
 	switch v := value.(type) {
 	case []byte:
@@ -40,14 +57,45 @@ func (m *mockRedisClient) Set(ctx context.Context, key string, value interface{}
 	return nil
 }
 
-func (m *mockRedisClient) Get(ctx context.Context, key string) ([]byte, error) {
-	if val, ok := m.data[key]; ok {
-		return val, nil
+func (m *mockRedisClient) Del(ctx context.Context, keys ...string) error {
+	for _, key := range keys {
+		delete(m.data, key)
 	}
-	// Return error similar to redis.Nil
-	return nil, context.DeadlineExceeded // Using a standard error instead
+	return nil
 }
 
+func (m *mockRedisClient) Exists(ctx context.Context, key string) (bool, error) {
+	_, ok := m.data[key]
+	return ok, nil
+}
+
+func (m *mockRedisClient) Expire(ctx context.Context, key string, expiration int) error {
+	return nil
+}
+
+// Hash Operations
+func (m *mockRedisClient) HSet(ctx context.Context, key string, field string, value interface{}) error {
+	return nil
+}
+
+func (m *mockRedisClient) HGet(ctx context.Context, key string, field string) ([]byte, error) {
+	return nil, nil
+}
+
+func (m *mockRedisClient) HGetAll(ctx context.Context, key string) (map[string]string, error) {
+	return nil, nil
+}
+
+func (m *mockRedisClient) HIncrBy(ctx context.Context, key string, field string, incr int64) (int64, error) {
+	return 0, nil
+}
+
+// Multiple Key Operations
+func (m *mockRedisClient) MGet(ctx context.Context, keys ...string) ([]interface{}, error) {
+	return nil, nil
+}
+
+// Distributed Lock
 func (m *mockRedisClient) Lock(ctx context.Context, key string, expiration int) (bool, error) {
 	return true, nil
 }
@@ -56,8 +104,21 @@ func (m *mockRedisClient) Unlock(ctx context.Context, key string) error {
 	return nil
 }
 
+// Pub/Sub Operations
 func (m *mockRedisClient) Publish(ctx context.Context, channel string, message interface{}) error {
-	// For testing, we just verify it doesn't error
+	return nil
+}
+
+func (m *mockRedisClient) Subscribe(ctx context.Context, channels ...string) *redis.PubSub {
+	return nil
+}
+
+// Pipeline Operations
+func (m *mockRedisClient) Pipeline() redis.Pipeliner {
+	return nil
+}
+
+func (m *mockRedisClient) TxPipeline() redis.Pipeliner {
 	return nil
 }
 
@@ -132,27 +193,26 @@ func TestCheckpoint_Phase1And2(t *testing.T) {
 		t.Logf("✓ Callback processed successfully using lookup: jobID=%s", jobID)
 	})
 
-	t.Run("3. Verify callbacks work with fallback (UserID provided)", func(t *testing.T) {
-		jobID := "test-job-fallback"
-		userID := "user-fallback"
+	t.Run("3. Verify callbacks fail when job mapping not found (no fallback)", func(t *testing.T) {
+		jobID := "test-job-not-found"
 
-		// Create callback request WITH UserID (old format)
-		// Note: We're NOT storing a job mapping to test the fallback
+		// Create callback request WITHOUT stored job mapping
+		// Current implementation has NO fallback - it should fail
 		req := webhook.CallbackRequest{
 			JobID:    jobID,
 			Status:   "success",
 			Platform: "tiktok",
 			Payload:  webhook.CallbackPayload{},
-			UserID:   userID, // Provided UserID - should use fallback
+			UserID:   "user-fallback", // This is ignored - no fallback in current impl
 		}
 
-		// Process callback
+		// Process callback - should fail because no job mapping exists
 		err := uc.HandleDryRunCallback(ctx, req)
-		if err != nil {
-			t.Fatalf("Failed to handle callback with fallback: %v", err)
+		if err == nil {
+			t.Fatalf("Expected error when job mapping not found, got nil")
 		}
 
-		t.Logf("✓ Callback processed successfully using fallback: jobID=%s, userID=%s", jobID, userID)
+		t.Logf("✓ Callback correctly failed when job mapping not found: jobID=%s, error=%v", jobID, err)
 	})
 
 	t.Run("4. Verify old collector callbacks (with UserID) still work", func(t *testing.T) {
@@ -184,10 +244,10 @@ func TestCheckpoint_Phase1And2(t *testing.T) {
 		t.Logf("✓ Old collector callback processed successfully: jobID=%s, userID=%s", jobID, userID)
 	})
 
-	t.Run("5. Verify missing JobID is handled gracefully", func(t *testing.T) {
+	t.Run("5. Verify missing job mapping returns error", func(t *testing.T) {
 		jobID := "test-job-missing"
 
-		// Create callback request WITHOUT UserID and WITHOUT stored mapping
+		// Create callback request WITHOUT stored mapping
 		req := webhook.CallbackRequest{
 			JobID:    jobID,
 			Status:   "failed",
@@ -196,14 +256,14 @@ func TestCheckpoint_Phase1And2(t *testing.T) {
 			UserID:   "", // No UserID provided
 		}
 
-		// Process callback - should log error but return nil (acknowledge callback)
-		// This prevents retries for missing job mappings
+		// Process callback - should return error because job mapping not found
+		// Current implementation does NOT acknowledge callback without valid mapping
 		err := uc.HandleDryRunCallback(ctx, req)
-		if err != nil {
-			t.Errorf("Expected nil error for missing JobID (should acknowledge callback), got: %v", err)
+		if err == nil {
+			t.Errorf("Expected error for missing job mapping, got nil")
 		}
 
-		t.Logf("✓ Missing JobID handled gracefully (callback acknowledged, notification skipped)")
+		t.Logf("✓ Missing job mapping correctly returns error: %v", err)
 	})
 
 	t.Run("6. Verify dry-run jobs with empty projectID work", func(t *testing.T) {

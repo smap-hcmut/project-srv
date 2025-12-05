@@ -63,15 +63,6 @@ func main() {
 	defer postgre.Disconnect(ctx, postgresDB)
 	logger.Infof(ctx, "PostgreSQL connected successfully to %s:%d/%s", cfg.Postgres.Host, cfg.Postgres.Port, cfg.Postgres.DBName)
 
-	// // Initialize MinIO
-	// minioClient, err := minio.Connect(ctx, cfg.MinIO)
-	// if err != nil {
-	// 	logger.Error(ctx, "Failed to connect to MinIO: ", err)
-	// 	return
-	// }
-	// defer minio.Disconnect(ctx)
-	// logger.Infof(ctx, "MinIO connected successfully to %s", cfg.MinIO.Endpoint)
-
 	// Initialize RabbitMQ
 	amqpConn, err := rabbitmq.Dial(cfg.RabbitMQ.URL, true)
 	if err != nil {
@@ -80,15 +71,25 @@ func main() {
 	}
 	defer amqpConn.Close()
 
-	// Initialize Redis
-	redisOpts := pkgRedis.NewClientOptions().SetOptions(cfg.Redis)
-	redisClient, err := pkgRedis.Connect(redisOpts)
+	// Initialize Redis (Main - DB 0: job mapping, pub/sub)
+	mainRedisOpts := pkgRedis.NewClientOptions().SetOptions(cfg.Redis)
+	mainRedisClient, err := pkgRedis.Connect(mainRedisOpts)
 	if err != nil {
-		logger.Error(ctx, "Failed to connect to Redis: ", err)
+		logger.Error(ctx, "Failed to connect to Redis (main): ", err)
 		return
 	}
-	defer redisClient.Disconnect()
-	logger.Infof(ctx, "Redis connected successfully")
+	defer mainRedisClient.Disconnect()
+	logger.Infof(ctx, "Redis (main) connected successfully to DB %d", cfg.Redis.DB)
+
+	// Initialize Redis (State - DB 1 for project progress tracking)
+	stateRedisOpts := pkgRedis.NewClientOptions().SetOptions(cfg.Redis).SetDB(cfg.Redis.StateDB)
+	stateRedisClient, err := pkgRedis.Connect(stateRedisOpts)
+	if err != nil {
+		logger.Error(ctx, "Failed to connect to Redis (state): ", err)
+		return
+	}
+	defer stateRedisClient.Disconnect()
+	logger.Infof(ctx, "Redis (state) connected successfully to DB %d", cfg.Redis.StateDB)
 
 	// Initialize Discord
 	discordClient, err := discord.New(logger, &discord.DiscordWebhook{
@@ -118,8 +119,9 @@ func main() {
 		// // Message Queue Configuration
 		AmqpConn: amqpConn,
 
-		// Cache Configuration
-		RedisClient: redisClient,
+		// Redis Configuration
+		MainRedisClient:  mainRedisClient,
+		StateRedisClient: stateRedisClient,
 
 		// Authentication & Security Configuration
 		JwtSecretKey: cfg.JWT.SecretKey,
@@ -127,12 +129,9 @@ func main() {
 		Encrypter:    encrypterInstance,
 		InternalKey:  cfg.InternalConfig.InternalKey,
 
-		// Monitoring & Notification Configuration
-		Discord: discordClient,
-
 		// External Services
-		LLMConfig:       cfg.LLM,
-		CollectorConfig: cfg.Collector,
+		Discord: discordClient,
+		LLMConfig: cfg.LLM,
 	})
 	if err != nil {
 		logger.Error(ctx, "Failed to initialize HTTP server: ", err)

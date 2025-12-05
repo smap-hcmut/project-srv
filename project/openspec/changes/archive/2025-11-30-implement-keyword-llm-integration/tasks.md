@@ -98,7 +98,6 @@
 ### 2.1 Update Keyword Usecase Structure
 - [x] 2.1.1 Update `internal/keyword/usecase/new.go`
   - [x] Add `llmProvider` field to `usecase` struct
-  - [x] Add `collectorClient` field to `usecase` struct
   - [x] Update constructor to accept LLM provider and Collector client
   - [x] Store dependencies in struct
 - [x] 2.1.2 Update `internal/keyword/usecase/keyword.go` (if needed for interface changes)

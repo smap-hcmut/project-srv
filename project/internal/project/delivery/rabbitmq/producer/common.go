@@ -9,9 +9,17 @@ import (
 
 // Run runs the producer
 func (p *implProducer) Run() (err error) {
+	// Initialize dry-run writer (legacy collector.inbound exchange)
 	p.dryRunWriter, err = p.getWriter(rabb.CollectorInboundExchange)
 	if err != nil {
 		fmt.Println("Error when getting dry-run writer")
+		return
+	}
+
+	// Initialize smap.events writer (new standardized exchange)
+	p.smapEventsWriter, err = p.getWriter(rabb.SMAPEventsExchange)
+	if err != nil {
+		fmt.Println("Error when getting smap.events writer")
 		return
 	}
 
@@ -22,6 +30,9 @@ func (p *implProducer) Run() (err error) {
 func (p *implProducer) Close() {
 	if p.dryRunWriter != nil {
 		p.dryRunWriter.Close()
+	}
+	if p.smapEventsWriter != nil {
+		p.smapEventsWriter.Close()
 	}
 }
 

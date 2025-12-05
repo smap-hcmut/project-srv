@@ -32,16 +32,3 @@ func (uc *usecase) Validate(ctx context.Context, input keyword.ValidateInput) (k
 		ValidKeywords: validKeywords,
 	}, nil
 }
-
-// Test performs a dry run test of keywords
-func (uc *usecase) Test(ctx context.Context, input keyword.TestInput) (keyword.TestOutput, error) {
-	results, err := uc.test(ctx, input.Keywords)
-	if err != nil {
-		uc.l.Errorf(ctx, "internal.keyword.usecase.Test: %v", err)
-		return keyword.TestOutput{}, err
-	}
-
-	return keyword.TestOutput{
-		Results: results,
-	}, nil
-}

@@ -8,9 +8,10 @@ import (
 	projectProd "smap-project/internal/project/delivery/rabbitmq/producer"
 	projectrepository "smap-project/internal/project/repository/postgre"
 	projectusecase "smap-project/internal/project/usecase"
+	staterepo "smap-project/internal/state/repository/redis"
+	stateusecase "smap-project/internal/state/usecase"
 	webhookhttp "smap-project/internal/webhook/delivery/http"
 	webhookusecase "smap-project/internal/webhook/usecase"
-	"smap-project/pkg/collector"
 	"smap-project/pkg/i18n"
 	"smap-project/pkg/llm"
 	"smap-project/pkg/scope"
@@ -38,31 +39,28 @@ func (srv HTTPServer) mapHandlers() error {
 		return err
 	}
 
-	// Initialize Collector client
-	collectorClient := collector.NewClient(srv.collectorConfig, srv.l)
-
-	// Initialize project repository
-	projectRepo := projectrepository.New(srv.postgresDB, srv.l)
-
-	// Initialize keyword usecase
-	keywordUC := usecase.New(srv.l, llmProvider, collectorClient)
-
+	// Producer
 	projectProd := projectProd.New(srv.l, *srv.amqpConn)
 	if err := projectProd.Run(); err != nil {
 		return err
 	}
 
-	// Initialize webhook usecase first (needed by project usecase)
-	webhookUC := webhookusecase.New(srv.l, srv.redisClient)
-	webhookHandler := webhookhttp.New(srv.l, webhookUC, srv.discord, srv.internalKey)
-	webhookhttp.MapWebhookRoutes(srv.gin.Group("/internal"), webhookHandler, mw)
+	// Usecase
+	keywordUC := usecase.New(srv.l, llmProvider)
 
-	// Initialize project usecase (pass webhookUC)
-	projectUC := projectusecase.New(srv.l, projectRepo, keywordUC, projectProd, webhookUC)
-	// Initialize project HTTP handler
+	webhookUC := webhookusecase.New(srv.l, srv.mainRedisClient)
+	webhookHandler := webhookhttp.New(srv.l, webhookUC, srv.discord, srv.internalKey)
+
+	stateRepo := staterepo.NewStateRepository(srv.stateRedisClient, srv.l)
+	stateUC := stateusecase.New(stateRepo, srv.l)
+
+	projectRepo := projectrepository.New(srv.postgresDB, srv.l)
+	projectUC := projectusecase.New(srv.l, projectRepo, keywordUC, projectProd, webhookUC, stateUC)
 	projectHandler := projecthttp.New(srv.l, projectUC, srv.discord)
-	// Map routes (no prefix)
+
+	// Map routes
 	projecthttp.MapProjectRoutes(srv.gin.Group("/projects"), projectHandler, mw)
+	webhookhttp.MapWebhookRoutes(srv.gin.Group("/internal"), webhookHandler, mw)
 
 	return nil
 }

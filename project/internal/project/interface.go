@@ -17,4 +17,6 @@ type UseCase interface {
 	Delete(ctx context.Context, sc model.Scope, ip DeleteInput) error
 	// SuggestKeywords(ctx context.Context, sc model.Scope, brandName string) ([]string, []string, error)
 	DryRunKeywords(ctx context.Context, sc model.Scope, keywords []string) (string, error)
+	GetProgress(ctx context.Context, sc model.Scope, projectID string) (ProgressOutput, error)
+	Execute(ctx context.Context, sc model.Scope, projectID string) error
 }

@@ -9,7 +9,4 @@ type UseCase interface {
 
 	// Validate validates and normalizes keywords
 	Validate(ctx context.Context, input ValidateInput) (ValidateOutput, error)
-
-	// Test performs a dry run test of keywords
-	Test(ctx context.Context, input TestInput) (TestOutput, error)
 }

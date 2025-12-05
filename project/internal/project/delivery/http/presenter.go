@@ -255,3 +255,32 @@ func (r DryRunKeywordsReq) validate() error {
 func (r DryRunKeywordsReq) toInput() []string {
 	return r.Keywords
 }
+
+// ProgressResp represents the HTTP response for project progress
+type ProgressResp struct {
+	ID              string            `json:"id"`
+	Name            string            `json:"name"`
+	Description     *string           `json:"description,omitempty"`
+	Status          string            `json:"status"`
+	FromDate        response.DateTime `json:"from_date"`
+	ToDate          response.DateTime `json:"to_date"`
+	TotalItems      int64             `json:"total_items"`
+	ProcessedItems  int64             `json:"processed_items"`
+	FailedItems     int64             `json:"failed_items"`
+	ProgressPercent float64           `json:"progress_percent"`
+}
+
+func (h handler) newProgressResp(o project.ProgressOutput) ProgressResp {
+	return ProgressResp{
+		ID:              o.Project.ID,
+		Name:            o.Project.Name,
+		Description:     o.Project.Description,
+		Status:          o.Status,
+		FromDate:        response.DateTime(o.Project.FromDate),
+		ToDate:          response.DateTime(o.Project.ToDate),
+		TotalItems:      o.TotalItems,
+		ProcessedItems:  o.ProcessedItems,
+		FailedItems:     o.FailedItems,
+		ProgressPercent: o.ProgressPercent,
+	}
+}

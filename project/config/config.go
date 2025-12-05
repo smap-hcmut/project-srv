@@ -40,8 +40,7 @@ type Config struct {
 	Discord DiscordConfig
 
 	// External Services
-	LLM       LLMConfig
-	Collector CollectorConfig
+	LLM LLMConfig
 }
 
 // LLMConfig is the configuration for the LLM provider.
@@ -51,12 +50,6 @@ type LLMConfig struct {
 	Model      string `env:"LLM_MODEL" envDefault:"gemini-2.0-flash"`
 	Timeout    int    `env:"LLM_TIMEOUT" envDefault:"30"`
 	MaxRetries int    `env:"LLM_MAX_RETRIES" envDefault:"3"`
-}
-
-// CollectorConfig is the configuration for the Collector service.
-type CollectorConfig struct {
-	BaseURL string `env:"COLLECTOR_SERVICE_URL" envDefault:"http://localhost:8081"`
-	Timeout int    `env:"COLLECTOR_TIMEOUT" envDefault:"30"`
 }
 
 // JWTConfig is the configuration for the JWT,
@@ -100,6 +93,7 @@ type RabbitMQConfig struct {
 
 // RedisConfig is the configuration for Redis,
 // which is used for pub/sub and caching.
+// StateDB is theproject progress tracking's Redis database
 type RedisConfig struct {
 	RedisAddr       []string `env:"REDIS_HOST"`
 	RedisStandAlone bool     `env:"REDIS_STANDALONE"`
@@ -110,6 +104,7 @@ type RedisConfig struct {
 	PoolTimeout     int      `env:"REDIS_POOL_TIMEOUT"`
 	Password        string   `env:"REDIS_PASSWORD"`
 	DB              int      `env:"REDIS_DATABASE"`
+	StateDB         int      `env:"REDIS_STATE_DB" envDefault:"1"`
 }
 
 // LoggerConfig is the configuration for the logger,

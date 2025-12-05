@@ -38,3 +38,12 @@ func (co ClientOptions) SetOptions(opts config.RedisConfig) ClientOptions {
 	}
 	return co
 }
+
+// SetDB sets the Redis database number for standalone mode.
+// Note: Cluster mode does not support database selection.
+func (co ClientOptions) SetDB(db int) ClientOptions {
+	if co.clo != nil {
+		co.clo.DB = db
+	}
+	return co
+}

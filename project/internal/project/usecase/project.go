@@ -117,6 +117,7 @@ func (uc *usecase) Create(ctx context.Context, sc model.Scope, ip project.Create
 		competitorNames = append(competitorNames, ck.CompetitorName)
 	}
 
+	// Save project to PostgreSQL only (no Redis state, no event publishing)
 	p, err := uc.repo.Create(ctx, sc, repository.CreateOptions{
 		Name:               ip.Name,
 		Description:        ip.Description,
@@ -136,6 +137,50 @@ func (uc *usecase) Create(ctx context.Context, sc model.Scope, ip project.Create
 	return project.ProjectOutput{
 		Project: p,
 	}, nil
+}
+
+// Execute starts processing for an existing project.
+// Flow: Verify ownership → Check duplicate → Init Redis state → Publish event
+func (uc *usecase) Execute(ctx context.Context, sc model.Scope, projectID string) error {
+	// Step 1: Get project and verify ownership
+	p, err := uc.repo.Detail(ctx, sc, projectID)
+	if err != nil {
+		if err == repository.ErrNotFound {
+			uc.l.Warnf(ctx, "internal.project.usecase.Execute: project %s not found", projectID)
+			return project.ErrProjectNotFound
+		}
+		uc.l.Errorf(ctx, "internal.project.usecase.Execute: %v", err)
+		return err
+	}
+
+	if p.CreatedBy != sc.UserID {
+		uc.l.Warnf(ctx, "internal.project.usecase.Execute: user %s does not own project %s", sc.UserID, projectID)
+		return project.ErrUnauthorized
+	}
+
+	// Step 2: Check if project is already executing (prevent duplicate execution)
+	existingState, err := uc.stateUC.GetProjectState(ctx, projectID)
+	if err == nil && existingState != nil {
+		uc.l.Warnf(ctx, "internal.project.usecase.Execute: project %s already has state (status: %s)", projectID, existingState.Status)
+		return project.ErrProjectAlreadyExecuting
+	}
+
+	// Step 3: Initialize Redis state
+	if err := uc.stateUC.InitProjectState(ctx, projectID); err != nil {
+		uc.l.Errorf(ctx, "internal.project.usecase.Execute: %v", err)
+		return err
+	}
+
+	// Step 4: Publish project.created event
+	event := rabbitmq.ToProjectCreatedEvent(p)
+	if err := uc.producer.PublishProjectCreated(ctx, event); err != nil {
+		uc.l.Errorf(ctx, "internal.project.usecase.Execute: %v", err)
+		// Clean up Redis state on failure
+		_ = uc.stateUC.DeleteProjectState(ctx, projectID)
+		return err
+	}
+
+	return nil
 }
 
 func (uc *usecase) GetOne(ctx context.Context, sc model.Scope, ip project.GetOneInput) (model.Project, error) {
@@ -251,6 +296,56 @@ func (uc *usecase) Delete(ctx context.Context, sc model.Scope, ip project.Delete
 	}
 
 	return nil
+}
+
+func (uc *usecase) GetProgress(ctx context.Context, sc model.Scope, projectID string) (project.ProgressOutput, error) {
+	// Step 1: Verify user owns this project (authorization check)
+	p, err := uc.repo.Detail(ctx, sc, projectID)
+	if err != nil {
+		if err == repository.ErrNotFound {
+			uc.l.Warnf(ctx, "internal.project.usecase.GetProgress: project %s not found", projectID)
+			return project.ProgressOutput{}, project.ErrProjectNotFound
+		}
+		uc.l.Errorf(ctx, "internal.project.usecase.GetProgress: %v", err)
+		return project.ProgressOutput{}, err
+	}
+
+	if p.CreatedBy != sc.UserID {
+		uc.l.Warnf(ctx, "internal.project.usecase.GetProgress: user %s does not own project %s", sc.UserID, projectID)
+		return project.ProgressOutput{}, project.ErrUnauthorized
+	}
+
+	// Step 2: Get state from Redis
+	state, err := uc.stateUC.GetProjectState(ctx, projectID)
+	if err != nil {
+		uc.l.Warnf(ctx, "internal.project.usecase.GetProgress: failed to get Redis state for project %s: %v", projectID, err)
+		// Fall through to PostgreSQL fallback
+	} else if state != nil {
+		// Calculate progress percentage
+		var progressPercent float64
+		if state.Total > 0 {
+			progressPercent = float64(state.Done) / float64(state.Total) * 100
+		}
+
+		return project.ProgressOutput{
+			Project:         p,
+			Status:          string(state.Status),
+			TotalItems:      state.Total,
+			ProcessedItems:  state.Done,
+			FailedItems:     state.Errors,
+			ProgressPercent: progressPercent,
+		}, nil
+	}
+
+	// Step 3: Fallback to PostgreSQL status with zero progress
+	return project.ProgressOutput{
+		Project:         p,
+		Status:          p.Status,
+		TotalItems:      0,
+		ProcessedItems:  0,
+		FailedItems:     0,
+		ProgressPercent: 0,
+	}, nil
 }
 
 func (uc *usecase) DryRunKeywords(ctx context.Context, sc model.Scope, keywords []string) (string, error) {

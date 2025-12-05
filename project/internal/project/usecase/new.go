@@ -7,6 +7,7 @@ import (
 	"smap-project/internal/project"
 	"smap-project/internal/project/delivery/rabbitmq/producer"
 	"smap-project/internal/project/repository"
+	"smap-project/internal/state"
 	"smap-project/internal/webhook"
 	pkgLog "smap-project/pkg/log"
 )
@@ -18,9 +19,11 @@ type usecase struct {
 	keywordUC keyword.UseCase
 	producer  producer.Producer
 	webhookUC webhook.UseCase
+	stateUC   state.UseCase
 }
 
-func New(l pkgLog.Logger, repo repository.Repository, keywordUC keyword.UseCase, producer producer.Producer, webhookUC webhook.UseCase) project.UseCase {
+// New creates a new project usecase
+func New(l pkgLog.Logger, repo repository.Repository, keywordUC keyword.UseCase, producer producer.Producer, webhookUC webhook.UseCase, stateUC state.UseCase) project.UseCase {
 	return &usecase{
 		l:         l,
 		repo:      repo,
@@ -28,5 +31,6 @@ func New(l pkgLog.Logger, repo repository.Repository, keywordUC keyword.UseCase,
 		keywordUC: keywordUC,
 		producer:  producer,
 		webhookUC: webhookUC,
+		stateUC:   stateUC,
 	}
 }

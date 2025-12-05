@@ -139,3 +139,39 @@ func (h handler) processDryRunReq(c *gin.Context) (DryRunKeywordsReq, model.Scop
 
 	return req, sc, nil
 }
+
+func (h handler) processProgressReq(c *gin.Context) (string, model.Scope, error) {
+	ctx := c.Request.Context()
+
+	sc, ok := scope.GetScopeFromContext(ctx)
+	if !ok {
+		h.l.Errorf(ctx, "project.http.processProgressReq: unauthorized")
+		return "", model.Scope{}, errUnauthorized
+	}
+
+	id := c.Param("id")
+	if id == "" {
+		h.l.Errorf(ctx, "project.http.processProgressReq.InvalidID: %v", id)
+		return "", model.Scope{}, errWrongBody
+	}
+
+	return id, sc, nil
+}
+
+func (h handler) processExecuteReq(c *gin.Context) (string, model.Scope, error) {
+	ctx := c.Request.Context()
+
+	sc, ok := scope.GetScopeFromContext(ctx)
+	if !ok {
+		h.l.Errorf(ctx, "project.http.processExecuteReq: unauthorized")
+		return "", model.Scope{}, errUnauthorized
+	}
+
+	id := c.Param("id")
+	if id == "" {
+		h.l.Errorf(ctx, "project.http.processExecuteReq.InvalidID: %v", id)
+		return "", model.Scope{}, errWrongBody
+	}
+
+	return id, sc, nil
+}

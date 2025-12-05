@@ -32,8 +32,9 @@ type HTTPServer struct {
 	// // Message Queue Configuration
 	amqpConn *pkgRabbitMQ.Connection
 
-	// Cache Configuration
-	redisClient pkgRedis.Client
+	// Redis Configuration
+	mainRedisClient  pkgRedis.Client // DB 0: job mapping, pub/sub
+	stateRedisClient pkgRedis.Client // DB 1: project progress tracking
 
 	// Authentication & Security Configuration
 	jwtSecretKey string
@@ -45,8 +46,7 @@ type HTTPServer struct {
 	discord *discord.Discord
 
 	// External Services
-	llmConfig       config.LLMConfig
-	collectorConfig config.CollectorConfig
+	llmConfig config.LLMConfig
 }
 
 type Config struct {
@@ -66,8 +66,9 @@ type Config struct {
 	// // Message Queue Configuration
 	AmqpConn *pkgRabbitMQ.Connection
 
-	// Cache Configuration
-	RedisClient pkgRedis.Client
+	// Redis Configuration
+	MainRedisClient  pkgRedis.Client // DB 0: job mapping, pub/sub
+	StateRedisClient pkgRedis.Client // DB 1: project progress tracking
 
 	// Authentication & Security Configuration
 	JwtSecretKey string
@@ -79,8 +80,7 @@ type Config struct {
 	Discord *discord.Discord
 
 	// External Services
-	LLMConfig       config.LLMConfig
-	CollectorConfig config.CollectorConfig
+	LLMConfig config.LLMConfig
 }
 
 // New creates a new HTTPServer instance with the provided configuration.
@@ -105,8 +105,9 @@ func New(logger log.Logger, cfg Config) (*HTTPServer, error) {
 		// // Message Queue Configuration
 		amqpConn: cfg.AmqpConn,
 
-		// Cache Configuration
-		redisClient: cfg.RedisClient,
+		// Redis Configuration
+		mainRedisClient:  cfg.MainRedisClient,
+		stateRedisClient: cfg.StateRedisClient,
 
 		// Authentication & Security Configuration
 		jwtSecretKey: cfg.JwtSecretKey,
@@ -118,8 +119,7 @@ func New(logger log.Logger, cfg Config) (*HTTPServer, error) {
 		discord: cfg.Discord,
 
 		// External Services
-		llmConfig:       cfg.LLMConfig,
-		collectorConfig: cfg.CollectorConfig,
+		llmConfig: cfg.LLMConfig,
 	}
 
 	if err := srv.validate(); err != nil {
@@ -179,9 +179,6 @@ func (srv HTTPServer) validate() error {
 	// External Services
 	if srv.llmConfig.APIKey == "" {
 		return errors.New("LLM API key is required")
-	}
-	if srv.collectorConfig.BaseURL == "" {
-		return errors.New("collector service URL is required")
 	}
 
 	return nil

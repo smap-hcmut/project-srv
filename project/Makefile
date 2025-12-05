@@ -25,6 +25,20 @@ run-consumer:
 	@echo "Running the consumer"
 	@go run cmd/consumer/main.go
 
+test:
+	@echo "Running all tests..."
+	@go test -v ./...
+
+test-coverage:
+	@echo "Running tests with coverage..."
+	@go test -v -coverprofile=coverage.out ./...
+	@go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report generated: coverage.html"
+
+test-short:
+	@echo "Running short tests..."
+	@go test -v -short ./...
+
 build-docker-compose:
 	@echo "make models first"
 	@make models
@@ -92,6 +106,11 @@ help:
 	@echo "  run-consumer        - Run consumer locally"
 	@echo "  build-docker-compose - Build with docker-compose"
 	@echo ""
+	@echo "Testing:"
+	@echo "  test                - Run all tests"
+	@echo "  test-coverage       - Run tests with coverage report"
+	@echo "  test-short          - Run short tests only"
+	@echo ""
 	@echo "Docker - API Server:"
 	@echo "  docker-build        - Build for local platform"
 	@echo "  docker-build-amd64  - Build for AMD64 servers"
@@ -120,4 +139,5 @@ help:
         docker-build docker-build-amd64 docker-build-multi \
         docker-run docker-clean docker-push \
         consumer-build consumer-build-amd64 consumer-build-multi \
-        consumer-run consumer-clean consumer-push help
+        consumer-run consumer-clean consumer-push \
+        test test-coverage test-short help

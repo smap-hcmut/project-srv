@@ -202,6 +202,88 @@ func (h handler) Delete(c *gin.Context) {
 	response.OK(c, nil)
 }
 
+// @Summary Get project progress
+// @Description Get real-time progress of a project's processing status
+// @Tags Projects
+// @Accept json
+// @Produce json
+// @Security CookieAuth
+// @Param id path string true "Project ID"
+// @Success 200 {object} ProgressResp
+// @Failure 400 {object} errors.HTTPError
+// @Failure 404 {object} errors.HTTPError
+// @Failure 403 {object} errors.HTTPError
+// @Failure 500 {object} errors.HTTPError
+// @Router /projects/{id}/progress [get]
+func (h handler) GetProgress(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	projectID, sc, err := h.processProgressReq(c)
+	if err != nil {
+		h.l.Errorf(ctx, "project.http.GetProgress.processProgressReq: %v", err)
+		response.Error(c, err, h.discord)
+		return
+	}
+
+	o, err := h.uc.GetProgress(ctx, sc, projectID)
+	if err != nil {
+		err = h.mapErrorCode(err)
+		if !slices.Contains(NotFound, err) {
+			h.l.Errorf(ctx, "project.http.GetProgress.GetProgress: %v", err)
+		} else {
+			h.l.Warnf(ctx, "project.http.GetProgress.GetProgress: %v", err)
+		}
+		response.Error(c, err, h.discord)
+		return
+	}
+
+	// Set Cache-Control header to prevent caching
+	c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+	c.Header("Pragma", "no-cache")
+	c.Header("Expires", "0")
+
+	response.OK(c, h.newProgressResp(o))
+}
+
+// @Summary Execute a project
+// @Description Start processing for an existing project (init Redis state + publish event)
+// @Tags Projects
+// @Accept json
+// @Produce json
+// @Security CookieAuth
+// @Param id path string true "Project ID"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} errors.HTTPError
+// @Failure 404 {object} errors.HTTPError
+// @Failure 403 {object} errors.HTTPError
+// @Failure 409 {object} errors.HTTPError "Project already executing"
+// @Failure 500 {object} errors.HTTPError
+// @Router /projects/{id}/execute [post]
+func (h handler) Execute(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	projectID, sc, err := h.processExecuteReq(c)
+	if err != nil {
+		h.l.Errorf(ctx, "project.http.Execute.processExecuteReq: %v", err)
+		response.Error(c, err, h.discord)
+		return
+	}
+
+	err = h.uc.Execute(ctx, sc, projectID)
+	if err != nil {
+		err = h.mapErrorCode(err)
+		if !slices.Contains(NotFound, err) {
+			h.l.Errorf(ctx, "project.http.Execute.Execute: %v", err)
+		} else {
+			h.l.Warnf(ctx, "project.http.Execute.Execute: %v", err)
+		}
+		response.Error(c, err, h.discord)
+		return
+	}
+
+	response.OK(c, nil)
+}
+
 // @Summary Dry run keywords
 // @Description Perform a dry run for the provided keywords
 // @Tags Projects

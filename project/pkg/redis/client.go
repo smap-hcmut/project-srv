@@ -49,6 +49,7 @@ func (ls *lockStore) delete(key string) {
 	delete(ls.locks, key)
 }
 
+// Connect creates a new Redis client from ClientOptions.
 func Connect(opts ClientOptions) (Client, error) {
 	if opts.csclo != nil {
 		cscl := redis.NewClusterClient(opts.csclo)
@@ -58,28 +59,54 @@ func Connect(opts ClientOptions) (Client, error) {
 	return &redisClient{cl: cl}, nil
 }
 
+// Database interface for accessing Redis client.
 type Database interface {
 	Client() Client
 }
 
+// Client defines the Redis client interface for storage and pub/sub operations.
 type Client interface {
+	// Connection
 	Disconnect() error
+	Ping(ctx context.Context) error
+	IsReady(ctx context.Context) bool
+
+	// Basic Key-Value Operations
 	Get(ctx context.Context, key string) ([]byte, error)
 	Set(ctx context.Context, key string, value interface{}, expiration int) error
-	// Lock acquires a distributed lock with the given key
-	// Returns true if lock acquired, false if already locked
+	Del(ctx context.Context, keys ...string) error
+	Exists(ctx context.Context, key string) (bool, error)
+	Expire(ctx context.Context, key string, expiration int) error
+
+	// Hash Operations
+	HSet(ctx context.Context, key string, field string, value interface{}) error
+	HGet(ctx context.Context, key string, field string) ([]byte, error)
+	HGetAll(ctx context.Context, key string) (map[string]string, error)
+	HIncrBy(ctx context.Context, key string, field string, incr int64) (int64, error)
+
+	// Multiple Key Operations
+	MGet(ctx context.Context, keys ...string) ([]interface{}, error)
+
+	// Distributed Lock
 	Lock(ctx context.Context, key string, expiration int) (bool, error)
-	// Unlock releases the distributed lock
 	Unlock(ctx context.Context, key string) error
-	// Publish publishes a message to a Redis channel
+
+	// Pub/Sub Operations
 	Publish(ctx context.Context, channel string, message interface{}) error
+	Subscribe(ctx context.Context, channels ...string) *redis.PubSub
+
+	// Pipeline Operations
+	Pipeline() redis.Pipeliner
+	TxPipeline() redis.Pipeliner
 }
 
+// redisClient implements Client interface supporting both standalone and cluster modes.
 type redisClient struct {
 	cl   *redis.Client
 	cscl *redis.ClusterClient
 }
 
+// Disconnect closes the Redis connection.
 func (rc *redisClient) Disconnect() error {
 	if rc.cscl != nil {
 		return rc.cscl.Close()
@@ -87,6 +114,22 @@ func (rc *redisClient) Disconnect() error {
 	return rc.cl.Close()
 }
 
+// Ping checks the Redis connection.
+func (rc *redisClient) Ping(ctx context.Context) error {
+	if rc.cscl != nil {
+		return rc.cscl.Ping(ctx).Err()
+	}
+	return rc.cl.Ping(ctx).Err()
+}
+
+// IsReady returns true if the client is connected and ready.
+func (rc *redisClient) IsReady(ctx context.Context) bool {
+	return rc.Ping(ctx) == nil
+}
+
+// --- Basic Key-Value Operations ---
+
+// Get returns the value of key.
 func (rc *redisClient) Get(ctx context.Context, key string) ([]byte, error) {
 	if rc.cscl != nil {
 		key = fmt.Sprintf("%s%s", PREFIX, key)
@@ -95,6 +138,7 @@ func (rc *redisClient) Get(ctx context.Context, key string) ([]byte, error) {
 	return rc.cl.Get(ctx, key).Bytes()
 }
 
+// Set sets key to hold the string value with expiration in seconds.
 func (rc *redisClient) Set(ctx context.Context, key string, value interface{}, expiration int) error {
 	if rc.cscl != nil {
 		key = fmt.Sprintf("%s%s", PREFIX, key)
@@ -103,6 +147,7 @@ func (rc *redisClient) Set(ctx context.Context, key string, value interface{}, e
 	return rc.cl.Set(ctx, key, value, time.Second*time.Duration(expiration)).Err()
 }
 
+// Del removes the specified keys.
 func (rc *redisClient) Del(ctx context.Context, keys ...string) error {
 	if rc.cscl != nil {
 		for i, key := range keys {
@@ -113,6 +158,31 @@ func (rc *redisClient) Del(ctx context.Context, keys ...string) error {
 	return rc.cl.Del(ctx, keys...).Err()
 }
 
+// Exists returns if key exists.
+func (rc *redisClient) Exists(ctx context.Context, key string) (bool, error) {
+	var result int64
+	var err error
+	if rc.cscl != nil {
+		key = fmt.Sprintf("%s%s", PREFIX, key)
+		result, err = rc.cscl.Exists(ctx, key).Result()
+	} else {
+		result, err = rc.cl.Exists(ctx, key).Result()
+	}
+	return result > 0, err
+}
+
+// Expire sets a timeout on key in seconds.
+func (rc *redisClient) Expire(ctx context.Context, key string, expiration int) error {
+	if rc.cscl != nil {
+		key = fmt.Sprintf("%s%s", PREFIX, key)
+		return rc.cscl.Expire(ctx, key, time.Second*time.Duration(expiration)).Err()
+	}
+	return rc.cl.Expire(ctx, key, time.Second*time.Duration(expiration)).Err()
+}
+
+// --- Hash Operations ---
+
+// HSet sets field in the hash stored at key to value.
 func (rc *redisClient) HSet(ctx context.Context, key string, field string, value interface{}) error {
 	if rc.cscl != nil {
 		key = fmt.Sprintf("%s%s", PREFIX, key)
@@ -121,6 +191,7 @@ func (rc *redisClient) HSet(ctx context.Context, key string, field string, value
 	return rc.cl.HSet(ctx, key, field, value).Err()
 }
 
+// HGet returns the value associated with field in the hash stored at key.
 func (rc *redisClient) HGet(ctx context.Context, key string, field string) ([]byte, error) {
 	if rc.cscl != nil {
 		key = fmt.Sprintf("%s%s", PREFIX, key)
@@ -129,6 +200,27 @@ func (rc *redisClient) HGet(ctx context.Context, key string, field string) ([]by
 	return rc.cl.HGet(ctx, key, field).Bytes()
 }
 
+// HGetAll returns all fields and values of the hash stored at key.
+func (rc *redisClient) HGetAll(ctx context.Context, key string) (map[string]string, error) {
+	if rc.cscl != nil {
+		key = fmt.Sprintf("%s%s", PREFIX, key)
+		return rc.cscl.HGetAll(ctx, key).Result()
+	}
+	return rc.cl.HGetAll(ctx, key).Result()
+}
+
+// HIncrBy increments the number stored at field in the hash by increment.
+func (rc *redisClient) HIncrBy(ctx context.Context, key string, field string, incr int64) (int64, error) {
+	if rc.cscl != nil {
+		key = fmt.Sprintf("%s%s", PREFIX, key)
+		return rc.cscl.HIncrBy(ctx, key, field, incr).Result()
+	}
+	return rc.cl.HIncrBy(ctx, key, field, incr).Result()
+}
+
+// --- Multiple Key Operations ---
+
+// MGet returns the values of all specified keys.
 func (rc *redisClient) MGet(ctx context.Context, keys ...string) ([]interface{}, error) {
 	if rc.cscl != nil {
 		for i, key := range keys {
@@ -139,14 +231,13 @@ func (rc *redisClient) MGet(ctx context.Context, keys ...string) ([]interface{},
 	return rc.cl.MGet(ctx, keys...).Result()
 }
 
-// Lock acquires a distributed lock using SET NX EX pattern
-// key: lock key
-// expiration: lock expiration time in seconds
-// Returns true if lock acquired, false if already locked
+// --- Distributed Lock Operations ---
+
+// Lock acquires a distributed lock using SET NX EX pattern.
+// Returns true if lock acquired, false if already locked.
 func (rc *redisClient) Lock(ctx context.Context, key string, expiration int) (bool, error) {
 	lockKey := fmt.Sprintf("%slock:%s", PREFIX, key)
-	// Sử dụng unique value (timestamp + random) để verify khi unlock
-	// Tránh unlock nhầm lock của process khác
+	// Sử dụng unique value (timestamp) để verify khi unlock
 	lockValue := fmt.Sprintf("%d", time.Now().UnixNano())
 	expirationDuration := time.Second * time.Duration(expiration)
 
@@ -171,17 +262,15 @@ func (rc *redisClient) Lock(ctx context.Context, key string, expiration int) (bo
 	return result, nil
 }
 
-// Unlock releases the distributed lock
-// Sử dụng Lua script để verify lockValue trước khi delete atomically
-// Chỉ delete nếu lockValue khớp, tránh unlock nhầm lock của process khác
+// Unlock releases the distributed lock.
+// Sử dụng Lua script để verify lockValue trước khi delete atomically.
 func (rc *redisClient) Unlock(ctx context.Context, key string) error {
 	lockKey := fmt.Sprintf("%slock:%s", PREFIX, key)
 
 	// Lấy lockValue từ memory store
 	lockValue, exists := globalLockStore.get(lockKey)
 	if !exists {
-		// Nếu không có trong store, có thể lock đã expired hoặc không phải lock của process này
-		// Vẫn thử unlock nhưng không verify
+		// Nếu không có trong store, thử unlock trực tiếp
 		if rc.cscl != nil {
 			return rc.cscl.Del(ctx, lockKey).Err()
 		}
@@ -189,47 +278,60 @@ func (rc *redisClient) Unlock(ctx context.Context, key string) error {
 	}
 
 	// Sử dụng Lua script để verify và delete atomically
+	var result interface{}
+	var err error
+
 	if rc.cscl != nil {
-		// Eval script với cluster client
-		result, err := rc.cscl.Eval(ctx, unlockScript, []string{lockKey}, lockValue).Result()
-		if err != nil {
-			// Nếu lỗi, vẫn xóa khỏi memory store
-			globalLockStore.delete(lockKey)
-			return err
-		}
-
-		// Script trả về số lượng keys đã delete (0 hoặc 1)
-		// Nếu = 0 nghĩa là lockValue không khớp hoặc lock đã expired
-		if deleted, ok := result.(int64); ok && deleted == 0 {
-			globalLockStore.delete(lockKey)
-			return fmt.Errorf("lock value mismatch or lock expired for key: %s", key)
-		}
-
-		globalLockStore.delete(lockKey)
-		return nil
-	}
-
-	// Sử dụng Lua script với standalone client
-	result, err := rc.cl.Eval(ctx, unlockScript, []string{lockKey}, lockValue).Result()
-	if err != nil {
-		globalLockStore.delete(lockKey)
-		return err
-	}
-
-	// Script trả về số lượng keys đã delete (0 hoặc 1)
-	if deleted, ok := result.(int64); ok && deleted == 0 {
-		globalLockStore.delete(lockKey)
-		return fmt.Errorf("lock value mismatch or lock expired for key: %s", key)
+		result, err = rc.cscl.Eval(ctx, unlockScript, []string{lockKey}, lockValue).Result()
+	} else {
+		result, err = rc.cl.Eval(ctx, unlockScript, []string{lockKey}, lockValue).Result()
 	}
 
 	globalLockStore.delete(lockKey)
+
+	if err != nil {
+		return err
+	}
+
+	if deleted, ok := result.(int64); ok && deleted == 0 {
+		return fmt.Errorf("lock value mismatch or lock expired for key: %s", key)
+	}
+
 	return nil
 }
 
-// Publish publishes a message to a Redis channel
+// --- Pub/Sub Operations ---
+
+// Publish publishes a message to a Redis channel.
 func (rc *redisClient) Publish(ctx context.Context, channel string, message interface{}) error {
 	if rc.cscl != nil {
 		return rc.cscl.Publish(ctx, channel, message).Err()
 	}
 	return rc.cl.Publish(ctx, channel, message).Err()
+}
+
+// Subscribe subscribes to the specified channels.
+func (rc *redisClient) Subscribe(ctx context.Context, channels ...string) *redis.PubSub {
+	if rc.cscl != nil {
+		return rc.cscl.Subscribe(ctx, channels...)
+	}
+	return rc.cl.Subscribe(ctx, channels...)
+}
+
+// --- Pipeline Operations ---
+
+// Pipeline returns a pipeline for executing multiple commands.
+func (rc *redisClient) Pipeline() redis.Pipeliner {
+	if rc.cscl != nil {
+		return rc.cscl.Pipeline()
+	}
+	return rc.cl.Pipeline()
+}
+
+// TxPipeline returns a transactional pipeline (MULTI/EXEC).
+func (rc *redisClient) TxPipeline() redis.Pipeliner {
+	if rc.cscl != nil {
+		return rc.cscl.TxPipeline()
+	}
+	return rc.cl.TxPipeline()
 }

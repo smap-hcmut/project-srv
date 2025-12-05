@@ -12,6 +12,7 @@ var (
 	errUnauthorized     = pkgErrors.NewHTTPError(30005, "Unauthorized")
 	errInvalidStatus    = pkgErrors.NewHTTPError(30006, "Invalid project status")
 	errInvalidDateRange = pkgErrors.NewHTTPError(30007, "Invalid date range")
+	errAlreadyExecuting = pkgErrors.NewHTTPError(30008, "Project is already executing")
 )
 
 var NotFound = []error{
@@ -28,6 +29,8 @@ func (h handler) mapErrorCode(err error) error {
 		return errInvalidStatus
 	case project.ErrInvalidDateRange:
 		return errInvalidDateRange
+	case project.ErrProjectAlreadyExecuting:
+		return errAlreadyExecuting
 	default:
 		return err
 	}

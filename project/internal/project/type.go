@@ -77,11 +77,21 @@ type DeleteInput struct {
 
 // DryRunKeywordsInput represents input for dry-run keywords request
 type DryRunKeywordsInput struct {
-	Keywords []string `json:"keywords" binding:"required,min=1,max=10"`
+	Keywords []string
 }
 
 // DryRunKeywordsOutput represents output for dry-run keywords request
 type DryRunKeywordsOutput struct {
-	JobID  string `json:"job_id"`
-	Status string `json:"status"` // "processing"
+	JobID  string
+	Status string // "processing"
+}
+
+// ProgressOutput represents output for project progress tracking
+type ProgressOutput struct {
+	Project         model.Project
+	Status          string
+	TotalItems      int64
+	ProcessedItems  int64
+	FailedItems     int64
+	ProgressPercent float64
 }
