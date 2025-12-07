@@ -277,15 +277,15 @@ def on_item_crawled(project_id, user_id, is_error=False):
 
 ### 4.5. Collector Checklist
 
-- [ ] Declare queue `collector.project.created`
-- [ ] Bind to exchange `smap.events` với routing key `project.created`
-- [ ] Parse `ProjectCreatedEvent` schema
-- [ ] Extract và lưu `user_id` từ payload
-- [ ] Connect to Redis DB 1 (state)
-- [ ] Implement `update_project_state()` function
-- [ ] Implement `notify_progress()` function
-- [ ] Add throttling (5 giây minimum)
-- [ ] Retry webhook calls với exponential backoff
+- [x] Declare queue `collector.project.created`
+- [x] Bind to exchange `smap.events` với routing key `project.created`
+- [x] Parse `ProjectCreatedEvent` schema
+- [x] Extract và lưu `user_id` từ payload
+- [x] Connect to Redis DB 1 (state)
+- [x] Implement `update_project_state()` function
+- [x] Implement `notify_progress()` function
+- [x] Add throttling (5 giây minimum)
+- [x] Retry webhook calls với exponential backoff
 
 ---
 
@@ -401,13 +401,13 @@ for msg := range pubsub.Channel() {
 
 #### 5.4.2. WebSocket Checklist
 
-- [ ] Subscribe to `user_noti:*` pattern
-- [ ] Extract `user_id` từ channel name
-- [ ] Route messages to correct user connections
-- [ ] Handle `project_progress` messages
-- [ ] Handle `project_completed` messages
-- [ ] Handle `dryrun_result` messages
-- [ ] Handle connection/disconnection gracefully
+- [x] Subscribe to `user_noti:*` pattern
+- [x] Extract `user_id` từ channel name
+- [x] Route messages to correct user connections
+- [x] Handle `project_progress` messages
+- [x] Handle `project_completed` messages
+- [x] Handle `dryrun_result` messages
+- [x] Handle connection/disconnection gracefully
 
 ---
 
@@ -528,13 +528,13 @@ setInterval(() => pollProgress(projectId), 5000);
 
 ### 7.4. Frontend Checklist
 
-- [ ] WebSocket connection với JWT token
-- [ ] Handle `project_progress` messages
-- [ ] Handle `project_completed` messages
-- [ ] Handle `dryrun_result` messages
-- [ ] Fallback to polling khi WebSocket fail
-- [ ] Progress bar UI component
-- [ ] Completion notification UI
+- [x] WebSocket connection với JWT token
+- [x] Handle `project_progress` messages
+- [x] Handle `project_completed` messages
+- [x] Handle `dryrun_result` messages
+- [x] Fallback to polling khi WebSocket fail
+- [x] Progress bar UI component
+- [x] Completion notification UI
 
 ---
 
