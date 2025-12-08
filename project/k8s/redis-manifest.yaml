@@ -1,0 +1,220 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+  namespace: smap
+data:
+  redis.conf: |
+    # Network Configuration
+    bind 0.0.0.0
+    port 6379
+    protected-mode no
+
+    # Persistence Configuration
+    # RDB: Save snapshot every 900s if 1 key changed, 300s if 10 keys, 60s if 10000 keys
+    save 900 1
+    save 300 10
+    save 60 10000
+    dir /data
+    dbfilename dump.rdb
+
+    # AOF: Append-only file for better durability
+    appendonly yes
+    appendfilename "appendonly.aof"
+    appendfsync everysec
+
+    # Memory Management
+    # Set maxmemory to 80% of container memory limit (512Mi * 0.8 = ~410Mi)
+    maxmemory 410mb
+    # LRU eviction policy: Remove least recently used keys when memory is full
+    maxmemory-policy allkeys-lru
+
+    # Performance Tuning
+    tcp-backlog 511
+    timeout 0
+    tcp-keepalive 300
+
+    # Logging
+    loglevel notice
+
+    # Disable dangerous commands in production
+    # rename-command FLUSHDB ""
+    # rename-command FLUSHALL ""
+    # rename-command CONFIG ""
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: redis-secret
+  namespace: smap
+type: Opaque
+stringData:
+  REDIS_PASSWORD: "21042004"
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  namespace: smap
+  labels:
+    app: redis
+spec:
+  serviceName: redis-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      # Init container to optimize kernel parameters
+      # Note: Requires privileged access. Remove if cluster doesn't allow it.
+      initContainers:
+        - name: init-sysctl
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              sysctl -w net.core.somaxconn=1024
+              echo never > /sys/kernel/mm/transparent_hugepage/enabled || true
+          securityContext:
+            privileged: true
+
+      containers:
+        - name: redis
+          image: redis:7.2-alpine
+          command:
+            - redis-server
+            - /usr/local/etc/redis/redis.conf
+            - --requirepass
+            - $(REDIS_PASSWORD)
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: REDIS_PASSWORD
+          ports:
+            - containerPort: 6379
+              name: redis
+              protocol: TCP
+
+          # Volume mounts
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+            - name: config
+              mountPath: /usr/local/etc/redis/redis.conf
+              subPath: redis.conf
+
+          # Resource limits
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+
+          # Health checks
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - redis-cli -a $REDIS_PASSWORD ping | grep PONG
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - redis-cli -a $REDIS_PASSWORD ping | grep PONG
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+      volumes:
+        - name: config
+          configMap:
+            name: redis-config
+
+  # Persistent volume claim template
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 5Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-headless
+  namespace: smap
+  labels:
+    app: redis
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - port: 6379
+      targetPort: 6379
+      protocol: TCP
+      name: redis
+  selector:
+    app: redis
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: smap
+  labels:
+    app: redis
+spec:
+  type: ClusterIP
+  ports:
+    - port: 6379
+      targetPort: 6379
+      protocol: TCP
+      name: redis
+  selector:
+    app: redis
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-loadbalancer
+  namespace: smap
+  labels:
+    app: redis
+  annotations:
+    metallb.universe.tf/address-pool: smap-pool
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 6379
+      targetPort: 6379
+      protocol: TCP
+      name: redis
+  selector:
+    app: redis

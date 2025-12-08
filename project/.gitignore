@@ -6,9 +6,6 @@ vendor/
 .env
 sqlboiler.toml
 
-# Kubernetes secrets
-k8s/secret.yaml
-
 docs
 
 # OpenSpec

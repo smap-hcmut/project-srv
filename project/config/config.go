@@ -20,9 +20,6 @@ type Config struct {
 	// Database Configuration
 	Postgres PostgresConfig
 
-	// // Storage Configuration
-	// MinIO MinIOConfig
-
 	// Message Queue Configuration
 	RabbitMQ RabbitMQConfig
 
@@ -34,13 +31,13 @@ type Config struct {
 	Cookie         CookieConfig
 	Encrypter      EncrypterConfig
 	InternalConfig InternalConfig
-	IdentityConfig IdentityConfig
 
 	// Monitoring & Notification Configuration
 	Discord DiscordConfig
 
 	// External Services
-	LLM LLMConfig
+	Identity IdentityConfig
+	LLM      LLMConfig
 }
 
 // LLMConfig is the configuration for the LLM provider.
@@ -94,15 +91,15 @@ type RabbitMQConfig struct {
 // RedisConfig is the configuration for Redis,
 // which is used for pub/sub and caching.
 // StateDB is the project progress tracking's Redis database
+// Note: Only standalone mode is supported (cluster mode not needed for this service)
 type RedisConfig struct {
-	RedisAddr       []string `env:"REDIS_HOST"`
-	RedisStandAlone bool     `env:"REDIS_STANDALONE"`
-	MinIdleConns    int      `env:"REDIS_MIN_IDLE_CONNS"`
-	PoolSize        int      `env:"REDIS_POOL_SIZE"`
-	PoolTimeout     int      `env:"REDIS_POOL_TIMEOUT"`
-	Password        string   `env:"REDIS_PASSWORD"`
-	DB              int      `env:"REDIS_DATABASE"`
-	StateDB         int      `env:"REDIS_STATE_DB" envDefault:"1"`
+	Host         string `env:"REDIS_HOST" envDefault:"localhost:6379"`
+	Password     string `env:"REDIS_PASSWORD"`
+	DB           int    `env:"REDIS_DB" envDefault:"0"`
+	StateDB      int    `env:"REDIS_STATE_DB" envDefault:"1"`
+	MinIdleConns int    `env:"REDIS_MIN_IDLE_CONNS" envDefault:"10"`
+	PoolSize     int    `env:"REDIS_POOL_SIZE" envDefault:"100"`
+	PoolTimeout  int    `env:"REDIS_POOL_TIMEOUT" envDefault:"30"`
 }
 
 // LoggerConfig is the configuration for the logger,
@@ -154,10 +151,13 @@ type InternalConfig struct {
 	InternalKey string `env:"INTERNAL_KEY"`
 }
 
+// IdentityConfig is the configuration for the Identity Service.
 type IdentityConfig struct {
-	BaseURL        string `env:"IDENTITY_SERVICE_URL" envDefault:"http://localhost:8080"`
-	Timeout        int    `env:"IDENTITY_TIMEOUT" envDefault:"30"`
-	InternalAPIKey string `env:"IDENTITY_INTERNAL_KEY"`
+	BaseURL string `env:"IDENTITY_SERVICE_URL" envDefault:"http://localhost:8085"`
+	Timeout int    `env:"IDENTITY_TIMEOUT" envDefault:"30"`
+	// InternalAPIKey is automatically set from InternalConfig.InternalKey
+	// No need to set IDENTITY_INTERNAL_KEY env variable
+	InternalAPIKey string
 }
 
 // Load is the function to load the configuration from the environment variables.
@@ -168,5 +168,9 @@ func Load() (*Config, error) {
 		fmt.Printf("Error loading configuration: %v", err)
 		return nil, err
 	}
+
+	// Auto-sync: Use INTERNAL_KEY for Identity service internal calls
+	cfg.Identity.InternalAPIKey = cfg.InternalConfig.InternalKey
+
 	return cfg, nil
 }
