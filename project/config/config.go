@@ -93,12 +93,10 @@ type RabbitMQConfig struct {
 
 // RedisConfig is the configuration for Redis,
 // which is used for pub/sub and caching.
-// StateDB is theproject progress tracking's Redis database
+// StateDB is the project progress tracking's Redis database
 type RedisConfig struct {
 	RedisAddr       []string `env:"REDIS_HOST"`
 	RedisStandAlone bool     `env:"REDIS_STANDALONE"`
-	RedisPassword   string   `env:"REDIS_PASSWORD"`
-	RedisDB         string   `env:"REDIS_DATABASE"`
 	MinIdleConns    int      `env:"REDIS_MIN_IDLE_CONNS"`
 	PoolSize        int      `env:"REDIS_POOL_SIZE"`
 	PoolTimeout     int      `env:"REDIS_POOL_TIMEOUT"`
