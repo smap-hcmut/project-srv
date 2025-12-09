@@ -123,9 +123,11 @@ func (uc *usecase) Create(ctx context.Context, sc model.Scope, ip project.Create
 	}
 
 	// Save project to PostgreSQL only (no Redis state, no event publishing)
+	// Set initial status to "draft" as per Requirements 2.1, 2.4
 	p, err := uc.repo.Create(ctx, sc, repository.CreateOptions{
 		Name:               ip.Name,
 		Description:        ip.Description,
+		Status:             model.ProjectStatusDraft,
 		FromDate:           ip.FromDate,
 		ToDate:             ip.ToDate,
 		BrandName:          ip.BrandName,
@@ -145,7 +147,8 @@ func (uc *usecase) Create(ctx context.Context, sc model.Scope, ip project.Create
 }
 
 // Execute starts processing for an existing project.
-// Flow: Verify ownership → Check duplicate → Init Redis state → Publish event
+// Flow: Verify ownership → Verify draft status → Check duplicate → Update PostgreSQL status → Init Redis state → Publish event
+// Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 5.1
 func (uc *usecase) Execute(ctx context.Context, sc model.Scope, projectID string) error {
 	// Step 1: Get project and verify ownership
 	p, err := uc.repo.Detail(ctx, sc, projectID)
@@ -163,29 +166,91 @@ func (uc *usecase) Execute(ctx context.Context, sc model.Scope, projectID string
 		return project.ErrUnauthorized
 	}
 
-	// Step 2: Check if project is already executing (prevent duplicate execution)
+	// Step 2: Verify project is in "draft" status (Requirement 5.1)
+	// Completed projects cannot be re-executed (Requirement 4.4)
+	// Process projects are already executing (Requirement 3.4)
+	if p.Status != model.ProjectStatusDraft {
+		uc.l.Warnf(ctx, "internal.project.usecase.Execute: project %s has status %s, expected draft", projectID, p.Status)
+		return project.ErrInvalidStatusTransition
+	}
+
+	// Step 3: Check if project is already executing (prevent duplicate execution - Requirement 3.4)
 	existingState, err := uc.stateUC.GetProjectState(ctx, projectID)
 	if err == nil && existingState != nil {
 		uc.l.Warnf(ctx, "internal.project.usecase.Execute: project %s already has state (status: %s)", projectID, existingState.Status)
 		return project.ErrProjectAlreadyExecuting
 	}
 
-	// Step 3: Initialize Redis state
+	// Step 4: Update PostgreSQL status to "process" (Requirements 3.1, 3.5)
+	processStatus := model.ProjectStatusProcess
+	_, err = uc.repo.Update(ctx, sc, repository.UpdateOptions{
+		ID:     projectID,
+		Status: &processStatus,
+	})
+	if err != nil {
+		uc.l.Errorf(ctx, "internal.project.usecase.Execute: failed to update status to process: %v", err)
+		return err
+	}
+	uc.l.Infof(ctx, "internal.project.usecase.Execute: updated project %s status to process", projectID)
+
+	// Step 5: Initialize Redis state (Requirement 3.2)
 	if err := uc.stateUC.InitProjectState(ctx, projectID); err != nil {
-		uc.l.Errorf(ctx, "internal.project.usecase.Execute: %v", err)
+		uc.l.Errorf(ctx, "internal.project.usecase.Execute: failed to init Redis state: %v", err)
+		// Rollback PostgreSQL status to "draft"
+		draftStatus := model.ProjectStatusDraft
+		if rollbackErr := uc.rollbackStatus(ctx, sc, projectID, &draftStatus); rollbackErr != nil {
+			uc.l.Errorf(ctx, "internal.project.usecase.Execute: failed to rollback status to draft: %v", rollbackErr)
+		}
 		return err
 	}
 
-	// Step 4: Publish project.created event
+	// Step 6: Publish project.created event (Requirement 3.3)
 	event := rabbitmq.ToProjectCreatedEvent(p)
 	if err := uc.producer.PublishProjectCreated(ctx, event); err != nil {
-		uc.l.Errorf(ctx, "internal.project.usecase.Execute: %v", err)
-		// Clean up Redis state on failure
+		uc.l.Errorf(ctx, "internal.project.usecase.Execute: failed to publish event: %v", err)
+		// Rollback both Redis and PostgreSQL
 		_ = uc.stateUC.DeleteProjectState(ctx, projectID)
+		draftStatus := model.ProjectStatusDraft
+		if rollbackErr := uc.rollbackStatus(ctx, sc, projectID, &draftStatus); rollbackErr != nil {
+			uc.l.Errorf(ctx, "internal.project.usecase.Execute: failed to rollback status to draft: %v", rollbackErr)
+		}
 		return err
 	}
 
+	uc.l.Infof(ctx, "internal.project.usecase.Execute: successfully executed project %s", projectID)
 	return nil
+}
+
+// rollbackStatus is a helper function to rollback project status
+func (uc *usecase) rollbackStatus(ctx context.Context, sc model.Scope, projectID string, status *string) error {
+	_, err := uc.repo.Update(ctx, sc, repository.UpdateOptions{
+		ID:     projectID,
+		Status: status,
+	})
+	if err != nil {
+		return err
+	}
+	uc.l.Infof(ctx, "internal.project.usecase.rollbackStatus: rolled back project %s status to %s", projectID, *status)
+	return nil
+}
+
+// validateStatusTransition validates status transitions to prevent invalid state changes
+// Valid transitions:
+// - draft -> process (via Execute, not Patch)
+// - process -> completed (via system, not user)
+// - Any status can stay the same
+// Users should not manually change status via Patch - status changes happen through Execute or system events
+// Requirements: 5.2, 5.5
+func (uc *usecase) validateStatusTransition(from, to string) error {
+	// If status is not changing, allow it
+	if from == to {
+		return nil
+	}
+
+	// Users should not manually change status via Patch
+	// Status changes happen through Execute (draft -> process) or system events (process -> completed)
+	// Attempting to change status manually is an invalid transition
+	return project.ErrInvalidStatusTransition
 }
 
 func (uc *usecase) GetOne(ctx context.Context, sc model.Scope, ip project.GetOneInput) (model.Project, error) {
@@ -221,18 +286,33 @@ func (uc *usecase) Patch(ctx context.Context, sc model.Scope, ip project.PatchIn
 		return project.ProjectOutput{}, err
 	}
 
+	// Check if user owns this project
+	if p.CreatedBy != sc.UserID {
+		uc.l.Warnf(ctx, "internal.project.usecase.Patch: user %s does not own project %s", sc.UserID, ip.ID)
+		return project.ProjectOutput{}, project.ErrUnauthorized
+	}
+
+	// Validate status transition if status is being updated (Requirements 5.2, 5.3, 5.5)
+	if ip.Status != nil {
+		// Validate status value is one of three allowed values (Requirement 5.3)
+		if !model.IsValidProjectStatus(*ip.Status) {
+			uc.l.Warnf(ctx, "internal.project.usecase.Patch: invalid status value %s", *ip.Status)
+			return project.ProjectOutput{}, project.ErrInvalidStatus
+		}
+
+		// Enforce valid status transitions (Requirement 5.2, 5.5)
+		if err := uc.validateStatusTransition(p.Status, *ip.Status); err != nil {
+			uc.l.Warnf(ctx, "internal.project.usecase.Patch: invalid status transition from %s to %s", p.Status, *ip.Status)
+			return project.ProjectOutput{}, err
+		}
+	}
+
 	opts := repository.UpdateOptions{
 		ID:          ip.ID,
 		Description: ip.Description,
 		Status:      ip.Status,
 		FromDate:    ip.FromDate,
 		ToDate:      ip.ToDate,
-	}
-
-	// Check if user owns this project
-	if p.CreatedBy != sc.UserID {
-		uc.l.Warnf(ctx, "internal.project.usecase.Patch: user %s does not own project %s", sc.UserID, ip.ID)
-		return project.ProjectOutput{}, project.ErrUnauthorized
 	}
 
 	// Validate and normalize brand keywords
@@ -309,6 +389,11 @@ func (uc *usecase) Delete(ctx context.Context, sc model.Scope, ip project.Delete
 	return nil
 }
 
+// GetProgress returns project progress with status and execution metrics.
+// Always returns PostgreSQL status (draft, process, completed) for consistency.
+// Includes detailed execution metrics from Redis when available.
+// For completed projects, Redis state is retained for historical reference (Requirement 4.2).
+// Requirements: 4.2, 6.5
 func (uc *usecase) GetProgress(ctx context.Context, sc model.Scope, projectID string) (project.ProgressOutput, error) {
 	// Step 1: Verify user owns this project (authorization check)
 	p, err := uc.repo.Detail(ctx, sc, projectID)
@@ -326,12 +411,16 @@ func (uc *usecase) GetProgress(ctx context.Context, sc model.Scope, projectID st
 		return project.ProgressOutput{}, project.ErrUnauthorized
 	}
 
-	// Step 2: Get state from Redis
+	// Step 2: Get execution metrics from Redis (if available)
 	state, err := uc.stateUC.GetProjectState(ctx, projectID)
 	if err != nil {
 		uc.l.Warnf(ctx, "internal.project.usecase.GetProgress: failed to get Redis state for project %s: %v", projectID, err)
 		// Fall through to PostgreSQL fallback
-	} else if state != nil {
+	}
+
+	// Step 3: Return PostgreSQL status with Redis metrics (if available)
+	// Always return one of three valid PostgreSQL status values: "draft", "process", "completed"
+	if state != nil {
 		// Calculate progress percentage
 		var progressPercent float64
 		if state.Total > 0 {
@@ -340,7 +429,7 @@ func (uc *usecase) GetProgress(ctx context.Context, sc model.Scope, projectID st
 
 		return project.ProgressOutput{
 			Project:         p,
-			Status:          string(state.Status),
+			Status:          p.Status, // PostgreSQL status (draft, process, completed)
 			TotalItems:      state.Total,
 			ProcessedItems:  state.Done,
 			FailedItems:     state.Errors,
@@ -348,10 +437,10 @@ func (uc *usecase) GetProgress(ctx context.Context, sc model.Scope, projectID st
 		}, nil
 	}
 
-	// Step 3: Fallback to PostgreSQL status with zero progress
+	// Step 4: Fallback to PostgreSQL status with zero metrics when Redis unavailable
 	return project.ProgressOutput{
 		Project:         p,
-		Status:          p.Status,
+		Status:          p.Status, // PostgreSQL status (draft, process, completed)
 		TotalItems:      0,
 		ProcessedItems:  0,
 		FailedItems:     0,
