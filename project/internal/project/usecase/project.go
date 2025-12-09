@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"smap-project/internal/keyword"
 	"smap-project/internal/model"
 	"smap-project/internal/project"
 	"smap-project/internal/project/delivery/rabbitmq"
@@ -85,30 +84,36 @@ func (uc *usecase) Create(ctx context.Context, sc model.Scope, ip project.Create
 	}
 
 	// Validate and normalize brand keywords
+	// TEMPORARILY DISABLED: LLM validation causes timeout (see validator.go)
 	brandKeywords := ip.BrandKeywords
-	if len(brandKeywords) > 0 {
-		validateOut, err := uc.keywordUC.Validate(ctx, keyword.ValidateInput{Keywords: brandKeywords})
-		if err != nil {
-			uc.l.Errorf(ctx, "internal.project.usecase.Create: %v", err)
-			return project.ProjectOutput{}, err
-		}
-		brandKeywords = validateOut.ValidKeywords
-	}
+	// if len(brandKeywords) > 0 {
+	// 	validateOut, err := uc.keywordUC.Validate(ctx, keyword.ValidateInput{Keywords: brandKeywords})
+	// 	if err != nil {
+	// 		uc.l.Errorf(ctx, "internal.project.usecase.Create: %v", err)
+	// 		return project.ProjectOutput{}, err
+	// 	}
+	// 	brandKeywords = validateOut.ValidKeywords
+	// }
 
 	// Validate and normalize competitor keywords
+	// TEMPORARILY DISABLED: LLM validation causes timeout (see validator.go)
 	competitorKeywords := make([]model.CompetitorKeyword, 0, len(ip.CompetitorKeywords))
 	for _, ck := range ip.CompetitorKeywords {
-		if len(ck.Keywords) > 0 {
-			validateOut, err := uc.keywordUC.Validate(ctx, keyword.ValidateInput{Keywords: ck.Keywords})
-			if err != nil {
-				uc.l.Errorf(ctx, "internal.project.usecase.Create: %v", err)
-				return project.ProjectOutput{}, err
-			}
-			competitorKeywords = append(competitorKeywords, model.CompetitorKeyword{
-				CompetitorName: ck.Name,
-				Keywords:       validateOut.ValidKeywords,
-			})
-		}
+		// if len(ck.Keywords) > 0 {
+		// 	validateOut, err := uc.keywordUC.Validate(ctx, keyword.ValidateInput{Keywords: ck.Keywords})
+		// 	if err != nil {
+		// 		uc.l.Errorf(ctx, "internal.project.usecase.Create: %v", err)
+		// 		return project.ProjectOutput{}, err
+		// 	}
+		// 	competitorKeywords = append(competitorKeywords, model.CompetitorKeyword{
+		// 		CompetitorName: ck.Name,
+		// 		Keywords:       validateOut.ValidKeywords,
+		// 	})
+		// }
+		competitorKeywords = append(competitorKeywords, model.CompetitorKeyword{
+			CompetitorName: ck.Name,
+			Keywords:       ck.Keywords,
+		})
 	}
 
 	// Extract competitor names from competitor keywords
@@ -231,31 +236,37 @@ func (uc *usecase) Patch(ctx context.Context, sc model.Scope, ip project.PatchIn
 	}
 
 	// Validate and normalize brand keywords
+	// TEMPORARILY DISABLED: LLM validation causes timeout (see validator.go)
 	brandKeywords := ip.BrandKeywords
-	if len(brandKeywords) > 0 {
-		validateOut, err := uc.keywordUC.Validate(ctx, keyword.ValidateInput{Keywords: brandKeywords})
-		if err != nil {
-			uc.l.Errorf(ctx, "internal.project.usecase.Create: %v", err)
-			return project.ProjectOutput{}, err
-		}
-		brandKeywords = validateOut.ValidKeywords
-	}
+	// if len(brandKeywords) > 0 {
+	// 	validateOut, err := uc.keywordUC.Validate(ctx, keyword.ValidateInput{Keywords: brandKeywords})
+	// 	if err != nil {
+	// 		uc.l.Errorf(ctx, "internal.project.usecase.Create: %v", err)
+	// 		return project.ProjectOutput{}, err
+	// 	}
+	// 	brandKeywords = validateOut.ValidKeywords
+	// }
 	opts.BrandKeywords = brandKeywords
 
 	// Validate and normalize competitor keywords
+	// TEMPORARILY DISABLED: LLM validation causes timeout (see validator.go)
 	competitorKeywords := make([]model.CompetitorKeyword, 0, len(ip.CompetitorKeywords))
 	for _, ck := range ip.CompetitorKeywords {
-		if len(ck.Keywords) > 0 {
-			validateOut, err := uc.keywordUC.Validate(ctx, keyword.ValidateInput{Keywords: ck.Keywords})
-			if err != nil {
-				uc.l.Errorf(ctx, "internal.project.usecase.Create: %v", err)
-				return project.ProjectOutput{}, err
-			}
-			competitorKeywords = append(competitorKeywords, model.CompetitorKeyword{
-				CompetitorName: ck.Name,
-				Keywords:       validateOut.ValidKeywords,
-			})
-		}
+		// if len(ck.Keywords) > 0 {
+		// 	validateOut, err := uc.keywordUC.Validate(ctx, keyword.ValidateInput{Keywords: ck.Keywords})
+		// 	if err != nil {
+		// 		uc.l.Errorf(ctx, "internal.project.usecase.Create: %v", err)
+		// 		return project.ProjectOutput{}, err
+		// 	}
+		// 	competitorKeywords = append(competitorKeywords, model.CompetitorKeyword{
+		// 		CompetitorName: ck.Name,
+		// 		Keywords:       validateOut.ValidKeywords,
+		// 	})
+		// }
+		competitorKeywords = append(competitorKeywords, model.CompetitorKeyword{
+			CompetitorName: ck.Name,
+			Keywords:       ck.Keywords,
+		})
 	}
 	opts.CompetitorKeywords = competitorKeywords
 
