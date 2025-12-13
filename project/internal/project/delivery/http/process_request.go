@@ -23,6 +23,11 @@ func (h handler) processGetReq(c *gin.Context) (GetReq, model.Scope, error) {
 	}
 	req.Paginate.Adjust()
 
+	if err := req.validate(); err != nil {
+		h.l.Errorf(ctx, "project.http.processGetReq.validate: %v", err)
+		return GetReq{}, model.Scope{}, errInvalidStatus
+	}
+
 	return req, sc, nil
 }
 
@@ -89,6 +94,10 @@ func (h handler) processPatchReq(c *gin.Context) (PatchReq, model.Scope, error) 
 
 	if err := req.validate(); err != nil {
 		h.l.Errorf(ctx, "project.http.processPatchReq.validate: %v", err)
+		// Return appropriate error based on validation failure
+		if err.Error() == "invalid status" {
+			return PatchReq{}, model.Scope{}, errInvalidStatus
+		}
 		return PatchReq{}, model.Scope{}, errWrongBody
 	}
 

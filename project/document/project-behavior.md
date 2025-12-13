@@ -90,12 +90,29 @@ type ProjectStatus string
 
 const (
     ProjectStatusDraft     ProjectStatus = "draft"      // Nháp, chưa execute
-    ProjectStatusActive    ProjectStatus = "active"     // Đang hoạt động
+    ProjectStatusProcess   ProjectStatus = "process"    // Đang xử lý
     ProjectStatusCompleted ProjectStatus = "completed"  // Hoàn thành
-    ProjectStatusArchived  ProjectStatus = "archived"   // Lưu trữ
-    ProjectStatusCancelled ProjectStatus = "cancelled"  // Đã hủy
 )
 ```
+
+**Status Lifecycle:**
+
+- **draft**: Initial state when project is created. Project can be fully edited. No Redis execution state exists.
+- **process**: Project is being executed. Redis state tracks detailed progress (INITIALIZING → CRAWLING → PROCESSING → DONE/FAILED).
+- **completed**: All processing finished. Results available, no re-execution allowed. Redis state retained for historical reference.
+
+**Valid Status Transitions:**
+
+- `draft` → `process` (via Execute API)
+- `process` → `completed` (via system/webhook when processing finishes)
+- `process` → `draft` (rollback on failure during execution)
+
+**Invalid Transitions:**
+
+- `draft` → `completed` (must go through process state)
+- `completed` → `draft` (no going back)
+- `completed` → `process` (no re-execution)
+- Any manual status change via Patch API (status changes only through Execute or system events)
 
 ### 2.3. Execution State (Redis)
 
@@ -137,9 +154,10 @@ type Scope struct {
 | Rule               | Mô Tả                                     | Error Code |
 | ------------------ | ----------------------------------------- | ---------- |
 | **Date Range**     | `to_date` phải sau `from_date`            | 30007      |
-| **Status Valid**   | Status phải là một trong 5 giá trị hợp lệ | 30006      |
+| **Status Valid**   | Status phải là một trong 3 giá trị hợp lệ: "draft", "process", "completed" | 30006      |
 | **Name Required**  | Tên project không được rỗng               | 30002      |
 | **Brand Required** | Brand name không được rỗng khi execute    | 30002      |
+| **Status Transition** | Status transitions phải tuân theo quy tắc hợp lệ | 30009      |
 
 ### 3.2. Authorization Rules
 
@@ -153,9 +171,11 @@ type Scope struct {
 
 | Rule                    | Mô Tả                                       | Error Code |
 | ----------------------- | ------------------------------------------- | ---------- |
-| **No Duplicate**        | Không thể execute project đang chạy         | 30008      |
-| **Rollback on Failure** | Nếu publish event thất bại, xóa Redis state | -          |
+| **Draft Only**          | Chỉ có thể execute project ở trạng thái "draft" | 30009      |
+| **No Duplicate**        | Không thể execute project đang chạy (status "process") | 30008      |
+| **Rollback on Failure** | Nếu Redis init hoặc publish event thất bại, rollback status về "draft" | -          |
 | **State TTL**           | Redis state có TTL 7 ngày                   | -          |
+| **No Re-execution**     | Project với status "completed" không thể execute lại | 30009      |
 
 ### 3.4. Soft Delete Rules
 
@@ -199,17 +219,22 @@ Request → Validate → PostgreSQL Insert → Response
 
 1. Get project từ PostgreSQL
 2. Verify ownership (`project.created_by == scope.user_id`)
-3. Check duplicate execution (query Redis state)
-4. Init Redis state với status `INITIALIZING`
-5. Publish `project.created` event to RabbitMQ
-6. Nếu publish thất bại → rollback Redis state
-7. Return success
+3. Verify project status is "draft" (reject if not)
+4. Check duplicate execution (query Redis state)
+5. Update PostgreSQL status to "process"
+6. Init Redis state với status `INITIALIZING`
+7. Publish `project.created` event to RabbitMQ
+8. Nếu Redis init thất bại → rollback PostgreSQL status về "draft"
+9. Nếu publish thất bại → rollback cả Redis state và PostgreSQL status về "draft"
+10. Return success
 
 ```
-Request → Auth Check → Duplicate Check → Redis Init → RabbitMQ Publish → Response
-                                              ↓
-                                    (Rollback on failure)
+Request → Auth Check → Status Check → Duplicate Check → PostgreSQL Update → Redis Init → RabbitMQ Publish → Response
+                                                              ↓                  ↓              ↓
+                                                        (Rollback on failure) ────────────────┘
 ```
+
+**Status Transition:** `draft` → `process`
 
 ### 4.3. Get Progress
 
@@ -487,9 +512,10 @@ redis.HSet(key, "status", "DONE")
 | 30003 | ErrInvalidID               | 400         | Invalid project ID format |
 | 30004 | ErrProjectNotFound         | 404         | Project không tồn tại     |
 | 30005 | ErrUnauthorized            | 403         | Không có quyền truy cập   |
-| 30006 | ErrInvalidStatus           | 400         | Status không hợp lệ       |
+| 30006 | ErrInvalidStatus           | 400         | Status không hợp lệ (phải là "draft", "process", hoặc "completed") |
 | 30007 | ErrInvalidDateRange        | 400         | Date range không hợp lệ   |
 | 30008 | ErrProjectAlreadyExecuting | 409         | Project đang được execute |
+| 30009 | ErrInvalidStatusTransition | 400         | Status transition không hợp lệ |
 
 ### 8.2. Error Response Format
 
@@ -597,6 +623,93 @@ Request
 
 ---
 
+## Appendix A: Project Status State Machine
+
+### PostgreSQL Status State Machine
+
+The project lifecycle follows a simplified three-state model:
+
+```
+                    ┌──────────────┐
+                    │   [START]    │
+                    └──────┬───────┘
+                           │
+                           │ Create Project
+                           ▼
+                    ┌──────────────┐
+              ┌─────│    draft     │◄────┐
+              │     └──────┬───────┘     │
+              │            │             │
+              │            │ Execute     │ Rollback on
+              │            │             │ failure
+              │            ▼             │
+              │     ┌──────────────┐    │
+              │     │   process    │────┘
+              │     └──────┬───────┘
+              │            │
+              │            │ All tasks complete
+              │            │ (via webhook)
+              │            ▼
+              │     ┌──────────────┐
+              └────►│  completed   │
+                    └──────────────┘
+```
+
+**Valid Transitions:**
+- `draft` → `process` (via Execute API)
+- `process` → `completed` (via system/webhook)
+- `process` → `draft` (rollback on failure)
+
+**Invalid Transitions:**
+- `draft` → `completed` (must go through process)
+- `completed` → `draft` (no going back)
+- `completed` → `process` (no re-execution)
+- Any transition via Patch API (status changes only through Execute or system)
+
+### Redis Execution State vs PostgreSQL Status
+
+The system maintains two separate status tracking mechanisms:
+
+**PostgreSQL Status (Persistent):**
+- Lifecycle state: `draft`, `process`, `completed`
+- Persisted permanently
+- Visible to users via API
+- Updated by Project Service
+
+**Redis Execution State (Runtime):**
+- Processing state: `INITIALIZING`, `CRAWLING`, `PROCESSING`, `DONE`, `FAILED`
+- Temporary (7-day TTL)
+- Used for progress tracking
+- Updated by Collector Service
+
+**Relationship:**
+
+```
+PostgreSQL "draft" status
+    ↓
+    No Redis state exists
+    
+PostgreSQL "process" status
+    ↓
+    Contains detailed Redis state:
+    - INITIALIZING (just started)
+    - CRAWLING (collecting data)
+    - PROCESSING (analyzing data)
+    - DONE (finished successfully)
+    - FAILED (error occurred)
+    ↓
+PostgreSQL "completed" status (when Redis shows DONE)
+    ↓
+    Redis state retained for historical reference
+```
+
+This separation allows:
+- Simple, clear lifecycle states in PostgreSQL
+- Detailed progress tracking in Redis
+- Clean separation of concerns between services
+
+---
+
 **Last Updated:** December 2025
-**Version:** 2.0.0
+**Version:** 3.0.0 (Status Model Simplified)
 **Maintained By:** SMAP Development Team

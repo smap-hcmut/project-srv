@@ -2,6 +2,7 @@ package model
 
 import (
 	"encoding/json"
+	"slices"
 	"time"
 
 	"smap-project/internal/sqlboiler"
@@ -136,26 +137,17 @@ func (p *Project) ToDBProject() *sqlboiler.Project {
 // ProjectStatus constants
 const (
 	ProjectStatusDraft     = "draft"
-	ProjectStatusActive    = "active"
+	ProjectStatusProcess   = "process"
 	ProjectStatusCompleted = "completed"
-	ProjectStatusArchived  = "archived"
-	ProjectStatusCancelled = "cancelled"
 )
 
-// IsValidStatus checks if the given status is valid
+// IsValidProjectStatus checks if the given status is valid
 func IsValidProjectStatus(status string) bool {
 	validStatuses := []string{
 		ProjectStatusDraft,
-		ProjectStatusActive,
+		ProjectStatusProcess,
 		ProjectStatusCompleted,
-		ProjectStatusArchived,
-		ProjectStatusCancelled,
 	}
 
-	for _, v := range validStatuses {
-		if v == status {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(validStatuses, status)
 }

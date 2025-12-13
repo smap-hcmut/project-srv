@@ -3,6 +3,7 @@ package http
 import (
 	"errors"
 
+	"smap-project/internal/model"
 	"smap-project/internal/project"
 	"smap-project/pkg/paginator"
 	postgres "smap-project/pkg/postgre"
@@ -76,6 +77,13 @@ func (r PatchReq) validate() error {
 		return errors.New("invalid id")
 	}
 
+	// Validate status if provided
+	if r.Status != nil {
+		if !model.IsValidProjectStatus(*r.Status) {
+			return errors.New("invalid status")
+		}
+	}
+
 	return nil
 }
 
@@ -103,6 +111,16 @@ type GetReq struct {
 	Statuses   []string `form:"statuses"`
 	SearchName *string  `form:"search_name"`
 	Paginate   paginator.PaginateQuery
+}
+
+func (r GetReq) validate() error {
+	// Validate all status values if provided
+	for _, status := range r.Statuses {
+		if !model.IsValidProjectStatus(status) {
+			return errors.New("invalid status")
+		}
+	}
+	return nil
 }
 
 func (r GetReq) toInput() project.GetInput {
