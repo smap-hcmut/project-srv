@@ -222,13 +222,13 @@ func (h handler) Create(c *gin.Context) {
     // 4. Parse request body into CreateReq
     var req CreateReq
     c.ShouldBindJSON(&req)
-    
+
     // 5. Convert request DTO to UseCase Input
     input := req.ToCreateInput()
-    
+
     // 6. Call UseCase
     output, err := h.uc.Create(ctx, sc, input)
-    
+
     // 7. Convert UseCase Output to HTTP Response
     resp := ToProjectResp(output.Project)
     response.OK(c, resp)
@@ -240,13 +240,13 @@ func (uc *usecase) Create(ctx context.Context, sc model.Scope, ip project.Create
     if !model.IsValidProjectStatus(ip.Status) {
         return project.ErrInvalidStatus
     }
-    
+
     // Create domain model
     p := model.Project{...}
-    
+
     // Call Repository
     created, err := uc.repo.Create(ctx, sc, repository.CreateOptions{Project: p})
-    
+
     return project.ProjectOutput{Project: created}
 }
 
@@ -254,10 +254,10 @@ func (uc *usecase) Create(ctx context.Context, sc model.Scope, ip project.Create
 func (r *implRepository) Create(ctx context.Context, sc model.Scope, opts CreateOptions) {
     // Convert domain model to DB model
     dbProject := opts.Project.ToDBProject()
-    
+
     // Execute SQL
     err := dbProject.Insert(ctx, r.db, boil.Infer())
-    
+
     // Convert DB model to domain model
     return NewProjectFromDB(dbProject)
 }
@@ -293,17 +293,17 @@ httpServer := httpserver.New(logger, httpserver.Config{
 func (srv HTTPServer) mapHandlers() error {
     // 1. Initialize Repository (data layer)
     projectRepo := projectrepository.New(srv.postgresDB, srv.l)
-    
+
     // 2. Initialize UseCase (business layer)
     projectUC := projectusecase.New(srv.l, projectRepo)
-    
+
     // 3. Initialize Handler (delivery layer)
     projectHandler := projecthttp.New(srv.l, projectUC)
-    
+
     // 4. Map routes
     api := srv.gin.Group(apiPrefix)
     projecthttp.MapProjectRoutes(api.Group("/projects"), projectHandler, mw)
-    
+
     return nil
 }
 ```
@@ -422,12 +422,12 @@ package usecase
 func (uc *usecase) Create(ctx context.Context, sc model.Scope, ip {module}.CreateInput) ({module}.EntityOutput, error) {
     // Business logic
     entity := model.Entity{...}
-    
+
     created, err := uc.repo.Create(ctx, sc, repository.CreateOptions{Entity: entity})
     if err != nil {
         return {module}.EntityOutput{}, err
     }
-    
+
     return {module}.EntityOutput{Entity: created}, nil
 }
 ```
@@ -440,20 +440,20 @@ package http
 func (h handler) Create(c *gin.Context) {
     ctx := c.Request.Context()
     sc, _ := scope.GetScopeFromContext(ctx)
-    
+
     var req CreateEntityRequest
     if err := c.ShouldBindJSON(&req); err != nil {
         response.Error(c, err, nil)
         return
     }
-    
+
     input := req.ToCreateInput()
     output, err := h.uc.Create(ctx, sc, input)
     if err != nil {
         response.Error(c, err, nil)
         return
     }
-    
+
     resp := ToEntityResponse(output.Entity)
     response.OK(c, resp)
 }
@@ -480,15 +480,15 @@ In `internal/httpserver/handler.go`:
 ```go
 func (srv HTTPServer) mapHandlers() error {
     // ... existing code ...
-    
+
     // Initialize new module
     entityRepo := entityrepository.New(srv.postgresDB, srv.l)
     entityUC := entityusecase.New(srv.l, entityRepo)
     entityHandler := entityhttp.New(srv.l, entityUC)
-    
+
     // Map routes
     entityhttp.MapEntityRoutes(api.Group("/entities"), entityHandler, mw)
-    
+
     return nil
 }
 ```
@@ -506,6 +506,7 @@ Delivery → UseCase → Repository → Database
 ```
 
 **NEVER:**
+
 - Repository imports UseCase
 - UseCase imports Delivery
 - Database imports Repository
@@ -648,3 +649,147 @@ Always pass `context.Context` to logger to trace requests.
 ---
 
 **This document will be updated when there are changes to architecture or new best practices.**
+
+---
+
+## Webhook Module & Redis Pub/Sub
+
+### Overview
+
+The webhook module handles callbacks from external services (crawler, collector) and publishes real-time updates to WebSocket clients via Redis Pub/Sub.
+
+### Architecture
+
+```
+Crawler/Collector → Project Service (Webhook) → Redis Pub/Sub → WebSocket Service → Client
+```
+
+### Topic Patterns
+
+The webhook module uses topic-specific routing patterns for Redis Pub/Sub:
+
+| Message Type     | Topic Pattern                  | Description                            |
+| ---------------- | ------------------------------ | -------------------------------------- |
+| Dry-run Jobs     | `job:{jobID}:{userID}`         | Results from dry-run crawl jobs        |
+| Project Progress | `project:{projectID}:{userID}` | Progress updates for project execution |
+
+### Message Types
+
+#### JobMessage (Dry-run Results)
+
+Published to topic: `job:{jobID}:{userID}`
+
+```go
+type JobMessage struct {
+    Platform Platform   `json:"platform"`           // TIKTOK, YOUTUBE, INSTAGRAM
+    Status   Status     `json:"status"`             // PROCESSING, COMPLETED, FAILED
+    Batch    *BatchData `json:"batch,omitempty"`    // Crawled content
+    Progress *Progress  `json:"progress,omitempty"` // Progress metrics
+}
+```
+
+#### ProjectMessage (Progress Updates)
+
+Published to topic: `project:{projectID}:{userID}`
+
+```go
+type ProjectMessage struct {
+    Status   Status    `json:"status"`             // PROCESSING, COMPLETED, FAILED
+    Progress *Progress `json:"progress,omitempty"` // Progress metrics
+}
+```
+
+### Data Flow
+
+#### Dry-Run Job Flow
+
+```
+1. Crawler sends callback → Project Service
+   CallbackRequest { JobID, Platform, Status, Payload }
+
+2. Project Service looks up userID from Redis job mapping
+   Key: job:mapping:{jobID}
+
+3. Transform to JobMessage:
+   - Map content to BatchData
+   - Map errors to Progress.Errors
+   - Set platform and status enums
+
+4. Publish to Redis: job:{jobID}:{userID}
+```
+
+#### Project Progress Flow
+
+```
+1. Collector sends callback → Project Service
+   ProgressCallbackRequest { ProjectID, UserID, Status, Total, Done, Errors }
+
+2. Transform to ProjectMessage:
+   - Calculate progress percentage
+   - Map status to enum
+   - Convert error count to messages
+
+3. Publish to Redis: project:{projectID}:{userID}
+```
+
+### Webhook Module Structure
+
+```
+internal/webhook/
+├── delivery/http/
+│   ├── handler.go          # DryRunCallback, ProgressCallback
+│   ├── routes.go           # MapWebhookRoutes()
+│   ├── process_request.go  # Request parsing
+│   ├── error.go            # HTTP-specific errors
+│   └── new.go              # Handler constructor
+│
+├── usecase/
+│   ├── new.go              # UseCase constructor
+│   ├── webhook.go          # HandleDryRunCallback, HandleProgressCallback
+│   ├── transformers.go     # TransformDryRunCallback, TransformProjectCallback
+│   └── job_mapping.go      # StoreJobMapping, getJobMapping
+│
+├── interface.go            # UseCase interface
+├── type.go                 # CallbackRequest, ProgressCallbackRequest
+└── redis_types.go          # JobMessage, ProjectMessage, enums
+```
+
+### Job Mapping
+
+Job mappings are stored in Redis to associate JobID with UserID and ProjectID:
+
+```
+Key: job:mapping:{jobID}
+Value: {
+    "user_id": "...",
+    "project_id": "...",
+    "platform": "...",
+    "created_at": "..."
+}
+TTL: 7 days
+```
+
+### WebSocket Service Integration
+
+The WebSocket service subscribes to Redis patterns:
+
+```go
+// Subscribe to new topic patterns
+redis.PSubscribe("job:*")
+redis.PSubscribe("project:*")
+
+// Handle messages
+func handleMessage(channel string, data []byte) {
+    if strings.HasPrefix(channel, "job:") {
+        // Parse JobMessage and deliver to client
+    } else if strings.HasPrefix(channel, "project:") {
+        // Parse ProjectMessage and deliver to client
+    }
+}
+```
+
+### Related Documentation
+
+- [Redis Pub/Sub Deployment Checklist](redis_pubsub_deployment_checklist.md)
+- [Redis Pub/Sub Rollback Procedures](redis_pubsub_rollback_procedures.md)
+- [Redis Pub/Sub Troubleshooting Guide](redis_pubsub_troubleshooting.md)

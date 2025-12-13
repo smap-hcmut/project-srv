@@ -4,14 +4,17 @@ import (
 	pkgErrors "smap-project/pkg/errors"
 )
 
+// HTTP error codes for webhook endpoints (31xxx range)
 var (
-	errWrongBody        = pkgErrors.NewHTTPError(31001, "Wrong body")
-	errUnauthorized     = pkgErrors.NewHTTPError(31002, "Unauthorized")
-	errInvalidCallback  = pkgErrors.NewHTTPError(31004, "Invalid callback payload")
-	errRedisPublishFail = pkgErrors.NewHTTPError(31005, "Failed to publish to Redis")
+	// errWrongBody is returned when request body parsing fails
+	errWrongBody = pkgErrors.NewHTTPError(31001, "Wrong body")
 )
 
+// mapErrorCode maps domain errors to HTTP errors
+// Currently passes through errors as-is since the usecase layer
+// returns descriptive errors that are suitable for HTTP responses
 func (h handler) mapErrorCode(err error) error {
 	// Map domain errors to HTTP errors if needed
+	// The usecase layer already returns well-formatted errors
 	return err
 }

@@ -1,3 +1,6 @@
+// Package usecase implements the business logic for webhook callback processing.
+// It handles transformation of crawler/collector callbacks into structured messages
+// and publishes them to Redis for WebSocket delivery.
 package usecase
 
 import (
@@ -5,101 +8,112 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"smap-project/internal/model"
 	"smap-project/internal/webhook"
 )
 
+// HandleDryRunCallback processes dry-run job callbacks from the crawler service.
+// It looks up the job mapping from Redis, transforms the callback into a JobMessage,
+// and publishes it to the job-specific Redis topic.
+//
+// Topic pattern: job:{jobID}:{userID}
+//
+// The function performs the following steps:
+//  1. Look up userID and projectID from Redis job mapping
+//  2. Transform the callback request to a structured JobMessage
+//  3. Publish the message to Redis for WebSocket delivery
+//
+// Returns an error if job mapping lookup fails, message marshaling fails,
+// or Redis publish fails.
 func (uc *usecase) HandleDryRunCallback(ctx context.Context, req webhook.CallbackRequest) error {
-	// Always look up UserID and ProjectID from Redis (no fallback)
+	// Look up UserID and ProjectID from Redis job mapping
 	userID, projectID, err := uc.getJobMapping(ctx, req.JobID)
 	if err != nil {
-		// Log error with JobID, Platform, and Status (Requirement 5.1, 5.3)
-		uc.l.Errorf(ctx, "Failed to get job mapping: job_id=%s, platform=%s, status=%s, error=%v", req.JobID, req.Platform, req.Status, err)
+		uc.l.Errorf(ctx, "webhook.HandleDryRunCallback.getJobMapping failed: job_id=%s, platform=%s, status=%s, error=%v",
+			req.JobID, req.Platform, req.Status, err)
 		return err
 	}
 
-	// Successfully looked up from Redis
-	uc.l.Infof(ctx, "Successfully looked up job mapping: job_id=%s, user_id=%s, project_id=%s", req.JobID, userID, projectID)
+	// Log successful job mapping lookup with context
+	uc.l.Infof(ctx, "webhook.HandleDryRunCallback: job mapping found: job_id=%s, user_id=%s, project_id=%s",
+		req.JobID, userID, projectID)
 
-	// Format Redis channel as user_noti:{user_id}
-	channel := fmt.Sprintf("user_noti:%s", userID)
+	// Build job-specific topic pattern for Redis pub/sub
+	channel := fmt.Sprintf("job:%s:%s", req.JobID, userID)
 
-	// Construct message with type="dryrun_result"
-	// Note: job_id, platform, status must be inside payload because
-	// websocket subscriber only extracts "type" and "payload" fields
-	message := map[string]interface{}{
-		"type": webhook.MessageTypeDryRunResult,
-		"payload": map[string]interface{}{
-			"job_id":   req.JobID,
-			"platform": req.Platform,
-			"status":   req.Status,
-			"content":  req.Payload.Content,
-			"errors":   req.Payload.Errors,
-		},
-	}
+	// Transform callback to structured JobMessage
+	message := uc.TransformDryRunCallback(req)
 
 	// Marshal message to JSON
 	body, err := json.Marshal(message)
 	if err != nil {
-		uc.l.Errorf(ctx, "internal.webhook.usecase.HandleDryRunCallback.Marshal: %v", err)
-		return fmt.Errorf("failed to marshal message: %w", err)
+		uc.l.Errorf(ctx, "webhook.HandleDryRunCallback.Marshal failed: job_id=%s, message_type=JobMessage, error=%v",
+			req.JobID, err)
+		return fmt.Errorf("failed to marshal JobMessage: %w", err)
 	}
 
-	// Publish to Redis
+	// Publish to Redis with structured logging
 	if err := uc.redisClient.Publish(ctx, channel, body); err != nil {
-		uc.l.Errorf(ctx, "internal.webhook.usecase.HandleDryRunCallback.Publish: %v", err)
+		uc.l.Errorf(ctx, "webhook.HandleDryRunCallback.Publish failed: topic=%s, job_id=%s, message_size=%d, error=%v",
+			channel, req.JobID, len(body), err)
 		return fmt.Errorf("failed to publish to Redis: %w", err)
 	}
 
-	uc.l.Infof(ctx, "Published dry-run result to Redis: channel=%s, job_id=%s, platform=%s, status=%s", channel, req.JobID, req.Platform, req.Status)
+	// Log successful publish with metrics for observability
+	contentCount := 0
+	if message.Batch != nil {
+		contentCount = len(message.Batch.ContentList)
+	}
+	uc.l.Infof(ctx, "webhook.HandleDryRunCallback: published to Redis: topic=%s, job_id=%s, platform=%s, status=%s, content_count=%d, message_size=%d",
+		channel, req.JobID, message.Platform, message.Status, contentCount, len(body))
 
 	return nil
 }
 
-// HandleProgressCallback handles progress updates from collector service
-// and publishes to WebSocket via Redis Pub/Sub
+// HandleProgressCallback processes progress updates from the collector service.
+// It validates the request, transforms it into a ProjectMessage, and publishes
+// to the project-specific Redis topic.
+//
+// Topic pattern: project:{projectID}:{userID}
+//
+// The function performs the following steps:
+//  1. Validate required fields (projectID, userID)
+//  2. Transform the progress callback to a structured ProjectMessage
+//  3. Publish the message to Redis for WebSocket delivery
+//
+// Returns an error if validation fails, message marshaling fails,
+// or Redis publish fails.
 func (uc *usecase) HandleProgressCallback(ctx context.Context, req webhook.ProgressCallbackRequest) error {
-	// Format Redis channel as user_noti:{user_id}
-	channel := fmt.Sprintf("user_noti:%s", req.UserID)
-
-	// Calculate progress percentage
-	var progressPercent float64
-	if req.Total > 0 {
-		progressPercent = float64(req.Done) / float64(req.Total) * 100
+	// Validate required fields before processing
+	if req.ProjectID == "" || req.UserID == "" {
+		uc.l.Errorf(ctx, "webhook.HandleProgressCallback: validation failed: project_id=%s, user_id=%s",
+			req.ProjectID, req.UserID)
+		return fmt.Errorf("missing required fields: project_id or user_id")
 	}
 
-	// Determine message type based on status
-	messageType := webhook.MessageTypeProjectProgress
-	status := model.ProjectStatus(req.Status)
-	if status == model.ProjectStatusDone || status == model.ProjectStatusFailed {
-		messageType = webhook.MessageTypeProjectCompleted
-	}
+	// Build project-specific topic pattern for Redis pub/sub
+	channel := fmt.Sprintf("project:%s:%s", req.ProjectID, req.UserID)
 
-	// Construct message
-	message := map[string]interface{}{
-		"type": messageType,
-		"payload": map[string]interface{}{
-			"project_id":       req.ProjectID,
-			"status":           req.Status,
-			"total":            req.Total,
-			"done":             req.Done,
-			"errors":           req.Errors,
-			"progress_percent": progressPercent,
-		},
-	}
+	// Transform callback to structured ProjectMessage
+	message := uc.TransformProjectCallback(req)
 
 	// Marshal message to JSON
 	body, err := json.Marshal(message)
 	if err != nil {
-		uc.l.Errorf(ctx, "internal.webhook.usecase.HandleProgressCallback.Marshal: %v", err)
-		return err
+		uc.l.Errorf(ctx, "webhook.HandleProgressCallback.Marshal failed: project_id=%s, message_type=ProjectMessage, error=%v",
+			req.ProjectID, err)
+		return fmt.Errorf("failed to marshal ProjectMessage: %w", err)
 	}
 
-	// Publish to Redis
+	// Publish to Redis with structured logging
 	if err := uc.redisClient.Publish(ctx, channel, body); err != nil {
-		uc.l.Errorf(ctx, "internal.webhook.usecase.HandleProgressCallback.Publish: %v", err)
-		return err
+		uc.l.Errorf(ctx, "webhook.HandleProgressCallback.Publish failed: topic=%s, project_id=%s, message_size=%d, error=%v",
+			channel, req.ProjectID, len(body), err)
+		return fmt.Errorf("failed to publish to Redis: %w", err)
 	}
+
+	// Log successful publish with metrics for observability
+	uc.l.Infof(ctx, "webhook.HandleProgressCallback: published to Redis: topic=%s, project_id=%s, status=%s, progress=%d/%d (%.1f%%), message_size=%d",
+		channel, req.ProjectID, message.Status, message.Progress.Current, message.Progress.Total, message.Progress.Percentage, len(body))
 
 	return nil
 }
