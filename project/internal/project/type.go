@@ -82,8 +82,12 @@ type DryRunKeywordsInput struct {
 
 // DryRunKeywordsOutput represents output for dry-run keywords request
 type DryRunKeywordsOutput struct {
-	JobID  string
-	Status string // "processing"
+	JobID             string        `json:"job_id"`
+	Status            string        `json:"status"` // "processing"
+	SampledKeywords   []string      `json:"sampled_keywords"`
+	TotalKeywords     int           `json:"total_keywords"`
+	SamplingRatio     float64       `json:"sampling_ratio"`
+	EstimatedDuration time.Duration `json:"estimated_duration"`
 }
 
 // ProgressOutput represents output for project progress tracking

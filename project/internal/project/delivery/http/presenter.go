@@ -255,8 +255,12 @@ func (h handler) newSuggestKeywordsResp(niche []string, negative []string) Sugge
 
 // DryRunJobResp represents the HTTP response for a dry-run job creation
 type DryRunJobResp struct {
-	JobID  string `json:"job_id"`
-	Status string `json:"status"`
+	JobID             string   `json:"job_id"`
+	Status            string   `json:"status"`
+	SampledKeywords   []string `json:"sampled_keywords"`
+	TotalKeywords     int      `json:"total_keywords"`
+	SamplingRatio     float64  `json:"sampling_ratio"`
+	EstimatedDuration string   `json:"estimated_duration"` // Duration as string for JSON
 }
 
 type DryRunKeywordsReq struct {
@@ -270,8 +274,22 @@ func (r DryRunKeywordsReq) validate() error {
 	return nil
 }
 
-func (r DryRunKeywordsReq) toInput() []string {
-	return r.Keywords
+func (r DryRunKeywordsReq) toInput() project.DryRunKeywordsInput {
+	return project.DryRunKeywordsInput{
+		Keywords: r.Keywords,
+	}
+}
+
+// toDryRunJobResp converts project.DryRunKeywordsOutput to DryRunJobResp
+func toDryRunJobResp(output project.DryRunKeywordsOutput) DryRunJobResp {
+	return DryRunJobResp{
+		JobID:             output.JobID,
+		Status:            output.Status,
+		SampledKeywords:   output.SampledKeywords,
+		TotalKeywords:     output.TotalKeywords,
+		SamplingRatio:     output.SamplingRatio,
+		EstimatedDuration: output.EstimatedDuration.String(),
+	}
 }
 
 // ProgressResp represents the HTTP response for project progress

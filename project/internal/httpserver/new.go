@@ -47,6 +47,9 @@ type HTTPServer struct {
 
 	// External Services
 	llmConfig config.LLMConfig
+
+	// Dry-Run Configuration
+	dryRunSamplingConfig config.DryRunSamplingConfig
 }
 
 type Config struct {
@@ -81,6 +84,9 @@ type Config struct {
 
 	// External Services
 	LLMConfig config.LLMConfig
+
+	// Dry-Run Configuration
+	DryRunSamplingConfig config.DryRunSamplingConfig
 }
 
 // New creates a new HTTPServer instance with the provided configuration.
@@ -120,6 +126,9 @@ func New(logger log.Logger, cfg Config) (*HTTPServer, error) {
 
 		// External Services
 		llmConfig: cfg.LLMConfig,
+
+		// Dry-Run Configuration
+		dryRunSamplingConfig: cfg.DryRunSamplingConfig,
 	}
 
 	if err := srv.validate(); err != nil {

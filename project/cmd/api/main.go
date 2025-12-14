@@ -132,6 +132,9 @@ func main() {
 		// External Services
 		Discord: discordClient,
 		LLMConfig: cfg.LLM,
+
+		// Dry-Run Configuration
+		DryRunSamplingConfig: cfg.DryRunSampling,
 	})
 	if err != nil {
 		logger.Error(ctx, "Failed to initialize HTTP server: ", err)

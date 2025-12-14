@@ -16,7 +16,7 @@ type UseCase interface {
 	Patch(ctx context.Context, sc model.Scope, ip PatchInput) (ProjectOutput, error)
 	Delete(ctx context.Context, sc model.Scope, ip DeleteInput) error
 	// SuggestKeywords(ctx context.Context, sc model.Scope, brandName string) ([]string, []string, error)
-	DryRunKeywords(ctx context.Context, sc model.Scope, keywords []string) (string, error)
+	DryRunKeywords(ctx context.Context, sc model.Scope, input DryRunKeywordsInput) (DryRunKeywordsOutput, error)
 	GetProgress(ctx context.Context, sc model.Scope, projectID string) (ProgressOutput, error)
 	Execute(ctx context.Context, sc model.Scope, projectID string) error
 }

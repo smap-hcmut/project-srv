@@ -7,6 +7,7 @@ import (
 	"smap-project/internal/project"
 	"smap-project/internal/project/delivery/rabbitmq/producer"
 	"smap-project/internal/project/repository"
+	"smap-project/internal/sampling"
 	"smap-project/internal/state"
 	"smap-project/internal/webhook"
 	pkgLog "smap-project/pkg/log"
@@ -20,10 +21,11 @@ type usecase struct {
 	producer  producer.Producer
 	webhookUC webhook.UseCase
 	stateUC   state.UseCase
+	sampler   sampling.UseCase
 }
 
 // New creates a new project usecase
-func New(l pkgLog.Logger, repo repository.Repository, keywordUC keyword.UseCase, producer producer.Producer, webhookUC webhook.UseCase, stateUC state.UseCase) project.UseCase {
+func New(l pkgLog.Logger, repo repository.Repository, keywordUC keyword.UseCase, producer producer.Producer, webhookUC webhook.UseCase, stateUC state.UseCase, sampler sampling.UseCase) project.UseCase {
 	return &usecase{
 		l:         l,
 		repo:      repo,
@@ -32,5 +34,6 @@ func New(l pkgLog.Logger, repo repository.Repository, keywordUC keyword.UseCase,
 		producer:  producer,
 		webhookUC: webhookUC,
 		stateUC:   stateUC,
+		sampler:   sampler,
 	}
 }

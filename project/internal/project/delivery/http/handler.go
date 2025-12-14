@@ -305,7 +305,7 @@ func (h handler) DryRunKeywords(c *gin.Context) {
 
 	}
 
-	jobID, err := h.uc.DryRunKeywords(ctx, sc, req.toInput())
+	output, err := h.uc.DryRunKeywords(ctx, sc, req.toInput())
 
 	if err != nil {
 		err = h.mapErrorCode(err)
@@ -318,5 +318,5 @@ func (h handler) DryRunKeywords(c *gin.Context) {
 		return
 	}
 
-	response.OK(c, DryRunJobResp{JobID: jobID, Status: "processing"})
+	response.OK(c, toDryRunJobResp(output))
 }

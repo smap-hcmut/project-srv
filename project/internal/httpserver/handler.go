@@ -2,12 +2,14 @@ package httpserver
 
 import (
 	"context"
+
 	"smap-project/internal/keyword/usecase"
 	"smap-project/internal/middleware"
 	projecthttp "smap-project/internal/project/delivery/http"
 	projectProd "smap-project/internal/project/delivery/rabbitmq/producer"
 	projectrepository "smap-project/internal/project/repository/postgre"
 	projectusecase "smap-project/internal/project/usecase"
+	samplingusecase "smap-project/internal/sampling/usecase"
 	staterepo "smap-project/internal/state/repository/redis"
 	stateusecase "smap-project/internal/state/usecase"
 	webhookhttp "smap-project/internal/webhook/delivery/http"
@@ -55,7 +57,11 @@ func (srv HTTPServer) mapHandlers() error {
 	stateUC := stateusecase.New(stateRepo, srv.l)
 
 	projectRepo := projectrepository.New(srv.postgresDB, srv.l)
-	projectUC := projectusecase.New(srv.l, projectRepo, keywordUC, projectProd, webhookUC, stateUC)
+
+	// Initialize sampling strategy with centralized config (fallback to defaults if invalid)
+	samplingStrategy := samplingusecase.NewStrategy(srv.dryRunSamplingConfig, srv.l)
+
+	projectUC := projectusecase.New(srv.l, projectRepo, keywordUC, projectProd, webhookUC, stateUC, samplingStrategy)
 	projectHandler := projecthttp.New(srv.l, projectUC, srv.discord)
 
 	// Map routes

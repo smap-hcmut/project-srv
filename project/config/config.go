@@ -38,6 +38,9 @@ type Config struct {
 	// External Services
 	Identity IdentityConfig
 	LLM      LLMConfig
+
+	// Dry-Run Sampling Configuration
+	DryRunSampling DryRunSamplingConfig
 }
 
 // LLMConfig is the configuration for the LLM provider.
@@ -160,6 +163,24 @@ type IdentityConfig struct {
 	InternalAPIKey string
 }
 
+// DryRunSamplingConfig is the configuration for dry-run keyword sampling.
+type DryRunSamplingConfig struct {
+	// Percentage-based sampling
+	Percentage  float64 `env:"DRY_RUN_PERCENTAGE" envDefault:"10"`
+	MinKeywords int     `env:"DRY_RUN_MIN_KEYWORDS" envDefault:"3"`
+	MaxKeywords int     `env:"DRY_RUN_MAX_KEYWORDS" envDefault:"5"`
+
+	// Timing configuration
+	KeywordTimeEstimate string `env:"DRY_RUN_KEYWORD_TIME_ESTIMATE" envDefault:"16s"`
+
+	// Strategy selection
+	DefaultStrategy string `env:"DRY_RUN_SAMPLING_STRATEGY" envDefault:"percentage"`
+
+	// Emergency fallback
+	EmergencyThreshold string `env:"DRY_RUN_EMERGENCY_THRESHOLD" envDefault:"70s"`
+	EmergencyKeywords  int    `env:"DRY_RUN_EMERGENCY_KEYWORDS" envDefault:"3"`
+}
+
 // Load is the function to load the configuration from the environment variables.
 func Load() (*Config, error) {
 	cfg := &Config{}
@@ -172,5 +193,46 @@ func Load() (*Config, error) {
 	// Auto-sync: Use INTERNAL_KEY for Identity service internal calls
 	cfg.Identity.InternalAPIKey = cfg.InternalConfig.InternalKey
 
+	// Validate DryRun Sampling configuration
+	if err := cfg.validateDryRunSampling(); err != nil {
+		return nil, fmt.Errorf("invalid dry-run sampling configuration: %w", err)
+	}
+
 	return cfg, nil
+}
+
+// validateDryRunSampling validates the dry-run sampling configuration
+func (c *Config) validateDryRunSampling() error {
+	cfg := &c.DryRunSampling
+
+	// Validate percentage range
+	if cfg.Percentage <= 0 || cfg.Percentage > 100 {
+		return fmt.Errorf("percentage must be between 0 and 100, got %f", cfg.Percentage)
+	}
+
+	// Validate minimum keywords
+	if cfg.MinKeywords < 1 {
+		return fmt.Errorf("minimum keywords must be at least 1, got %d", cfg.MinKeywords)
+	}
+
+	// Validate max >= min
+	if cfg.MaxKeywords < cfg.MinKeywords {
+		return fmt.Errorf("maximum keywords (%d) cannot be less than minimum (%d)",
+			cfg.MaxKeywords, cfg.MinKeywords)
+	}
+
+	// Validate emergency settings
+	if cfg.EmergencyKeywords < 1 {
+		return fmt.Errorf("emergency keywords must be at least 1, got %d", cfg.EmergencyKeywords)
+	}
+
+	// Validate strategy
+	switch cfg.DefaultStrategy {
+	case "percentage", "fixed", "tiered":
+		// Valid strategies
+	default:
+		return fmt.Errorf("invalid sampling strategy: %s", cfg.DefaultStrategy)
+	}
+
+	return nil
 }
