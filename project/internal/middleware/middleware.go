@@ -40,10 +40,10 @@ func (m Middleware) Auth() gin.HandlerFunc {
 
 func (m Middleware) InternalAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// First, attempt to read token from cookie (preferred method)
-		tokenString := c.GetHeader("Authorization")
+		// Read internal API key from X-Internal-Key header
+		// This is used for service-to-service communication
+		tokenString := c.GetHeader("X-Internal-Key")
 
-		// If no token found in cookie, return unauthorized
 		if tokenString == "" {
 			response.Unauthorized(c)
 			c.Abort()
