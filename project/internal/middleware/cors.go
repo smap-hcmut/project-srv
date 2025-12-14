@@ -164,30 +164,20 @@ func CORS(config CORSConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
 
-		// Debug logging
-		fmt.Printf("[CORS] Method=%s Origin='%s' Path=%s\n", c.Request.Method, origin, c.Request.URL.Path)
-
 		// Check if origin is allowed using dynamic validation function (if set)
 		originAllowed := false
 		if config.AllowOriginFunc != nil {
 			originAllowed = config.AllowOriginFunc(origin)
 			if originAllowed {
 				c.Header("Access-Control-Allow-Origin", origin)
-				fmt.Printf("[CORS] ✓ Origin allowed (dynamic): %s\n", origin)
-			} else {
-				fmt.Printf("[CORS] ✗ Origin rejected (dynamic): %s\n", origin)
 			}
 		} else if isOriginAllowed(origin, config.AllowedOrigins) {
 			// Fall back to static origin list
 			c.Header("Access-Control-Allow-Origin", origin)
 			originAllowed = true
-			fmt.Printf("[CORS] ✓ Origin allowed (static): %s\n", origin)
 		} else if len(config.AllowedOrigins) > 0 && config.AllowedOrigins[0] == "*" {
 			c.Header("Access-Control-Allow-Origin", "*")
 			originAllowed = true
-			fmt.Printf("[CORS] ✓ Wildcard allowed\n")
-		} else {
-			fmt.Printf("[CORS] ✗ Origin rejected (static): %s\n", origin)
 		}
 
 		// Handle preflight requests
