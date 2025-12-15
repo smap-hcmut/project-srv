@@ -73,12 +73,17 @@ func (uc *usecase) HandleDryRunCallback(ctx context.Context, req webhook.Callbac
 // It validates the request, transforms it into a ProjectMessage, and publishes
 // to the project-specific Redis topic.
 //
+// Supports both old flat format (deprecated) and new phase-based format.
+// Format detection: if Crawl.Total > 0 or Analyze.Total > 0, use new format.
+//
 // Topic pattern: project:{projectID}:{userID}
 //
 // The function performs the following steps:
 //  1. Validate required fields (projectID, userID)
-//  2. Transform the progress callback to a structured ProjectMessage
-//  3. Publish the message to Redis for WebSocket delivery
+//  2. Detect format (new phase-based vs old flat)
+//  3. Transform the progress callback to a structured ProjectMessage
+//  4. Build WebSocket message with phase structure
+//  5. Publish the message to Redis for WebSocket delivery
 //
 // Returns an error if validation fails, message marshaling fails,
 // or Redis publish fails.
@@ -90,18 +95,31 @@ func (uc *usecase) HandleProgressCallback(ctx context.Context, req webhook.Progr
 		return fmt.Errorf("missing required fields: project_id or user_id")
 	}
 
+	// Detect format and log deprecation warning for old format
+	isNewFormat := uc.isNewProgressFormat(req)
+	if !isNewFormat {
+		uc.l.Warnf(ctx, "webhook.HandleProgressCallback: DEPRECATED old format detected for project_id=%s, please migrate to phase-based format",
+			req.ProjectID)
+	}
+
 	// Build project-specific topic pattern for Redis pub/sub
 	channel := fmt.Sprintf("project:%s:%s", req.ProjectID, req.UserID)
 
-	// Transform callback to structured ProjectMessage
-	message := uc.TransformProjectCallback(req)
+	// Determine message type based on status
+	messageType := webhook.MessageTypeProjectProgress
+	if req.Status == "DONE" || req.Status == "FAILED" {
+		messageType = webhook.MessageTypeProjectCompleted
+	}
+
+	// Build WebSocket message with phase structure
+	wsMessage := uc.buildProgressWebSocketMessage(req, messageType)
 
 	// Marshal message to JSON
-	body, err := json.Marshal(message)
+	body, err := json.Marshal(wsMessage)
 	if err != nil {
-		uc.l.Errorf(ctx, "webhook.HandleProgressCallback.Marshal failed: project_id=%s, message_type=ProjectMessage, error=%v",
-			req.ProjectID, err)
-		return fmt.Errorf("failed to marshal ProjectMessage: %w", err)
+		uc.l.Errorf(ctx, "webhook.HandleProgressCallback.Marshal failed: project_id=%s, message_type=%s, error=%v",
+			req.ProjectID, messageType, err)
+		return fmt.Errorf("failed to marshal WebSocket message: %w", err)
 	}
 
 	// Publish to Redis with structured logging
@@ -112,8 +130,63 @@ func (uc *usecase) HandleProgressCallback(ctx context.Context, req webhook.Progr
 	}
 
 	// Log successful publish with metrics for observability
-	uc.l.Infof(ctx, "webhook.HandleProgressCallback: published to Redis: topic=%s, project_id=%s, status=%s, progress=%d/%d (%.1f%%), message_size=%d",
-		channel, req.ProjectID, message.Status, message.Progress.Current, message.Progress.Total, message.Progress.Percentage, len(body))
+	uc.l.Infof(ctx, "webhook.HandleProgressCallback: published to Redis: topic=%s, project_id=%s, status=%s, format=%s, overall_progress=%.1f%%, message_size=%d",
+		channel, req.ProjectID, req.Status, uc.formatType(isNewFormat), uc.getOverallProgress(req), len(body))
 
 	return nil
+}
+
+// buildProgressWebSocketMessage builds the WebSocket message with phase structure.
+// This is the message format that will be sent to connected clients.
+func (uc *usecase) buildProgressWebSocketMessage(req webhook.ProgressCallbackRequest, messageType string) map[string]interface{} {
+	// Build phase progress objects
+	crawl := map[string]interface{}{
+		"total":            req.Crawl.Total,
+		"done":             req.Crawl.Done,
+		"errors":           req.Crawl.Errors,
+		"progress_percent": req.Crawl.ProgressPercent,
+	}
+
+	analyze := map[string]interface{}{
+		"total":            req.Analyze.Total,
+		"done":             req.Analyze.Done,
+		"errors":           req.Analyze.Errors,
+		"progress_percent": req.Analyze.ProgressPercent,
+	}
+
+	// Calculate overall progress
+	overallProgress := req.OverallProgressPercent
+	if overallProgress == 0 {
+		overallProgress = uc.getOverallProgress(req)
+	}
+
+	return map[string]interface{}{
+		"type": messageType,
+		"payload": map[string]interface{}{
+			"project_id":               req.ProjectID,
+			"status":                   req.Status,
+			"crawl":                    crawl,
+			"analyze":                  analyze,
+			"overall_progress_percent": overallProgress,
+		},
+	}
+}
+
+// getOverallProgress calculates overall progress from request data.
+func (uc *usecase) getOverallProgress(req webhook.ProgressCallbackRequest) float64 {
+	if req.OverallProgressPercent > 0 {
+		return req.OverallProgressPercent
+	}
+	// Calculate from phases
+	crawlProgress := uc.calculatePhaseProgress(req.Crawl)
+	analyzeProgress := uc.calculatePhaseProgress(req.Analyze)
+	return (crawlProgress + analyzeProgress) / 2
+}
+
+// formatType returns format type string for logging.
+func (uc *usecase) formatType(isNewFormat bool) string {
+	if isNewFormat {
+		return "phase-based"
+	}
+	return "flat(deprecated)"
 }

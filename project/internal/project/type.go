@@ -90,7 +90,7 @@ type DryRunKeywordsOutput struct {
 	EstimatedDuration time.Duration `json:"estimated_duration"`
 }
 
-// ProgressOutput represents output for project progress tracking
+// ProgressOutput represents output for project progress tracking (old flat format)
 type ProgressOutput struct {
 	Project         model.Project
 	Status          string
@@ -98,4 +98,22 @@ type ProgressOutput struct {
 	ProcessedItems  int64
 	FailedItems     int64
 	ProgressPercent float64
+}
+
+// PhaseProgressOutput represents progress data for a single processing phase.
+type PhaseProgressOutput struct {
+	Total           int64
+	Done            int64
+	Errors          int64
+	ProgressPercent float64
+}
+
+// ProjectProgressOutput represents phase-based project progress output.
+// This is the new format that provides separate progress for crawl and analyze phases.
+type ProjectProgressOutput struct {
+	ProjectID              string
+	Status                 string
+	Crawl                  PhaseProgressOutput
+	Analyze                PhaseProgressOutput
+	OverallProgressPercent float64
 }

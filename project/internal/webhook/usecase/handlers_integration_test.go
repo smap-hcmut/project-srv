@@ -7,9 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"smap-project/internal/webhook"
 	"smap-project/pkg/log"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // extendedMockRedisClient extends the existing mock to track published messages
@@ -29,7 +30,7 @@ func newExtendedMockRedisClient() *extendedMockRedisClient {
 
 func (m *extendedMockRedisClient) Publish(ctx context.Context, channel string, message interface{}) error {
 	m.publishCount++
-	
+
 	// Convert message to bytes
 	var bytes []byte
 	switch v := message.(type) {
@@ -42,7 +43,7 @@ func (m *extendedMockRedisClient) Publish(ctx context.Context, channel string, m
 		jsonBytes, _ := json.Marshal(v)
 		bytes = jsonBytes
 	}
-	
+
 	m.publishedChannels[channel] = bytes
 	return nil
 }
@@ -155,7 +156,7 @@ func TestHandleDryRunCallbackIntegration(t *testing.T) {
 			// Clear previous test data
 			mockRedis.publishedChannels = make(map[string][]byte)
 			mockRedis.publishCount = 0
-			
+
 			// Setup job mapping if required
 			if tt.setupJobMapping {
 				err := uc.StoreJobMapping(ctx, tt.jobID, tt.userID, tt.projectID)
@@ -313,40 +314,23 @@ func TestHandleProgressCallbackIntegration(t *testing.T) {
 				_, channelExists := mockRedis.publishedChannels[tt.expectedChannel]
 				assert.True(t, channelExists, "Expected channel should exist: %s", tt.expectedChannel)
 
-				// Verify message structure
+				// Verify message structure (now WebSocket message format)
 				messageBytes := mockRedis.publishedChannels[tt.expectedChannel]
-				var projectMessage webhook.ProjectMessage
-				err := json.Unmarshal(messageBytes, &projectMessage)
-				assert.NoError(t, err, "Should be able to unmarshal ProjectMessage")
+				var wsMessage map[string]interface{}
+				err := json.Unmarshal(messageBytes, &wsMessage)
+				assert.NoError(t, err, "Should be able to unmarshal WebSocket message")
 
-				// Verify message content
-				var expectedStatus webhook.Status
-				switch tt.req.Status {
-				case "DONE":
-					expectedStatus = webhook.StatusCompleted
-				case "FAILED":
-					expectedStatus = webhook.StatusFailed
-				default:
-					expectedStatus = webhook.StatusProcessing
+				// Verify message type
+				expectedType := "project_progress"
+				if tt.req.Status == "DONE" || tt.req.Status == "FAILED" {
+					expectedType = "project_completed"
 				}
-				assert.Equal(t, expectedStatus, projectMessage.Status)
+				assert.Equal(t, expectedType, wsMessage["type"])
 
-				// Verify progress data
-				assert.NotNil(t, projectMessage.Progress, "Progress should be present")
-				assert.Equal(t, int(tt.req.Done), projectMessage.Progress.Current)
-				assert.Equal(t, int(tt.req.Total), projectMessage.Progress.Total)
-				
-				expectedPercentage := 0.0
-				if tt.req.Total > 0 {
-					expectedPercentage = float64(tt.req.Done) / float64(tt.req.Total) * 100.0
-				}
-				assert.Equal(t, expectedPercentage, projectMessage.Progress.Percentage)
-
-				if tt.req.Errors > 0 {
-					assert.NotEmpty(t, projectMessage.Progress.Errors, "Errors should be present when error count > 0")
-				} else {
-					assert.Empty(t, projectMessage.Progress.Errors, "Errors should be empty when error count = 0")
-				}
+				// Verify payload
+				payload := wsMessage["payload"].(map[string]interface{})
+				assert.Equal(t, tt.req.Status, payload["status"])
+				assert.Equal(t, tt.req.ProjectID, payload["project_id"])
 			}
 		})
 	}
@@ -355,27 +339,27 @@ func TestHandleProgressCallbackIntegration(t *testing.T) {
 func TestTopicPatternConsistency(t *testing.T) {
 	// Test that topic patterns follow the exact specification
 	tests := []struct {
-		name          string
-		jobID         string
-		projectID     string
-		userID        string
-		expectedJobTopic    string
+		name                 string
+		jobID                string
+		projectID            string
+		userID               string
+		expectedJobTopic     string
 		expectedProjectTopic string
 	}{
 		{
-			name:          "standard IDs",
-			jobID:         "job_123",
-			projectID:     "proj_456",
-			userID:        "user_789",
-			expectedJobTopic: "job:job_123:user_789",
+			name:                 "standard IDs",
+			jobID:                "job_123",
+			projectID:            "proj_456",
+			userID:               "user_789",
+			expectedJobTopic:     "job:job_123:user_789",
 			expectedProjectTopic: "project:proj_456:user_789",
 		},
 		{
-			name:          "UUID format IDs",
-			jobID:         "550e8400-e29b-41d4-a716-446655440000",
-			projectID:     "550e8400-e29b-41d4-a716-446655440001",
-			userID:        "550e8400-e29b-41d4-a716-446655440002",
-			expectedJobTopic: "job:550e8400-e29b-41d4-a716-446655440000:550e8400-e29b-41d4-a716-446655440002",
+			name:                 "UUID format IDs",
+			jobID:                "550e8400-e29b-41d4-a716-446655440000",
+			projectID:            "550e8400-e29b-41d4-a716-446655440001",
+			userID:               "550e8400-e29b-41d4-a716-446655440002",
+			expectedJobTopic:     "job:550e8400-e29b-41d4-a716-446655440000:550e8400-e29b-41d4-a716-446655440002",
 			expectedProjectTopic: "project:550e8400-e29b-41d4-a716-446655440001:550e8400-e29b-41d4-a716-446655440002",
 		},
 	}
@@ -386,7 +370,7 @@ func TestTopicPatternConsistency(t *testing.T) {
 			jobTopic := fmt.Sprintf("job:%s:%s", tt.jobID, tt.userID)
 			assert.Equal(t, tt.expectedJobTopic, jobTopic, "Job topic pattern should match specification")
 
-			// Test project topic pattern  
+			// Test project topic pattern
 			projectTopic := fmt.Sprintf("project:%s:%s", tt.projectID, tt.userID)
 			assert.Equal(t, tt.expectedProjectTopic, projectTopic, "Project topic pattern should match specification")
 		})

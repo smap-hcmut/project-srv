@@ -55,16 +55,63 @@ func (uc *usecase) TransformDryRunCallback(req webhook.CallbackRequest) webhook.
 // This function handles the conversion of progress data into the standardized message
 // format used for Redis pub/sub communication.
 //
+// Supports both old flat format (deprecated) and new phase-based format.
+// Format detection: if Crawl.Total > 0 or Analyze.Total > 0, use new format.
+//
 // The transformation includes:
 //   - Status string to Status enum mapping
 //   - Progress calculation (current, total, percentage)
 //   - Error count to error message array conversion
 func (uc *usecase) TransformProjectCallback(req webhook.ProgressCallbackRequest) webhook.ProjectMessage {
+	// Detect format: new format has phase data
+	if uc.isNewProgressFormat(req) {
+		return uc.transformNewProgressFormat(req)
+	}
+	return uc.transformOldProgressFormat(req)
+}
+
+// isNewProgressFormat detects if the request uses new phase-based format.
+// Returns true if Crawl.Total > 0 or Analyze.Total > 0.
+func (uc *usecase) isNewProgressFormat(req webhook.ProgressCallbackRequest) bool {
+	return req.Crawl.Total > 0 || req.Analyze.Total > 0
+}
+
+// transformNewProgressFormat handles the new phase-based progress format.
+// Builds a ProjectMessage with phase-specific progress data.
+func (uc *usecase) transformNewProgressFormat(req webhook.ProgressCallbackRequest) webhook.ProjectMessage {
+	// Calculate overall progress from phases
+	crawlProgress := uc.calculatePhaseProgress(req.Crawl)
+	analyzeProgress := uc.calculatePhaseProgress(req.Analyze)
+	overallProgress := (crawlProgress + analyzeProgress) / 2
+
+	// Use provided overall progress if available, otherwise calculate
+	if req.OverallProgressPercent > 0 {
+		overallProgress = req.OverallProgressPercent
+	}
+
+	// Build progress with phase data
+	progress := &webhook.Progress{
+		Current:    int(req.Crawl.Done + req.Analyze.Done),
+		Total:      int(req.Crawl.Total + req.Analyze.Total),
+		Percentage: overallProgress,
+		ETA:        0.0,
+		Errors:     uc.buildPhaseErrors(req.Crawl.Errors, req.Analyze.Errors),
+	}
+
+	return webhook.ProjectMessage{
+		Status:   uc.mapProjectStatus(req.Status),
+		Progress: progress,
+	}
+}
+
+// transformOldProgressFormat handles the deprecated flat progress format.
+// Logs a deprecation warning and converts to the standard ProjectMessage.
+func (uc *usecase) transformOldProgressFormat(req webhook.ProgressCallbackRequest) webhook.ProjectMessage {
 	progress := &webhook.Progress{
 		Current:    int(req.Done),
 		Total:      int(req.Total),
 		Percentage: uc.calculatePercentage(req.Done, req.Total),
-		ETA:        0.0, // TODO: Calculate ETA if needed
+		ETA:        0.0,
 		Errors:     uc.transformErrorCount(req.Errors),
 	}
 
@@ -72,6 +119,31 @@ func (uc *usecase) TransformProjectCallback(req webhook.ProgressCallbackRequest)
 		Status:   uc.mapProjectStatus(req.Status),
 		Progress: progress,
 	}
+}
+
+// calculatePhaseProgress calculates progress percentage for a single phase.
+func (uc *usecase) calculatePhaseProgress(phase webhook.PhaseProgress) float64 {
+	if phase.Total <= 0 {
+		return 0.0
+	}
+	// Use provided progress_percent if available
+	if phase.ProgressPercent > 0 {
+		return phase.ProgressPercent
+	}
+	// Calculate from done + errors
+	return float64(phase.Done+phase.Errors) / float64(phase.Total) * 100.0
+}
+
+// buildPhaseErrors combines errors from both phases into a string array.
+func (uc *usecase) buildPhaseErrors(crawlErrors, analyzeErrors int64) []string {
+	var errors []string
+	if crawlErrors > 0 {
+		errors = append(errors, fmt.Sprintf("Crawl phase encountered %d errors", crawlErrors))
+	}
+	if analyzeErrors > 0 {
+		errors = append(errors, fmt.Sprintf("Analyze phase encountered %d errors", analyzeErrors))
+	}
+	return errors
 }
 
 // Helper methods for content transformation

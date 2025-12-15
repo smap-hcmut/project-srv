@@ -320,3 +320,43 @@ func (h handler) newProgressResp(o project.ProgressOutput) ProgressResp {
 		ProgressPercent: o.ProgressPercent,
 	}
 }
+
+// PhaseProgressResp represents progress data for a single processing phase.
+// Used in API responses to show granular progress per phase (crawl or analyze).
+type PhaseProgressResp struct {
+	Total           int64   `json:"total"`            // Total items to process in this phase
+	Done            int64   `json:"done"`             // Completed items in this phase
+	Errors          int64   `json:"errors"`           // Failed items in this phase
+	ProgressPercent float64 `json:"progress_percent"` // Completion percentage (0-100)
+}
+
+// ProjectProgressResp represents the HTTP response for phase-based project progress.
+// This is the new format that provides separate progress for crawl and analyze phases.
+type ProjectProgressResp struct {
+	ProjectID              string            `json:"project_id"`               // Project unique identifier
+	Status                 string            `json:"status"`                   // Current status: INITIALIZING, PROCESSING, DONE, FAILED
+	Crawl                  PhaseProgressResp `json:"crawl"`                    // Crawl phase progress
+	Analyze                PhaseProgressResp `json:"analyze"`                  // Analyze phase progress
+	OverallProgressPercent float64           `json:"overall_progress_percent"` // Overall progress (0-100)
+}
+
+// newProjectProgressResp converts ProjectProgressOutput to ProjectProgressResp
+func (h handler) newProjectProgressResp(o project.ProjectProgressOutput) ProjectProgressResp {
+	return ProjectProgressResp{
+		ProjectID: o.ProjectID,
+		Status:    o.Status,
+		Crawl: PhaseProgressResp{
+			Total:           o.Crawl.Total,
+			Done:            o.Crawl.Done,
+			Errors:          o.Crawl.Errors,
+			ProgressPercent: o.Crawl.ProgressPercent,
+		},
+		Analyze: PhaseProgressResp{
+			Total:           o.Analyze.Total,
+			Done:            o.Analyze.Done,
+			Errors:          o.Analyze.Errors,
+			ProgressPercent: o.Analyze.ProgressPercent,
+		},
+		OverallProgressPercent: o.OverallProgressPercent,
+	}
+}

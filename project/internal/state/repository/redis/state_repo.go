@@ -11,10 +11,22 @@ import (
 const (
 	keyPrefix       = "smap:proj:"
 	fieldStatus     = "status"
-	fieldTotal      = "total"
-	fieldDone       = "done"
-	fieldErrors     = "errors"
 	stateTTLSeconds = 7 * 24 * 60 * 60 // 604800 seconds
+
+	// Crawl phase fields
+	fieldCrawlTotal  = "crawl_total"
+	fieldCrawlDone   = "crawl_done"
+	fieldCrawlErrors = "crawl_errors"
+
+	// Analyze phase fields
+	fieldAnalyzeTotal  = "analyze_total"
+	fieldAnalyzeDone   = "analyze_done"
+	fieldAnalyzeErrors = "analyze_errors"
+
+	// Old flat format fields (deprecated, kept for backward compatibility)
+	fieldTotal  = "total"
+	fieldDone   = "done"
+	fieldErrors = "errors"
 )
 
 // buildKey constructs the Redis key for a project's state.
@@ -28,8 +40,20 @@ func (r *redisStateRepository) InitState(ctx context.Context, projectID string, 
 	// Use pipeline for atomic operation
 	pipe := r.client.Pipeline()
 
-	// Set all fields using pipeline HSet
+	// Set status
 	pipe.HSet(ctx, key, fieldStatus, string(state.Status))
+
+	// Set crawl phase fields
+	pipe.HSet(ctx, key, fieldCrawlTotal, state.CrawlTotal)
+	pipe.HSet(ctx, key, fieldCrawlDone, state.CrawlDone)
+	pipe.HSet(ctx, key, fieldCrawlErrors, state.CrawlErrors)
+
+	// Set analyze phase fields
+	pipe.HSet(ctx, key, fieldAnalyzeTotal, state.AnalyzeTotal)
+	pipe.HSet(ctx, key, fieldAnalyzeDone, state.AnalyzeDone)
+	pipe.HSet(ctx, key, fieldAnalyzeErrors, state.AnalyzeErrors)
+
+	// Set old flat format fields for backward compatibility
 	pipe.HSet(ctx, key, fieldTotal, state.Total)
 	pipe.HSet(ctx, key, fieldDone, state.Done)
 	pipe.HSet(ctx, key, fieldErrors, state.Errors)
@@ -68,21 +92,54 @@ func (r *redisStateRepository) GetState(ctx context.Context, projectID string) (
 		Status: model.ProjectStatus(data[fieldStatus]),
 	}
 
-	if totalStr, ok := data[fieldTotal]; ok {
-		if total, err := strconv.ParseInt(totalStr, 10, 64); err == nil {
-			s.Total = total
+	// Parse crawl phase fields
+	if v, ok := data[fieldCrawlTotal]; ok {
+		if val, err := strconv.ParseInt(v, 10, 64); err == nil {
+			s.CrawlTotal = val
+		}
+	}
+	if v, ok := data[fieldCrawlDone]; ok {
+		if val, err := strconv.ParseInt(v, 10, 64); err == nil {
+			s.CrawlDone = val
+		}
+	}
+	if v, ok := data[fieldCrawlErrors]; ok {
+		if val, err := strconv.ParseInt(v, 10, 64); err == nil {
+			s.CrawlErrors = val
 		}
 	}
 
-	if doneStr, ok := data[fieldDone]; ok {
-		if done, err := strconv.ParseInt(doneStr, 10, 64); err == nil {
-			s.Done = done
+	// Parse analyze phase fields
+	if v, ok := data[fieldAnalyzeTotal]; ok {
+		if val, err := strconv.ParseInt(v, 10, 64); err == nil {
+			s.AnalyzeTotal = val
+		}
+	}
+	if v, ok := data[fieldAnalyzeDone]; ok {
+		if val, err := strconv.ParseInt(v, 10, 64); err == nil {
+			s.AnalyzeDone = val
+		}
+	}
+	if v, ok := data[fieldAnalyzeErrors]; ok {
+		if val, err := strconv.ParseInt(v, 10, 64); err == nil {
+			s.AnalyzeErrors = val
 		}
 	}
 
-	if errorsStr, ok := data[fieldErrors]; ok {
-		if errors, err := strconv.ParseInt(errorsStr, 10, 64); err == nil {
-			s.Errors = errors
+	// Parse old flat format fields for backward compatibility
+	if v, ok := data[fieldTotal]; ok {
+		if val, err := strconv.ParseInt(v, 10, 64); err == nil {
+			s.Total = val
+		}
+	}
+	if v, ok := data[fieldDone]; ok {
+		if val, err := strconv.ParseInt(v, 10, 64); err == nil {
+			s.Done = val
+		}
+	}
+	if v, ok := data[fieldErrors]; ok {
+		if val, err := strconv.ParseInt(v, 10, 64); err == nil {
+			s.Errors = val
 		}
 	}
 

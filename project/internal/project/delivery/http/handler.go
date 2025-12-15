@@ -202,8 +202,8 @@ func (h handler) Delete(c *gin.Context) {
 	response.OK(c, nil)
 }
 
-// @Summary Get project progress
-// @Description Get real-time progress of a project's processing status
+// @Summary Get project progress (legacy)
+// @Description Get real-time progress of a project's processing status (legacy flat format)
 // @Tags Projects
 // @Accept json
 // @Produce json
@@ -243,6 +243,49 @@ func (h handler) GetProgress(c *gin.Context) {
 	c.Header("Expires", "0")
 
 	response.OK(c, h.newProgressResp(o))
+}
+
+// @Summary Get project phase progress
+// @Description Get real-time phase-based progress of a project's processing status (new format with crawl/analyze phases)
+// @Tags Projects
+// @Accept json
+// @Produce json
+// @Security CookieAuth
+// @Param id path string true "Project ID"
+// @Success 200 {object} ProjectProgressResp
+// @Failure 400 {object} errors.HTTPError
+// @Failure 404 {object} errors.HTTPError
+// @Failure 403 {object} errors.HTTPError
+// @Failure 500 {object} errors.HTTPError
+// @Router /projects/{id}/phase-progress [get]
+func (h handler) GetPhaseProgress(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	projectID, sc, err := h.processProgressReq(c)
+	if err != nil {
+		h.l.Errorf(ctx, "project.http.GetPhaseProgress.processProgressReq: %v", err)
+		response.Error(c, err, h.discord)
+		return
+	}
+
+	o, err := h.uc.GetPhaseProgress(ctx, sc, projectID)
+	if err != nil {
+		err = h.mapErrorCode(err)
+		if !slices.Contains(NotFound, err) {
+			h.l.Errorf(ctx, "project.http.GetPhaseProgress.GetPhaseProgress: %v", err)
+		} else {
+			h.l.Warnf(ctx, "project.http.GetPhaseProgress.GetPhaseProgress: %v", err)
+		}
+		response.Error(c, err, h.discord)
+		return
+	}
+
+	// Set Cache-Control header to prevent caching
+	c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+	c.Header("Pragma", "no-cache")
+	c.Header("Expires", "0")
+
+	response.OK(c, h.newProjectProgressResp(o))
 }
 
 // @Summary Execute a project

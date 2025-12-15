@@ -130,14 +130,31 @@ type Error struct {
 	Keyword string `json:"keyword,omitempty"`
 }
 
-// ProgressCallbackRequest represents the webhook callback for progress updates from collector
+// PhaseProgress represents progress data for a single processing phase (crawl or analyze).
+// Used in webhook callbacks to track granular progress per phase.
+type PhaseProgress struct {
+	Total           int64   `json:"total"`            // Total items to process in this phase
+	Done            int64   `json:"done"`             // Completed items in this phase
+	Errors          int64   `json:"errors"`           // Failed items in this phase
+	ProgressPercent float64 `json:"progress_percent"` // Completion percentage (0-100)
+}
+
+// ProgressCallbackRequest represents the webhook callback for progress updates from collector.
+// Supports both old flat format (deprecated) and new phase-based format.
 type ProgressCallbackRequest struct {
 	ProjectID string `json:"project_id" binding:"required"`
 	UserID    string `json:"user_id" binding:"required"`
-	Status    string `json:"status" binding:"required"` // INITIALIZING, CRAWLING, PROCESSING, DONE, FAILED
-	Total     int64  `json:"total"`
-	Done      int64  `json:"done"`
-	Errors    int64  `json:"errors"`
+	Status    string `json:"status" binding:"required"` // INITIALIZING, PROCESSING, DONE, FAILED
+
+	// New phase-based progress fields
+	Crawl                  PhaseProgress `json:"crawl"`                    // Crawl phase progress
+	Analyze                PhaseProgress `json:"analyze"`                  // Analyze phase progress
+	OverallProgressPercent float64       `json:"overall_progress_percent"` // Overall progress (0-100)
+
+	// Old flat format fields (deprecated, kept for backward compatibility)
+	Total  int64 `json:"total,omitempty"`
+	Done   int64 `json:"done,omitempty"`
+	Errors int64 `json:"errors,omitempty"`
 }
 
 // JobMappingData represents the data stored in Redis for job mappings

@@ -449,6 +449,58 @@ func (uc *usecase) GetProgress(ctx context.Context, sc model.Scope, projectID st
 	}, nil
 }
 
+// GetPhaseProgress returns phase-based project progress with separate crawl and analyze metrics.
+// This is the new format that provides granular visibility into each processing phase.
+// Requirements: 4.2, 6.5
+func (uc *usecase) GetPhaseProgress(ctx context.Context, sc model.Scope, projectID string) (project.ProjectProgressOutput, error) {
+	// Step 1: Verify user owns this project (authorization check)
+	p, err := uc.repo.Detail(ctx, sc, projectID)
+	if err != nil {
+		if err == repository.ErrNotFound {
+			uc.l.Warnf(ctx, "internal.project.usecase.GetPhaseProgress: project %s not found", projectID)
+			return project.ProjectProgressOutput{}, project.ErrProjectNotFound
+		}
+		uc.l.Errorf(ctx, "internal.project.usecase.GetPhaseProgress: %v", err)
+		return project.ProjectProgressOutput{}, err
+	}
+
+	if p.CreatedBy != sc.UserID {
+		uc.l.Warnf(ctx, "internal.project.usecase.GetPhaseProgress: user %s does not own project %s", sc.UserID, projectID)
+		return project.ProjectProgressOutput{}, project.ErrUnauthorized
+	}
+
+	// Step 2: Get execution metrics from Redis (if available)
+	state, err := uc.stateUC.GetProjectState(ctx, projectID)
+	if err != nil {
+		uc.l.Warnf(ctx, "internal.project.usecase.GetPhaseProgress: failed to get Redis state for project %s: %v", projectID, err)
+		// Fall through to return zero metrics
+	}
+
+	// Step 3: Build phase-based progress output
+	output := project.ProjectProgressOutput{
+		ProjectID: projectID,
+		Status:    p.Status,
+	}
+
+	if state != nil {
+		output.Crawl = project.PhaseProgressOutput{
+			Total:           state.CrawlTotal,
+			Done:            state.CrawlDone,
+			Errors:          state.CrawlErrors,
+			ProgressPercent: state.CrawlProgressPercent(),
+		}
+		output.Analyze = project.PhaseProgressOutput{
+			Total:           state.AnalyzeTotal,
+			Done:            state.AnalyzeDone,
+			Errors:          state.AnalyzeErrors,
+			ProgressPercent: state.AnalyzeProgressPercent(),
+		}
+		output.OverallProgressPercent = state.OverallProgressPercent()
+	}
+
+	return output, nil
+}
+
 func (uc *usecase) DryRunKeywords(ctx context.Context, sc model.Scope, input project.DryRunKeywordsInput) (project.DryRunKeywordsOutput, error) {
 	// Apply keyword sampling using the new sampling module
 	samplingInput := sampling.SampleInput{

@@ -11,6 +11,7 @@ func MapProjectRoutes(r *gin.RouterGroup, h handler, mw middleware.Middleware) {
 	r.GET("", mw.Auth(), h.Get)
 	r.GET("/:id", mw.Auth(), h.Detail)
 	r.GET("/:id/progress", mw.Auth(), h.GetProgress)
+	r.GET("/:id/phase-progress", mw.Auth(), h.GetPhaseProgress)
 	r.POST("", mw.Auth(), h.Create)
 	r.POST("/:id/execute", mw.Auth(), h.Execute)
 	r.PATCH("/:id", mw.Auth(), h.Patch)

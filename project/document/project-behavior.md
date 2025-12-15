@@ -151,13 +151,13 @@ type Scope struct {
 
 ### 3.1. Project Validation Rules
 
-| Rule               | Mô Tả                                     | Error Code |
-| ------------------ | ----------------------------------------- | ---------- |
-| **Date Range**     | `to_date` phải sau `from_date`            | 30007      |
-| **Status Valid**   | Status phải là một trong 3 giá trị hợp lệ: "draft", "process", "completed" | 30006      |
-| **Name Required**  | Tên project không được rỗng               | 30002      |
-| **Brand Required** | Brand name không được rỗng khi execute    | 30002      |
-| **Status Transition** | Status transitions phải tuân theo quy tắc hợp lệ | 30009      |
+| Rule                  | Mô Tả                                                                      | Error Code |
+| --------------------- | -------------------------------------------------------------------------- | ---------- |
+| **Date Range**        | `to_date` phải sau `from_date`                                             | 30007      |
+| **Status Valid**      | Status phải là một trong 3 giá trị hợp lệ: "draft", "process", "completed" | 30006      |
+| **Name Required**     | Tên project không được rỗng                                                | 30002      |
+| **Brand Required**    | Brand name không được rỗng khi execute                                     | 30002      |
+| **Status Transition** | Status transitions phải tuân theo quy tắc hợp lệ                           | 30009      |
 
 ### 3.2. Authorization Rules
 
@@ -169,13 +169,13 @@ type Scope struct {
 
 ### 3.3. Execution Rules
 
-| Rule                    | Mô Tả                                       | Error Code |
-| ----------------------- | ------------------------------------------- | ---------- |
-| **Draft Only**          | Chỉ có thể execute project ở trạng thái "draft" | 30009      |
-| **No Duplicate**        | Không thể execute project đang chạy (status "process") | 30008      |
+| Rule                    | Mô Tả                                                                  | Error Code |
+| ----------------------- | ---------------------------------------------------------------------- | ---------- |
+| **Draft Only**          | Chỉ có thể execute project ở trạng thái "draft"                        | 30009      |
+| **No Duplicate**        | Không thể execute project đang chạy (status "process")                 | 30008      |
 | **Rollback on Failure** | Nếu Redis init hoặc publish event thất bại, rollback status về "draft" | -          |
-| **State TTL**           | Redis state có TTL 7 ngày                   | -          |
-| **No Re-execution**     | Project với status "completed" không thể execute lại | 30009      |
+| **State TTL**           | Redis state có TTL 7 ngày                                              | -          |
+| **No Re-execution**     | Project với status "completed" không thể execute lại                   | 30009      |
 
 ### 3.4. Soft Delete Rules
 
@@ -278,6 +278,45 @@ Request → Generate Job ID → Redis Store → RabbitMQ Publish → Response (j
 - Support filtering by status, search by name
 - Pagination với `page` và `limit` parameters
 
+### 4.6. Get Phase Progress
+
+**Endpoint:** `GET /projects/:id/phase-progress`
+
+**Behavior:**
+
+1. Get project từ PostgreSQL (verify ownership)
+2. Query Redis state (`smap:proj:{id}`)
+3. Build phase progress response with crawl/analyze breakdown
+4. Return detailed progress with phase-specific data
+
+**Response:**
+
+```json
+{
+  "project_id": "uuid",
+  "status": "PROCESSING",
+  "crawl": {
+    "total": 100,
+    "done": 100,
+    "errors": 0,
+    "progress_percent": 100.0
+  },
+  "analyze": {
+    "total": 100,
+    "done": 45,
+    "errors": 2,
+    "progress_percent": 47.0
+  },
+  "overall_progress_percent": 73.5
+}
+```
+
+```
+Request → Auth Check → Redis Query → Build Phase Response → Response
+```
+
+**Note:** This endpoint provides more detailed progress than `GET /projects/:id/progress` by breaking down progress into crawl and analyze phases.
+
 ---
 
 ## 5. State Management
@@ -294,12 +333,20 @@ job:mapping:{jobID}      → String (dry-run job mapping)
 **Key:** `smap:proj:{projectID}`
 **TTL:** 7 days (604800 seconds)
 
-| Field    | Type   | Writer            | Description          |
-| -------- | ------ | ----------------- | -------------------- |
-| `status` | String | Project/Collector | Execution status     |
-| `total`  | Int    | Collector         | Tổng items cần xử lý |
-| `done`   | Int    | Collector         | Items đã hoàn thành  |
-| `errors` | Int    | Collector         | Items bị lỗi         |
+| Field            | Type   | Writer            | Description                   |
+| ---------------- | ------ | ----------------- | ----------------------------- |
+| `status`         | String | Project/Collector | Execution status              |
+| `total`          | Int    | Collector         | Tổng items cần xử lý (legacy) |
+| `done`           | Int    | Collector         | Items đã hoàn thành (legacy)  |
+| `errors`         | Int    | Collector         | Items bị lỗi (legacy)         |
+| `crawl_total`    | Int    | Collector         | Tổng items crawl phase        |
+| `crawl_done`     | Int    | Collector         | Items crawl đã hoàn thành     |
+| `crawl_errors`   | Int    | Collector         | Items crawl bị lỗi            |
+| `analyze_total`  | Int    | Collector         | Tổng items analyze phase      |
+| `analyze_done`   | Int    | Collector         | Items analyze đã hoàn thành   |
+| `analyze_errors` | Int    | Collector         | Items analyze bị lỗi          |
+
+**Note:** Phase-based fields (`crawl_*`, `analyze_*`) are the new format. Legacy fields (`total`, `done`, `errors`) are kept for backward compatibility.
 
 ### 5.3. State Transitions
 
@@ -331,14 +378,43 @@ job:mapping:{jobID}      → String (dry-run job mapping)
 ```go
 pipe := redis.Pipeline()
 pipe.HSet(key, "status", "INITIALIZING")
+// Legacy fields
 pipe.HSet(key, "total", "0")
 pipe.HSet(key, "done", "0")
 pipe.HSet(key, "errors", "0")
+// Phase-based fields
+pipe.HSet(key, "crawl_total", "0")
+pipe.HSet(key, "crawl_done", "0")
+pipe.HSet(key, "crawl_errors", "0")
+pipe.HSet(key, "analyze_total", "0")
+pipe.HSet(key, "analyze_done", "0")
+pipe.HSet(key, "analyze_errors", "0")
 pipe.Expire(key, 7 * 24 * time.Hour)
 pipe.Exec()
 ```
 
-**Update State (Collector Service):**
+**Update State - Phase-Based (Collector Service - Recommended):**
+
+```go
+// Set crawl phase totals
+redis.HSet(key, "crawl_total", crawlCount)
+redis.HSet(key, "status", "CRAWLING")
+
+// Increment crawl done
+redis.HIncrBy(key, "crawl_done", 1)
+
+// Set analyze phase totals (after crawl complete)
+redis.HSet(key, "analyze_total", analyzeCount)
+redis.HSet(key, "status", "PROCESSING")
+
+// Increment analyze done
+redis.HIncrBy(key, "analyze_done", 1)
+
+// Mark complete
+redis.HSet(key, "status", "DONE")
+```
+
+**Update State - Legacy (Collector Service - Deprecated):**
 
 ```go
 // Set total items
@@ -433,7 +509,30 @@ redis.HSet(key, "status", "DONE")
 **Endpoint:** `POST /internal/progress/callback`
 **Auth:** `X-Internal-Key` header
 
-**Request:**
+**Request (New Phase-Based Format - Recommended):**
+
+```json
+{
+  "project_id": "uuid",
+  "user_id": "uuid",
+  "status": "PROCESSING",
+  "crawl": {
+    "total": 100,
+    "done": 100,
+    "errors": 0,
+    "progress_percent": 100.0
+  },
+  "analyze": {
+    "total": 100,
+    "done": 45,
+    "errors": 2,
+    "progress_percent": 47.0
+  },
+  "overall_progress_percent": 73.5
+}
+```
+
+**Request (Legacy Flat Format - Deprecated):**
 
 ```json
 {
@@ -449,14 +548,42 @@ redis.HSet(key, "status", "DONE")
 **Behavior:**
 
 1. Validate `X-Internal-Key`
-2. Calculate progress percent
-3. Determine message type (`project_progress` or `project_completed`)
-4. Publish to Redis Pub/Sub channel `user_noti:{user_id}`
+2. Detect format (new phase-based vs old flat)
+3. If old format: log deprecation warning
+4. Calculate progress percent (from phases or flat fields)
+5. Determine message type (`project_progress` or `project_completed`)
+6. Build WebSocket message with phase structure
+7. Publish to Redis Pub/Sub channel `project:{project_id}:{user_id}`
 
 **Message Types:**
 
 - `project_progress`: Khi status là INITIALIZING, CRAWLING, PROCESSING
 - `project_completed`: Khi status là DONE hoặc FAILED
+
+**WebSocket Message Format:**
+
+```json
+{
+  "type": "project_progress",
+  "payload": {
+    "project_id": "uuid",
+    "status": "PROCESSING",
+    "crawl": {
+      "total": 100,
+      "done": 80,
+      "errors": 2,
+      "progress_percent": 82.0
+    },
+    "analyze": {
+      "total": 78,
+      "done": 45,
+      "errors": 1,
+      "progress_percent": 59.0
+    },
+    "overall_progress_percent": 70.5
+  }
+}
+```
 
 ### 7.2. Dry-Run Callback
 
@@ -505,17 +632,17 @@ redis.HSet(key, "status", "DONE")
 
 ### 8.1. Error Codes
 
-| Code  | Name                       | HTTP Status | Description               |
-| ----- | -------------------------- | ----------- | ------------------------- |
-| 30001 | ErrInternal                | 500         | Internal server error     |
-| 30002 | ErrWrongBody               | 400         | Invalid request body      |
-| 30003 | ErrInvalidID               | 400         | Invalid project ID format |
-| 30004 | ErrProjectNotFound         | 404         | Project không tồn tại     |
-| 30005 | ErrUnauthorized            | 403         | Không có quyền truy cập   |
+| Code  | Name                       | HTTP Status | Description                                                        |
+| ----- | -------------------------- | ----------- | ------------------------------------------------------------------ |
+| 30001 | ErrInternal                | 500         | Internal server error                                              |
+| 30002 | ErrWrongBody               | 400         | Invalid request body                                               |
+| 30003 | ErrInvalidID               | 400         | Invalid project ID format                                          |
+| 30004 | ErrProjectNotFound         | 404         | Project không tồn tại                                              |
+| 30005 | ErrUnauthorized            | 403         | Không có quyền truy cập                                            |
 | 30006 | ErrInvalidStatus           | 400         | Status không hợp lệ (phải là "draft", "process", hoặc "completed") |
-| 30007 | ErrInvalidDateRange        | 400         | Date range không hợp lệ   |
-| 30008 | ErrProjectAlreadyExecuting | 409         | Project đang được execute |
-| 30009 | ErrInvalidStatusTransition | 400         | Status transition không hợp lệ |
+| 30007 | ErrInvalidDateRange        | 400         | Date range không hợp lệ                                            |
+| 30008 | ErrProjectAlreadyExecuting | 409         | Project đang được execute                                          |
+| 30009 | ErrInvalidStatusTransition | 400         | Status transition không hợp lệ                                     |
 
 ### 8.2. Error Response Format
 
@@ -656,11 +783,13 @@ The project lifecycle follows a simplified three-state model:
 ```
 
 **Valid Transitions:**
+
 - `draft` → `process` (via Execute API)
 - `process` → `completed` (via system/webhook)
 - `process` → `draft` (rollback on failure)
 
 **Invalid Transitions:**
+
 - `draft` → `completed` (must go through process)
 - `completed` → `draft` (no going back)
 - `completed` → `process` (no re-execution)
@@ -671,12 +800,14 @@ The project lifecycle follows a simplified three-state model:
 The system maintains two separate status tracking mechanisms:
 
 **PostgreSQL Status (Persistent):**
+
 - Lifecycle state: `draft`, `process`, `completed`
 - Persisted permanently
 - Visible to users via API
 - Updated by Project Service
 
 **Redis Execution State (Runtime):**
+
 - Processing state: `INITIALIZING`, `CRAWLING`, `PROCESSING`, `DONE`, `FAILED`
 - Temporary (7-day TTL)
 - Used for progress tracking
@@ -688,7 +819,7 @@ The system maintains two separate status tracking mechanisms:
 PostgreSQL "draft" status
     ↓
     No Redis state exists
-    
+
 PostgreSQL "process" status
     ↓
     Contains detailed Redis state:
@@ -704,6 +835,7 @@ PostgreSQL "completed" status (when Redis shows DONE)
 ```
 
 This separation allows:
+
 - Simple, clear lifecycle states in PostgreSQL
 - Detailed progress tracking in Redis
 - Clean separation of concerns between services

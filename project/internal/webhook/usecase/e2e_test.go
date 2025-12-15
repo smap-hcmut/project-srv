@@ -226,7 +226,7 @@ func TestE2E_DryRunCallbackToRedisPublish(t *testing.T) {
 	assert.Equal(t, 100.0, jobMessage.Progress.Percentage)
 }
 
-// TestE2E_ProjectProgressToRedisPublish tests the complete flow for project progress
+// TestE2E_ProjectProgressToRedisPublish tests the complete flow for project progress (old format)
 func TestE2E_ProjectProgressToRedisPublish(t *testing.T) {
 	ctx := context.Background()
 	mockRedis := newConcurrentMockRedisClient()
@@ -237,7 +237,7 @@ func TestE2E_ProjectProgressToRedisPublish(t *testing.T) {
 		redisClient: mockRedis,
 	}
 
-	// Create progress callback request
+	// Create progress callback request (old flat format)
 	req := webhook.ProgressCallbackRequest{
 		ProjectID: "e2e_proj_123",
 		UserID:    "e2e_user_456",
@@ -259,16 +259,290 @@ func TestE2E_ProjectProgressToRedisPublish(t *testing.T) {
 	expectedChannel := "project:e2e_proj_123:e2e_user_456"
 	assert.Equal(t, expectedChannel, messages[0].Channel, "Channel should match expected pattern")
 
-	// Verify message structure
-	var projectMessage webhook.ProjectMessage
-	err = json.Unmarshal(messages[0].Message, &projectMessage)
-	require.NoError(t, err, "Should unmarshal to ProjectMessage")
+	// Verify message is valid JSON with expected structure
+	var wsMessage map[string]interface{}
+	err = json.Unmarshal(messages[0].Message, &wsMessage)
+	require.NoError(t, err, "Should unmarshal to map")
 
-	assert.Equal(t, webhook.StatusProcessing, projectMessage.Status)
-	assert.NotNil(t, projectMessage.Progress)
-	assert.Equal(t, 50, projectMessage.Progress.Current)
-	assert.Equal(t, 100, projectMessage.Progress.Total)
-	assert.Equal(t, 50.0, projectMessage.Progress.Percentage)
+	// Verify WebSocket message structure
+	assert.Equal(t, "project_progress", wsMessage["type"])
+	payload := wsMessage["payload"].(map[string]interface{})
+	assert.Equal(t, "e2e_proj_123", payload["project_id"])
+	assert.Equal(t, "PROCESSING", payload["status"])
+}
+
+// TestE2E_PhaseBasedProgressToRedisPublish tests the complete flow for phase-based progress (new format)
+func TestE2E_PhaseBasedProgressToRedisPublish(t *testing.T) {
+	ctx := context.Background()
+	mockRedis := newConcurrentMockRedisClient()
+	logger := log.NewNopLogger()
+
+	uc := &usecase{
+		l:           logger,
+		redisClient: mockRedis,
+	}
+
+	// Create progress callback request (new phase-based format)
+	req := webhook.ProgressCallbackRequest{
+		ProjectID: "e2e_phase_proj_123",
+		UserID:    "e2e_user_456",
+		Status:    "PROCESSING",
+		Crawl: webhook.PhaseProgress{
+			Total:           100,
+			Done:            80,
+			Errors:          5,
+			ProgressPercent: 85.0,
+		},
+		Analyze: webhook.PhaseProgress{
+			Total:           80,
+			Done:            40,
+			Errors:          2,
+			ProgressPercent: 52.5,
+		},
+		OverallProgressPercent: 68.75,
+	}
+
+	// Execute the handler
+	err := uc.HandleProgressCallback(ctx, req)
+	require.NoError(t, err, "HandleProgressCallback should succeed with phase-based format")
+
+	// Verify Redis publish
+	messages := mockRedis.getPublishedMessages()
+	require.Len(t, messages, 1, "Should publish exactly one message")
+
+	// Verify channel pattern
+	expectedChannel := "project:e2e_phase_proj_123:e2e_user_456"
+	assert.Equal(t, expectedChannel, messages[0].Channel, "Channel should match expected pattern")
+
+	// Verify WebSocket message structure with phase data
+	var wsMessage map[string]interface{}
+	err = json.Unmarshal(messages[0].Message, &wsMessage)
+	require.NoError(t, err, "Should unmarshal to map")
+
+	assert.Equal(t, "project_progress", wsMessage["type"])
+	payload := wsMessage["payload"].(map[string]interface{})
+	assert.Equal(t, "e2e_phase_proj_123", payload["project_id"])
+	assert.Equal(t, "PROCESSING", payload["status"])
+
+	// Verify crawl phase data
+	crawl := payload["crawl"].(map[string]interface{})
+	assert.Equal(t, float64(100), crawl["total"])
+	assert.Equal(t, float64(80), crawl["done"])
+	assert.Equal(t, float64(5), crawl["errors"])
+	assert.Equal(t, 85.0, crawl["progress_percent"])
+
+	// Verify analyze phase data
+	analyze := payload["analyze"].(map[string]interface{})
+	assert.Equal(t, float64(80), analyze["total"])
+	assert.Equal(t, float64(40), analyze["done"])
+	assert.Equal(t, float64(2), analyze["errors"])
+	assert.Equal(t, 52.5, analyze["progress_percent"])
+
+	// Verify overall progress
+	assert.Equal(t, 68.75, payload["overall_progress_percent"])
+}
+
+// TestE2E_PhaseBasedProgressCompleted tests completion message with phase data
+func TestE2E_PhaseBasedProgressCompleted(t *testing.T) {
+	ctx := context.Background()
+	mockRedis := newConcurrentMockRedisClient()
+	logger := log.NewNopLogger()
+
+	uc := &usecase{
+		l:           logger,
+		redisClient: mockRedis,
+	}
+
+	// Create completed progress callback request
+	req := webhook.ProgressCallbackRequest{
+		ProjectID: "e2e_complete_proj",
+		UserID:    "e2e_user_456",
+		Status:    "DONE",
+		Crawl: webhook.PhaseProgress{
+			Total:           100,
+			Done:            98,
+			Errors:          2,
+			ProgressPercent: 100.0,
+		},
+		Analyze: webhook.PhaseProgress{
+			Total:           98,
+			Done:            95,
+			Errors:          3,
+			ProgressPercent: 100.0,
+		},
+		OverallProgressPercent: 100.0,
+	}
+
+	// Execute the handler
+	err := uc.HandleProgressCallback(ctx, req)
+	require.NoError(t, err, "HandleProgressCallback should succeed")
+
+	// Verify Redis publish
+	messages := mockRedis.getPublishedMessages()
+	require.Len(t, messages, 1, "Should publish exactly one message")
+
+	// Verify WebSocket message type is project_completed
+	var wsMessage map[string]interface{}
+	err = json.Unmarshal(messages[0].Message, &wsMessage)
+	require.NoError(t, err, "Should unmarshal to map")
+
+	assert.Equal(t, "project_completed", wsMessage["type"], "Should be project_completed for DONE status")
+	payload := wsMessage["payload"].(map[string]interface{})
+	assert.Equal(t, "DONE", payload["status"])
+	assert.Equal(t, 100.0, payload["overall_progress_percent"])
+}
+
+// TestBackwardCompatibility_OldFormatStillWorks tests that old format continues to work
+func TestBackwardCompatibility_OldFormatStillWorks(t *testing.T) {
+	ctx := context.Background()
+	mockRedis := newConcurrentMockRedisClient()
+	logger := log.NewNopLogger()
+
+	uc := &usecase{
+		l:           logger,
+		redisClient: mockRedis,
+	}
+
+	tests := []struct {
+		name   string
+		req    webhook.ProgressCallbackRequest
+		status string
+	}{
+		{
+			name: "old format CRAWLING status",
+			req: webhook.ProgressCallbackRequest{
+				ProjectID: "old_format_proj_1",
+				UserID:    "user_123",
+				Status:    "CRAWLING",
+				Total:     100,
+				Done:      50,
+				Errors:    0,
+			},
+			status: "CRAWLING",
+		},
+		{
+			name: "old format PROCESSING status",
+			req: webhook.ProgressCallbackRequest{
+				ProjectID: "old_format_proj_2",
+				UserID:    "user_123",
+				Status:    "PROCESSING",
+				Total:     100,
+				Done:      75,
+				Errors:    5,
+			},
+			status: "PROCESSING",
+		},
+		{
+			name: "old format DONE status",
+			req: webhook.ProgressCallbackRequest{
+				ProjectID: "old_format_proj_3",
+				UserID:    "user_123",
+				Status:    "DONE",
+				Total:     100,
+				Done:      100,
+				Errors:    0,
+			},
+			status: "DONE",
+		},
+		{
+			name: "old format FAILED status",
+			req: webhook.ProgressCallbackRequest{
+				ProjectID: "old_format_proj_4",
+				UserID:    "user_123",
+				Status:    "FAILED",
+				Total:     100,
+				Done:      50,
+				Errors:    50,
+			},
+			status: "FAILED",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRedis.reset()
+
+			err := uc.HandleProgressCallback(ctx, tt.req)
+			require.NoError(t, err, "Old format should still work")
+
+			messages := mockRedis.getPublishedMessages()
+			require.Len(t, messages, 1, "Should publish message")
+
+			var wsMessage map[string]interface{}
+			err = json.Unmarshal(messages[0].Message, &wsMessage)
+			require.NoError(t, err)
+
+			payload := wsMessage["payload"].(map[string]interface{})
+			assert.Equal(t, tt.status, payload["status"])
+		})
+	}
+}
+
+// TestMixedFormatScenarios tests handling of mixed old and new format requests
+func TestMixedFormatScenarios(t *testing.T) {
+	ctx := context.Background()
+	mockRedis := newConcurrentMockRedisClient()
+	logger := log.NewNopLogger()
+
+	uc := &usecase{
+		l:           logger,
+		redisClient: mockRedis,
+	}
+
+	// Send old format first
+	oldReq := webhook.ProgressCallbackRequest{
+		ProjectID: "mixed_proj",
+		UserID:    "user_123",
+		Status:    "PROCESSING",
+		Total:     100,
+		Done:      30,
+		Errors:    0,
+	}
+	err := uc.HandleProgressCallback(ctx, oldReq)
+	require.NoError(t, err)
+
+	// Then send new format
+	newReq := webhook.ProgressCallbackRequest{
+		ProjectID: "mixed_proj",
+		UserID:    "user_123",
+		Status:    "PROCESSING",
+		Crawl: webhook.PhaseProgress{
+			Total:           100,
+			Done:            100,
+			Errors:          0,
+			ProgressPercent: 100.0,
+		},
+		Analyze: webhook.PhaseProgress{
+			Total:           100,
+			Done:            50,
+			Errors:          0,
+			ProgressPercent: 50.0,
+		},
+		OverallProgressPercent: 75.0,
+	}
+	err = uc.HandleProgressCallback(ctx, newReq)
+	require.NoError(t, err)
+
+	// Verify both messages were published
+	messages := mockRedis.getPublishedMessages()
+	assert.Len(t, messages, 2, "Should publish both messages")
+
+	// Verify first message (old format) has phase data with zeros
+	var msg1 map[string]interface{}
+	err = json.Unmarshal(messages[0].Message, &msg1)
+	require.NoError(t, err)
+	payload1 := msg1["payload"].(map[string]interface{})
+	crawl1 := payload1["crawl"].(map[string]interface{})
+	assert.Equal(t, float64(0), crawl1["total"], "Old format should have zero crawl total")
+
+	// Verify second message (new format) has phase data
+	var msg2 map[string]interface{}
+	err = json.Unmarshal(messages[1].Message, &msg2)
+	require.NoError(t, err)
+	payload2 := msg2["payload"].(map[string]interface{})
+	crawl2 := payload2["crawl"].(map[string]interface{})
+	assert.Equal(t, float64(100), crawl2["total"], "New format should have crawl total")
+	assert.Equal(t, 75.0, payload2["overall_progress_percent"])
 }
 
 // createTestContent creates a test content item for testing
@@ -476,13 +750,14 @@ func TestBoundaryConditions(t *testing.T) {
 		messages := mockRedis.getPublishedMessages()
 		require.Len(t, messages, 1)
 
-		var projectMessage webhook.ProjectMessage
-		err = json.Unmarshal(messages[0].Message, &projectMessage)
+		// Parse WebSocket message format
+		var wsMessage map[string]interface{}
+		err = json.Unmarshal(messages[0].Message, &wsMessage)
 		require.NoError(t, err)
 
-		assert.Equal(t, 0, projectMessage.Progress.Current)
-		assert.Equal(t, 0, projectMessage.Progress.Total)
-		assert.Equal(t, 0.0, projectMessage.Progress.Percentage, "Percentage should be 0 when total is 0")
+		payload := wsMessage["payload"].(map[string]interface{})
+		assert.Equal(t, "INITIALIZING", payload["status"])
+		assert.Equal(t, 0.0, payload["overall_progress_percent"], "Percentage should be 0 when total is 0")
 	})
 
 	t.Run("100% progress", func(t *testing.T) {
@@ -503,12 +778,14 @@ func TestBoundaryConditions(t *testing.T) {
 		messages := mockRedis.getPublishedMessages()
 		require.Len(t, messages, 1)
 
-		var projectMessage webhook.ProjectMessage
-		err = json.Unmarshal(messages[0].Message, &projectMessage)
+		// Parse WebSocket message format
+		var wsMessage map[string]interface{}
+		err = json.Unmarshal(messages[0].Message, &wsMessage)
 		require.NoError(t, err)
 
-		assert.Equal(t, webhook.StatusCompleted, projectMessage.Status)
-		assert.Equal(t, 100.0, projectMessage.Progress.Percentage)
+		assert.Equal(t, "project_completed", wsMessage["type"])
+		payload := wsMessage["payload"].(map[string]interface{})
+		assert.Equal(t, "DONE", payload["status"])
 	})
 
 	t.Run("large error count", func(t *testing.T) {
@@ -529,13 +806,14 @@ func TestBoundaryConditions(t *testing.T) {
 		messages := mockRedis.getPublishedMessages()
 		require.Len(t, messages, 1)
 
-		var projectMessage webhook.ProjectMessage
-		err = json.Unmarshal(messages[0].Message, &projectMessage)
+		// Parse WebSocket message format
+		var wsMessage map[string]interface{}
+		err = json.Unmarshal(messages[0].Message, &wsMessage)
 		require.NoError(t, err)
 
-		assert.Equal(t, webhook.StatusFailed, projectMessage.Status)
-		assert.Len(t, projectMessage.Progress.Errors, 1)
-		assert.Contains(t, projectMessage.Progress.Errors[0], "999 errors")
+		assert.Equal(t, "project_completed", wsMessage["type"])
+		payload := wsMessage["payload"].(map[string]interface{})
+		assert.Equal(t, "FAILED", payload["status"])
 	})
 }
 

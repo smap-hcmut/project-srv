@@ -4,9 +4,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"smap-project/internal/webhook"
 	"smap-project/pkg/log"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // createTestUsecase creates a usecase instance for testing
@@ -168,11 +169,11 @@ func TestTransformDryRunCallback(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := uc.TransformDryRunCallback(tt.req)
-			
+
 			// Assert platform and status
 			assert.Equal(t, tt.expected.Platform, result.Platform)
 			assert.Equal(t, tt.expected.Status, result.Status)
-			
+
 			// Assert batch data
 			if tt.expected.Batch == nil {
 				assert.Nil(t, result.Batch)
@@ -180,7 +181,7 @@ func TestTransformDryRunCallback(t *testing.T) {
 				assert.NotNil(t, result.Batch)
 				assert.Equal(t, tt.expected.Batch.Keyword, result.Batch.Keyword)
 				assert.Len(t, result.Batch.ContentList, len(tt.expected.Batch.ContentList))
-				
+
 				// Check content items if any
 				for i, expectedItem := range tt.expected.Batch.ContentList {
 					actualItem := result.Batch.ContentList[i]
@@ -190,7 +191,7 @@ func TestTransformDryRunCallback(t *testing.T) {
 					assert.Equal(t, expectedItem.Metrics, actualItem.Metrics)
 					assert.Equal(t, expectedItem.PublishedAt, actualItem.PublishedAt)
 					assert.Equal(t, expectedItem.Permalink, actualItem.Permalink)
-					
+
 					if expectedItem.Media == nil {
 						assert.Nil(t, actualItem.Media)
 					} else {
@@ -199,7 +200,7 @@ func TestTransformDryRunCallback(t *testing.T) {
 					}
 				}
 			}
-			
+
 			// Assert progress
 			if tt.expected.Progress == nil {
 				assert.Nil(t, result.Progress)
@@ -224,7 +225,7 @@ func TestTransformProjectCallback(t *testing.T) {
 		expected webhook.ProjectMessage
 	}{
 		{
-			name: "project in progress",
+			name: "old format - project in progress",
 			req: webhook.ProgressCallbackRequest{
 				ProjectID: "proj_123",
 				UserID:    "user_456",
@@ -245,7 +246,7 @@ func TestTransformProjectCallback(t *testing.T) {
 			},
 		},
 		{
-			name: "project completed",
+			name: "old format - project completed",
 			req: webhook.ProgressCallbackRequest{
 				ProjectID: "proj_456",
 				UserID:    "user_789",
@@ -266,7 +267,7 @@ func TestTransformProjectCallback(t *testing.T) {
 			},
 		},
 		{
-			name: "project failed with errors",
+			name: "old format - project failed with errors",
 			req: webhook.ProgressCallbackRequest{
 				ProjectID: "proj_789",
 				UserID:    "user_123",
@@ -291,7 +292,7 @@ func TestTransformProjectCallback(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := uc.TransformProjectCallback(tt.req)
-			
+
 			assert.Equal(t, tt.expected.Status, result.Status)
 			assert.NotNil(t, result.Progress)
 			assert.Equal(t, tt.expected.Progress.Current, result.Progress.Current)
@@ -299,6 +300,233 @@ func TestTransformProjectCallback(t *testing.T) {
 			assert.Equal(t, tt.expected.Progress.Percentage, result.Progress.Percentage)
 			assert.Equal(t, tt.expected.Progress.ETA, result.Progress.ETA)
 			assert.Equal(t, tt.expected.Progress.Errors, result.Progress.Errors)
+		})
+	}
+}
+
+func TestTransformProjectCallback_NewFormat(t *testing.T) {
+	uc := createTestUsecase()
+
+	tests := []struct {
+		name     string
+		req      webhook.ProgressCallbackRequest
+		expected webhook.ProjectMessage
+	}{
+		{
+			name: "new format - crawl in progress",
+			req: webhook.ProgressCallbackRequest{
+				ProjectID: "proj_123",
+				UserID:    "user_456",
+				Status:    "PROCESSING",
+				Crawl: webhook.PhaseProgress{
+					Total:           100,
+					Done:            60,
+					Errors:          5,
+					ProgressPercent: 65.0,
+				},
+				Analyze: webhook.PhaseProgress{
+					Total:           0,
+					Done:            0,
+					Errors:          0,
+					ProgressPercent: 0.0,
+				},
+				OverallProgressPercent: 32.5,
+			},
+			expected: webhook.ProjectMessage{
+				Status: webhook.StatusProcessing,
+				Progress: &webhook.Progress{
+					Current:    60,
+					Total:      100,
+					Percentage: 32.5,
+					ETA:        0.0,
+					Errors:     []string{"Crawl phase encountered 5 errors"},
+				},
+			},
+		},
+		{
+			name: "new format - both phases in progress",
+			req: webhook.ProgressCallbackRequest{
+				ProjectID: "proj_456",
+				UserID:    "user_789",
+				Status:    "PROCESSING",
+				Crawl: webhook.PhaseProgress{
+					Total:           100,
+					Done:            100,
+					Errors:          0,
+					ProgressPercent: 100.0,
+				},
+				Analyze: webhook.PhaseProgress{
+					Total:           100,
+					Done:            50,
+					Errors:          2,
+					ProgressPercent: 52.0,
+				},
+				OverallProgressPercent: 76.0,
+			},
+			expected: webhook.ProjectMessage{
+				Status: webhook.StatusProcessing,
+				Progress: &webhook.Progress{
+					Current:    150,
+					Total:      200,
+					Percentage: 76.0,
+					ETA:        0.0,
+					Errors:     []string{"Analyze phase encountered 2 errors"},
+				},
+			},
+		},
+		{
+			name: "new format - completed",
+			req: webhook.ProgressCallbackRequest{
+				ProjectID: "proj_789",
+				UserID:    "user_123",
+				Status:    "DONE",
+				Crawl: webhook.PhaseProgress{
+					Total:           100,
+					Done:            98,
+					Errors:          2,
+					ProgressPercent: 100.0,
+				},
+				Analyze: webhook.PhaseProgress{
+					Total:           98,
+					Done:            95,
+					Errors:          3,
+					ProgressPercent: 100.0,
+				},
+				OverallProgressPercent: 100.0,
+			},
+			expected: webhook.ProjectMessage{
+				Status: webhook.StatusCompleted,
+				Progress: &webhook.Progress{
+					Current:    193,
+					Total:      198,
+					Percentage: 100.0,
+					ETA:        0.0,
+					Errors: []string{
+						"Crawl phase encountered 2 errors",
+						"Analyze phase encountered 3 errors",
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := uc.TransformProjectCallback(tt.req)
+
+			assert.Equal(t, tt.expected.Status, result.Status)
+			assert.NotNil(t, result.Progress)
+			assert.Equal(t, tt.expected.Progress.Current, result.Progress.Current)
+			assert.Equal(t, tt.expected.Progress.Total, result.Progress.Total)
+			assert.Equal(t, tt.expected.Progress.Percentage, result.Progress.Percentage)
+			assert.Equal(t, tt.expected.Progress.ETA, result.Progress.ETA)
+			assert.Equal(t, tt.expected.Progress.Errors, result.Progress.Errors)
+		})
+	}
+}
+
+func TestIsNewProgressFormat(t *testing.T) {
+	uc := createTestUsecase()
+
+	tests := []struct {
+		name     string
+		req      webhook.ProgressCallbackRequest
+		expected bool
+	}{
+		{
+			name: "old format - no phase data",
+			req: webhook.ProgressCallbackRequest{
+				ProjectID: "proj_123",
+				Total:     100,
+				Done:      50,
+			},
+			expected: false,
+		},
+		{
+			name: "new format - crawl has data",
+			req: webhook.ProgressCallbackRequest{
+				ProjectID: "proj_123",
+				Crawl: webhook.PhaseProgress{
+					Total: 100,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "new format - analyze has data",
+			req: webhook.ProgressCallbackRequest{
+				ProjectID: "proj_123",
+				Analyze: webhook.PhaseProgress{
+					Total: 50,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "new format - both have data",
+			req: webhook.ProgressCallbackRequest{
+				ProjectID: "proj_123",
+				Crawl: webhook.PhaseProgress{
+					Total: 100,
+				},
+				Analyze: webhook.PhaseProgress{
+					Total: 50,
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := uc.isNewProgressFormat(tt.req)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestBuildPhaseErrors(t *testing.T) {
+	uc := createTestUsecase()
+
+	tests := []struct {
+		name          string
+		crawlErrors   int64
+		analyzeErrors int64
+		expected      []string
+	}{
+		{
+			name:          "no errors",
+			crawlErrors:   0,
+			analyzeErrors: 0,
+			expected:      nil,
+		},
+		{
+			name:          "crawl errors only",
+			crawlErrors:   5,
+			analyzeErrors: 0,
+			expected:      []string{"Crawl phase encountered 5 errors"},
+		},
+		{
+			name:          "analyze errors only",
+			crawlErrors:   0,
+			analyzeErrors: 3,
+			expected:      []string{"Analyze phase encountered 3 errors"},
+		},
+		{
+			name:          "both phases have errors",
+			crawlErrors:   2,
+			analyzeErrors: 4,
+			expected: []string{
+				"Crawl phase encountered 2 errors",
+				"Analyze phase encountered 4 errors",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := uc.buildPhaseErrors(tt.crawlErrors, tt.analyzeErrors)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }

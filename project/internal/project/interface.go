@@ -18,5 +18,6 @@ type UseCase interface {
 	// SuggestKeywords(ctx context.Context, sc model.Scope, brandName string) ([]string, []string, error)
 	DryRunKeywords(ctx context.Context, sc model.Scope, input DryRunKeywordsInput) (DryRunKeywordsOutput, error)
 	GetProgress(ctx context.Context, sc model.Scope, projectID string) (ProgressOutput, error)
+	GetPhaseProgress(ctx context.Context, sc model.Scope, projectID string) (ProjectProgressOutput, error)
 	Execute(ctx context.Context, sc model.Scope, projectID string) error
 }
