@@ -108,9 +108,10 @@ type RedisConfig struct {
 // LoggerConfig is the configuration for the logger,
 // which is used to log the application.
 type LoggerConfig struct {
-	Level    string `env:"LOGGER_LEVEL" envDefault:"debug"`
-	Mode     string `env:"LOGGER_MODE" envDefault:"debug"`
-	Encoding string `env:"LOGGER_ENCODING" envDefault:"console"`
+	Level        string `env:"LOGGER_LEVEL" envDefault:"debug"`
+	Mode         string `env:"LOGGER_MODE" envDefault:"debug"`
+	Encoding     string `env:"LOGGER_ENCODING" envDefault:"console"`
+	ColorEnabled bool   `env:"LOGGER_COLOR_ENABLED" envDefault:"true"`
 }
 
 // PostgresConfig is the configuration for the Postgres,
