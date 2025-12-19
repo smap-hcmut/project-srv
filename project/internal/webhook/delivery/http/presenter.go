@@ -7,12 +7,10 @@ import (
 // CallbackReq represents the HTTP request for webhook callback
 type CallbackReq struct {
 	JobID    string                  `json:"job_id" binding:"required"`
-	Status   string                  `json:"status" binding:"required,oneof=success failed"`
-	Platform string                  `json:"platform" binding:"required,oneof=youtube tiktok"`
+	Status   string                  `json:"status" binding:"required"`
+	Platform string                  `json:"platform" binding:"required"`
 	Payload  webhook.CallbackPayload `json:"payload"`
-	// UserID is optional for backward compatibility during migration.
-	// The project service will look up UserID from JobID using Redis.
-	UserID string `json:"user_id,omitempty"`
+	UserID   string                  `json:"user_id,omitempty"`
 }
 
 func (r CallbackReq) toInput() webhook.CallbackRequest {
