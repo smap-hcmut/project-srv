@@ -6,36 +6,8 @@ SMAP Project Service manages project-related operations for the SMAP platform. I
 
 ## Tech Stack
 
-- **Language**: Go 1.25+
-- **Web Framework**: Gin
-- **Database**: PostgreSQL 15+
-- **ORM**: SQLBoiler
-- **Authentication**: JWT
-- **Documentation**: Swagger
-- **Infrastructure**: Docker, Docker Compose
-- **Object Storage**: MinIO
-- **Messaging**: RabbitMQ
-**SMAP Project Service** is a project management microservice for the SMAP platform. It provides comprehensive project lifecycle management, brand tracking, and competitor analysis capabilities.
-
-### Key Goals
-- Manage project CRUD operations with user isolation
-- Track brand names and associated keywords
-- Monitor competitor names and their keyword mappings
-- Support project status workflow (draft → active → completed/archived/cancelled)
-- Provide pagination and filtering for large datasets
-- Maintain data integrity with soft delete pattern
-
-### Core Features
-- **Project Management**: Full lifecycle management with date range validation
-- **Brand Tracking**: Track brand names and multiple keywords per brand
-- **Competitor Analysis**: Monitor competitors with flexible keyword mapping (JSONB)
-- **User Isolation**: Users can only access their own projects
-- **Soft Delete**: Data retention for audit purposes
-
-## Tech Stack
-
 ### Backend Core
-- **Go** 1.23+ - Primary programming language
+- **Go** 1.25+ - Primary programming language
 - **Gin** v1.11.0 - HTTP web framework and routing
 - **PostgreSQL** 15+ - Primary relational database
 - **SQLBoiler** v4.19.5 - Type-safe ORM with code generation
@@ -57,10 +29,11 @@ SMAP Project Service manages project-related operations for the SMAP platform. I
 - **Make** - Build automation and task management
 - **Docker** - Containerization
 
-### Infrastructure (Optional/Commented)
-- **MinIO** - Object storage (currently commented out)
-- **RabbitMQ** - Message queue (currently commented out)
-- **Discord Webhooks** - Notification system
+### Infrastructure
+- **Redis** - Pub/sub messaging and state management (DB 0: job mapping, DB 1: project progress tracking)
+- **RabbitMQ** - Message queue for async operations
+- **MinIO** - Object storage (infrastructure ready but not actively used)
+- **Discord Webhooks** - Notification system for error reporting
 
 ### Supporting Libraries
 - **caarlos0/env/v9** - Environment variable parsing
@@ -70,41 +43,6 @@ SMAP Project Service manages project-related operations for the SMAP platform. I
 
 ## Project Conventions
 
-### Code Style
-
-- Standard Go conventions (gofmt)
-- Project layout follows standard Go patterns (`cmd`, `internal`, `pkg`)
-
-### Architecture Patterns
-
-- **Layered Architecture**: Handlers -> Services -> Repositories
-- **Dependency Injection**: Manual injection in `main.go`
-
-### Testing Strategy
-
-- Standard Go testing (`go test`)
-- Unit tests for business logic
-
-### Git Workflow
-
-- Feature branching strategy
-
-## Domain Context
-
-- **Projects**: Core entity, belongs to a user.
-- **Brand & Competitors**: Projects track a brand and its competitors.
-- **Keywords**: Used for tracking brand and competitor mentions.
-
-## Important Constraints
-
-- **User Isolation**: Users can only access their own projects.
-- **Soft Delete**: Projects are soft-deleted for audit purposes.
-
-## External Dependencies
-
-- **PostgreSQL**: Primary data store.
-- **MinIO**: For file storage (if applicable).
-- **RabbitMQ**: For asynchronous tasks.
 **Naming Conventions:**
 - **Exported identifiers**: PascalCase (e.g., `Project`, `CreateInput`, `Handler`)
 - **Private identifiers**: camelCase (e.g., `handler`, `usecase`, `repository`)
@@ -326,12 +264,29 @@ HTTP Response ← Presenter ← Output ← Domain Model
 - **Configuration**: Available in config but commented out in main.go
 - **Use Case**: Would be used for project file attachments if enabled
 
-**4. RabbitMQ (Message Queue)**
-- **Purpose**: Async message processing (currently not active)
-- **Configuration**: Available in config but commented out in main.go
-- **Use Case**: Would be used for async operations if enabled
+**3. Redis (Cache & State Management)**
+- **Purpose**: Pub/sub messaging and project progress state tracking
+- **Configuration**: Two Redis databases
+  - DB 0: Main Redis for job mapping and pub/sub
+  - DB 1: State Redis for project progress tracking
+- **Connection**: `redis://host:port` with password support
+- **Features Used**:
+  - Pub/sub for webhook event processing
+  - Job mapping storage (job_id → user_id, project_id)
+  - Project progress state tracking
+- **Port**: 6379 (default)
 
-**5. Discord Webhooks**
+**4. RabbitMQ (Message Queue)**
+- **Purpose**: Async message processing for project operations
+- **Configuration**: Connection URL from environment variables
+- **Use Case**: Used for async project-related message processing
+
+**5. MinIO (Object Storage)**
+- **Purpose**: File storage (infrastructure ready but not actively used)
+- **Configuration**: Available in config but not initialized in main.go
+- **Use Case**: Would be used for project file attachments if enabled
+
+**6. Discord Webhooks**
 - **Purpose**: Error notifications and monitoring alerts
 - **Integration**: Active, used for error reporting
 - **Configuration**: Webhook ID and token from environment variables
@@ -343,6 +298,13 @@ Project API Server
 ├── PostgreSQL (Required)
 │   └── Projects data persistence
 │
+├── Redis (Required)
+│   ├── DB 0: Job mapping and pub/sub
+│   └── DB 1: Project progress state tracking
+│
+├── RabbitMQ (Required)
+│   └── Async message processing
+│
 ├── Identity Service (Indirect - via JWT)
 │   └── User authentication (stateless)
 │
@@ -351,7 +313,7 @@ Project API Server
 ```
 
 **Dependency Notes:**
-- PostgreSQL is the only hard dependency (required for service to start)
+- PostgreSQL, Redis, and RabbitMQ are hard dependencies (required for service to start)
 - Identity service is indirect (JWT tokens validated, no service calls)
-- MinIO and RabbitMQ are optional (infrastructure ready but not active)
+- MinIO infrastructure is ready but not actively used
 - Discord is active for monitoring but not critical for core functionality
