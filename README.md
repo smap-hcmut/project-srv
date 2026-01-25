@@ -39,21 +39,7 @@ The Project service uses **HttpOnly cookie authentication** for secure, stateles
 - Format: `Authorization: Bearer {token}`
 - Will be removed in future versions
 
-### Getting Authenticated
-
-```bash
-# Login via Identity service to get cookie
-curl -i -X POST https://smap-api.tantai.dev/identity/authentication/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "user@example.com",
-    "password": "your_password",
-    "remember": false
-  }' \
-  -c cookies.txt
-
-# Cookie is now stored and will be sent automatically
-```
+**Lưu ý:** Khi sử dụng Swagger UI, bạn có thể authenticate trực tiếp trong giao diện Swagger bằng cách click nút "Authorize" và nhập token hoặc cookie.
 
 ---
 
@@ -98,61 +84,40 @@ make migrate-up
 # Generate SQLBoiler models
 make sqlboiler
 
+# Generate Swagger documentation
+make swagger
+
 # Run the service
 make run-api
 ```
 
-### API Examples
+Service sẽ chạy tại `http://localhost:8080` (hoặc port được cấu hình trong `APP_PORT`).
 
-**Using Cookie Authentication (Recommended):**
+### Testing API với Swagger
 
-```bash
-# After logging in via Identity service, cookie is stored
-# Use -b flag to send cookies with request
-curl -X GET https://smap-api.tantai.dev/project/projects \
-  -b cookies.txt
-```
+Sau khi service đã chạy, bạn có thể test API thông qua Swagger UI:
 
-**Create Project with Cookie:**
+1. **Truy cập Swagger UI:**
 
-```bash
-curl -X POST https://smap-api.tantai.dev/project/projects \
-  -b cookies.txt \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Q1 2025 Campaign",
-    "status": "draft",
-    "from_date": "2025-01-01T00:00:00Z",
-    "to_date": "2025-03-31T23:59:59Z",
-    "brand_name": "MyBrand",
-    "brand_keywords": ["mybrand", "my brand"],
-    "competitor_names": ["Competitor A"],
-    "competitor_keywords_map": {
-      "Competitor A": ["competitor-a", "comp-a"]
-    }
-  }'
-```
+   ```
+   http://localhost:8080/swagger/index.html
+   ```
 
-**Using Bearer Token (Legacy):**
+2. **Authenticate (nếu cần):**
+   - Swagger hỗ trợ cả Cookie và Bearer token authentication
+   - Click vào nút "Authorize" ở góc trên bên phải
+   - Nhập token hoặc cookie để authenticate
 
-```bash
-# For backward compatibility during migration
-curl -X POST https://smap-api.tantai.dev/project/projects \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Q1 2025 Campaign",
-    "status": "draft",
-    "from_date": "2025-01-01T00:00:00Z",
-    "to_date": "2025-03-31T23:59:59Z",
-    "brand_name": "MyBrand",
-    "brand_keywords": ["mybrand", "my brand"],
-    "competitor_names": ["Competitor A"],
-    "competitor_keywords_map": {
-      "Competitor A": ["competitor-a", "comp-a"]
-    }
-  }'
-```
+3. **Test các endpoints:**
+   - Xem danh sách tất cả endpoints có sẵn
+   - Click "Try it out" trên bất kỳ endpoint nào
+   - Điền thông tin và click "Execute" để test
+   - Xem response trực tiếp trong Swagger UI
+
+**Lưu ý:** Để sử dụng Swagger với authentication:
+
+- **Cookie Auth**: Đảm bảo bạn đã login qua Identity service và cookie được lưu trong browser
+- **Bearer Token**: Nhập token vào phần "Authorize" trong Swagger UI
 
 ---
 
