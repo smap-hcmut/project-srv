@@ -1,8 +1,8 @@
 package middleware
 
 import (
-	"smap-project/pkg/response"
-	"smap-project/pkg/scope"
+	"project-srv/pkg/response"
+	"project-srv/pkg/scope"
 
 	"github.com/gin-gonic/gin"
 )
@@ -13,7 +13,7 @@ func (m Middleware) AdminOnly() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
 		payload, ok := scope.GetPayloadFromContext(ctx)
-		if !ok {
+		if !ok {	
 			response.Unauthorized(c)
 			c.Abort()
 			return

@@ -3,24 +3,22 @@ package httpserver
 import (
 	"context"
 
-	"smap-project/internal/keyword/usecase"
-	"smap-project/internal/middleware"
-	projecthttp "smap-project/internal/project/delivery/http"
-	projectProd "smap-project/internal/project/delivery/rabbitmq/producer"
-	projectrepository "smap-project/internal/project/repository/postgre"
-	projectusecase "smap-project/internal/project/usecase"
-	samplingusecase "smap-project/internal/sampling/usecase"
-	staterepo "smap-project/internal/state/repository/redis"
-	stateusecase "smap-project/internal/state/usecase"
-	webhookhttp "smap-project/internal/webhook/delivery/http"
-	webhookusecase "smap-project/internal/webhook/usecase"
-	"smap-project/pkg/i18n"
-	"smap-project/pkg/llm"
-	"smap-project/pkg/scope"
+	campaignhttp "project-srv/internal/campaign/delivery/http"
+	campaignrepo "project-srv/internal/campaign/repository/postgre"
+	campaignuc "project-srv/internal/campaign/usecase"
+	crisishttp "project-srv/internal/crisis/delivery/http"
+	crisisrepo "project-srv/internal/crisis/repository/postgre"
+	crisisuc "project-srv/internal/crisis/usecase"
+	"project-srv/internal/middleware"
+	projecthttp "project-srv/internal/project/delivery/http"
+	projectrepo "project-srv/internal/project/repository/postgre"
+	projectuc "project-srv/internal/project/usecase"
+	"project-srv/pkg/i18n"
+	"project-srv/pkg/scope"
 
 	// Import this to execute the init function in docs.go which setups the Swagger docs.
 	// Uncomment after running: make swagger
-	_ "smap-project/docs"
+	// _ "project-srv/docs"
 
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -35,38 +33,26 @@ func (srv HTTPServer) mapHandlers() error {
 
 	i18n.Init()
 
-	// Initialize LLM provider
-	llmProvider, err := llm.NewProvider(srv.llmConfig, srv.l)
-	if err != nil {
-		return err
-	}
+	// Campaign module
+	campaignRepo := campaignrepo.New(srv.postgresDB, srv.l)
+	campaignUC := campaignuc.New(srv.l, campaignRepo)
+	campaignHandler := campaignhttp.New(srv.l, campaignUC, srv.discord)
 
-	// Producer
-	projectProd := projectProd.New(srv.l, *srv.amqpConn)
-	if err := projectProd.Run(); err != nil {
-		return err
-	}
-
-	// Usecase
-	keywordUC := usecase.New(srv.l, llmProvider)
-
-	webhookUC := webhookusecase.New(srv.l, srv.mainRedisClient)
-	webhookHandler := webhookhttp.New(srv.l, webhookUC, srv.discord, srv.internalKey)
-
-	stateRepo := staterepo.NewStateRepository(srv.stateRedisClient, srv.l)
-	stateUC := stateusecase.New(stateRepo, srv.l)
-
-	projectRepo := projectrepository.New(srv.postgresDB, srv.l)
-
-	// Initialize sampling strategy with centralized config (fallback to defaults if invalid)
-	samplingStrategy := samplingusecase.NewStrategy(srv.dryRunSamplingConfig, srv.l)
-
-	projectUC := projectusecase.New(srv.l, projectRepo, keywordUC, projectProd, webhookUC, stateUC, samplingStrategy)
+	// Project module
+	projectRepo := projectrepo.New(srv.postgresDB, srv.l)
+	projectUC := projectuc.New(srv.l, projectRepo, campaignUC)
 	projectHandler := projecthttp.New(srv.l, projectUC, srv.discord)
 
+	// Crisis Config module
+	crisisRepo := crisisrepo.New(srv.postgresDB, srv.l)
+	crisisUC := crisisuc.New(srv.l, crisisRepo, projectUC)
+	crisisHandler := crisishttp.New(srv.l, crisisUC, srv.discord)
+
 	// Map routes
-	projecthttp.MapProjectRoutes(srv.gin.Group("/projects"), projectHandler, mw)
-	webhookhttp.MapWebhookRoutes(srv.gin.Group("/internal"), webhookHandler, mw)
+	api := srv.gin.Group("/api/v1")
+	campaignHandler.RegisterRoutes(api, mw)
+	projectHandler.RegisterRoutes(api, mw)
+	crisisHandler.RegisterRoutes(api, mw)
 
 	return nil
 }

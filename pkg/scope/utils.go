@@ -3,7 +3,7 @@ package scope
 import (
 	"context"
 
-	"smap-project/internal/model"
+	"project-srv/internal/model"
 )
 
 type PayloadCtxKey struct{}

@@ -1,7 +1,7 @@
 package httpserver
 
 import (
-	"smap-project/pkg/response"
+	"project-srv/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

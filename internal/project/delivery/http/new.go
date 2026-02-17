@@ -1,19 +1,28 @@
 package http
 
 import (
-	"smap-project/internal/project"
-	"smap-project/pkg/discord"
-	pkgLog "smap-project/pkg/log"
+	"project-srv/internal/middleware"
+	"project-srv/internal/project"
+	"project-srv/pkg/discord"
+	"project-srv/pkg/log"
+
+	"github.com/gin-gonic/gin"
 )
 
+// Handler defines the HTTP handler interface for Project.
+type Handler interface {
+	RegisterRoutes(r *gin.RouterGroup, mw middleware.Middleware)
+}
+
 type handler struct {
-	l       pkgLog.Logger
+	l       log.Logger
 	uc      project.UseCase
 	discord *discord.Discord
 }
 
-func New(l pkgLog.Logger, uc project.UseCase, discord *discord.Discord) handler {
-	return handler{
+// New creates a new Project HTTP handler.
+func New(l log.Logger, uc project.UseCase, discord *discord.Discord) Handler {
+	return &handler{
 		l:       l,
 		uc:      uc,
 		discord: discord,

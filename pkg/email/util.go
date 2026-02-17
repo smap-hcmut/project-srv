@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"html/template"
 
-	i18nPkg "smap-project/pkg/i18n"
+	i18nPkg "project-srv/pkg/i18n"
 
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 )

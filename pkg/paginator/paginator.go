@@ -98,35 +98,3 @@ func (p PaginatorResponse) ToPaginator() Paginator {
 		CurrentPage: p.CurrentPage,
 	}
 }
-
-// NewPaginateQuery creates a new PaginateQuery with adjusted parameters
-func NewPaginateQuery(page int, limit int) PaginateQuery {
-	pq := PaginateQuery{
-		Page:  page,
-		Limit: int64(limit),
-	}
-	pq.Adjust()
-	return pq
-}
-
-// NewPaginator creates a new Paginator based on total items and query parameters
-func NewPaginator(total int, pq PaginateQuery) Paginator {
-	count := int64(0)
-	if total > 0 {
-		remaining := int64(total) - pq.Offset()
-		if remaining > 0 {
-			if remaining < pq.Limit {
-				count = remaining
-			} else {
-				count = pq.Limit
-			}
-		}
-	}
-
-	return Paginator{
-		Total:       int64(total),
-		Count:       count,
-		PerPage:     pq.Limit,
-		CurrentPage: pq.Page,
-	}
-}

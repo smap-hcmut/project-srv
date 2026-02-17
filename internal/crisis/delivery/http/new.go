@@ -1,0 +1,30 @@
+package http
+
+import (
+	"project-srv/internal/crisis"
+	"project-srv/internal/middleware"
+	"project-srv/pkg/discord"
+	"project-srv/pkg/log"
+
+	"github.com/gin-gonic/gin"
+)
+
+// Handler defines the HTTP handler interface for Crisis Config.
+type Handler interface {
+	RegisterRoutes(r *gin.RouterGroup, mw middleware.Middleware)
+}
+
+type handler struct {
+	l       log.Logger
+	uc      crisis.UseCase
+	discord *discord.Discord
+}
+
+// New creates a new Crisis Config HTTP handler.
+func New(l log.Logger, uc crisis.UseCase, discord *discord.Discord) Handler {
+	return &handler{
+		l:       l,
+		uc:      uc,
+		discord: discord,
+	}
+}
