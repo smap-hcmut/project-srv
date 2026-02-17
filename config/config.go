@@ -2,15 +2,13 @@ package config
 
 import (
 	"fmt"
+	"strings"
 
-	"github.com/caarlos0/env/v9"
+	"github.com/spf13/viper"
 )
 
 type Config struct {
 	// Environment Configuration
-	// Determines CORS behavior and other environment-specific settings
-	// Values: "production" (strict), "staging" (permissive), "dev" (permissive)
-	// Default: "production" (fail-safe for security)
 	Environment EnvironmentConfig
 
 	// Server Configuration
@@ -20,8 +18,8 @@ type Config struct {
 	// Database Configuration
 	Postgres PostgresConfig
 
-	// Message Queue Configuration
-	RabbitMQ RabbitMQConfig
+	// Message Queue Configuration (Kafka replaces RabbitMQ)
+	Kafka KafkaConfig
 
 	// Cache Configuration
 	Redis RedisConfig
@@ -34,205 +32,295 @@ type Config struct {
 
 	// Monitoring & Notification Configuration
 	Discord DiscordConfig
-
-	// External Services
-	Identity IdentityConfig
-	LLM      LLMConfig
-
-	// Dry-Run Sampling Configuration
-	DryRunSampling DryRunSamplingConfig
-}
-
-// LLMConfig is the configuration for the LLM provider.
-type LLMConfig struct {
-	Provider   string `env:"LLM_PROVIDER" envDefault:"gemini"`
-	APIKey     string `env:"LLM_API_KEY"`
-	Model      string `env:"LLM_MODEL" envDefault:"gemini-2.0-flash"`
-	Timeout    int    `env:"LLM_TIMEOUT" envDefault:"30"`
-	MaxRetries int    `env:"LLM_MAX_RETRIES" envDefault:"3"`
-}
-
-// JWTConfig is the configuration for the JWT,
-// which is used to generate and verify the JWT.
-type JWTConfig struct {
-	SecretKey string `env:"JWT_SECRET"`
 }
 
 // EnvironmentConfig is the configuration for the deployment environment.
-// It controls environment-specific behavior such as CORS validation.
 type EnvironmentConfig struct {
-	// Name is the environment name: "production", "staging", or "dev"
-	// Production uses strict CORS origins, non-production allows private subnets and localhost
-	Name string `env:"ENV" envDefault:"production"`
+	Name string
 }
 
-// CookieConfig is the configuration for HttpOnly cookies,
-// which is used for secure authentication token storage.
-type CookieConfig struct {
-	Domain         string `env:"COOKIE_DOMAIN" envDefault:".smap.com"`
-	Secure         bool   `env:"COOKIE_SECURE" envDefault:"true"`
-	SameSite       string `env:"COOKIE_SAMESITE" envDefault:"Lax"`
-	MaxAge         int    `env:"COOKIE_MAX_AGE" envDefault:"7200"`
-	MaxAgeRemember int    `env:"COOKIE_MAX_AGE_REMEMBER" envDefault:"2592000"`
-	Name           string `env:"COOKIE_NAME" envDefault:"smap_auth_token"`
+// KafkaConfig is the configuration for Kafka
+type KafkaConfig struct {
+	Brokers []string
+	Topic   string
+	GroupID string
 }
 
-// HTTPServerConfig is the configuration for the HTTP server,
-// which is used to start, call API, etc.
-type HTTPServerConfig struct {
-	Host string `env:"HOST" envDefault:""`
-	Port int    `env:"APP_PORT" envDefault:"8080"`
-	Mode string `env:"API_MODE" envDefault:"debug"`
-}
-
-// RabbitMQConfig is the configuration for the RabbitMQ,
-// which is used to connect to the RabbitMQ.
-type RabbitMQConfig struct {
-	URL string `env:"RABBITMQ_URL"`
-}
-
-// RedisConfig is the configuration for Redis,
-// which is used for pub/sub and caching.
-// StateDB is the project progress tracking's Redis database
-// Note: Only standalone mode is supported (cluster mode not needed for this service)
+// RedisConfig is the configuration for Redis
 type RedisConfig struct {
-	Host         string `env:"REDIS_HOST" envDefault:"localhost:6379"`
-	Password     string `env:"REDIS_PASSWORD"`
-	DB           int    `env:"REDIS_DB" envDefault:"0"`
-	StateDB      int    `env:"REDIS_STATE_DB" envDefault:"1"`
-	MinIdleConns int    `env:"REDIS_MIN_IDLE_CONNS" envDefault:"10"`
-	PoolSize     int    `env:"REDIS_POOL_SIZE" envDefault:"100"`
-	PoolTimeout  int    `env:"REDIS_POOL_TIMEOUT" envDefault:"30"`
+	Host     string
+	Port     int
+	Password string
+	DB       int
 }
 
-// LoggerConfig is the configuration for the logger,
-// which is used to log the application.
+// CookieConfig is the configuration for the cookie
+type CookieConfig struct {
+	Domain         string
+	Secure         bool
+	SameSite       string
+	MaxAge         int
+	MaxAgeRemember int
+	Name           string
+}
+
+// JWTConfig is the configuration for JWT
+type JWTConfig struct {
+	Algorithm string
+	Issuer    string
+	Audience  []string
+	SecretKey string
+	TTL       int // in seconds
+}
+
+// HTTPServerConfig is the configuration for the HTTP server
+type HTTPServerConfig struct {
+	Host string
+	Port int
+	Mode string
+}
+
+// LoggerConfig is the configuration for the logger
 type LoggerConfig struct {
-	Level        string `env:"LOGGER_LEVEL" envDefault:"debug"`
-	Mode         string `env:"LOGGER_MODE" envDefault:"debug"`
-	Encoding     string `env:"LOGGER_ENCODING" envDefault:"console"`
-	ColorEnabled bool   `env:"LOGGER_COLOR_ENABLED" envDefault:"true"`
+	Level        string
+	Mode         string
+	Encoding     string
+	ColorEnabled bool
 }
 
-// PostgresConfig is the configuration for the Postgres,
-// which is used to connect to the Postgres.
+// PostgresConfig is the configuration for Postgres
 type PostgresConfig struct {
-	Host     string `env:"POSTGRES_HOST" envDefault:"localhost"`
-	Port     int    `env:"POSTGRES_PORT" envDefault:"5432"`
-	User     string `env:"POSTGRES_USER" envDefault:"postgres"`
-	Password string `env:"POSTGRES_PASSWORD" envDefault:"postgres"`
-	DBName   string `env:"POSTGRES_DB" envDefault:"postgres"`
-	SSLMode  string `env:"POSTGRES_SSLMODE" envDefault:"prefer"`
-}
-
-type MinIOConfig struct {
-	Endpoint  string `env:"MINIO_ENDPOINT" envDefault:"localhost:9000"`
-	AccessKey string `env:"MINIO_ACCESS_KEY" envDefault:"minioadmin"`
-	SecretKey string `env:"MINIO_SECRET_KEY" envDefault:"minioadmin"`
-	UseSSL    bool   `env:"MINIO_USE_SSL" envDefault:"false"`
-	Region    string `env:"MINIO_REGION" envDefault:"us-east-1"`
-	Bucket    string `env:"MINIO_BUCKET"`
-
-	// Async upload settings
-	AsyncUploadWorkers   int `env:"MINIO_ASYNC_UPLOAD_WORKERS" envDefault:"4"`
-	AsyncUploadQueueSize int `env:"MINIO_ASYNC_UPLOAD_QUEUE_SIZE" envDefault:"100"`
+	Host     string
+	Port     int
+	User     string
+	Password string
+	DBName   string
+	SSLMode  string
+	Schema   string // Added Schema support
 }
 
 type DiscordConfig struct {
-	WebhookID    string `env:"DISCORD_WEBHOOK_ID"`
-	WebhookToken string `env:"DISCORD_WEBHOOK_TOKEN"`
+	WebhookID    string
+	WebhookToken string
 }
 
-// EncrypterConfig is the configuration for the encrypter,
-// which is used to encrypt and decrypt the data.
+// EncrypterConfig is the configuration for the encrypter
 type EncrypterConfig struct {
-	Key string `env:"ENCRYPT_KEY"`
+	Key string
 }
 
-// InternalConfig is the configuration for the internal,
-// which is used to check the internal request.
+// InternalConfig is the configuration for internal service authentication
 type InternalConfig struct {
-	InternalKey string `env:"INTERNAL_KEY"`
+	InternalKey string
+	ServiceKeys map[string]string
 }
 
-// IdentityConfig is the configuration for the Identity Service.
-type IdentityConfig struct {
-	BaseURL string `env:"IDENTITY_SERVICE_URL" envDefault:"http://localhost:8085"`
-	Timeout int    `env:"IDENTITY_TIMEOUT" envDefault:"30"`
-	// InternalAPIKey is automatically set from InternalConfig.InternalKey
-	// No need to set IDENTITY_INTERNAL_KEY env variable
-	InternalAPIKey string
-}
-
-// DryRunSamplingConfig is the configuration for dry-run keyword sampling.
-type DryRunSamplingConfig struct {
-	// Percentage-based sampling
-	Percentage  float64 `env:"DRY_RUN_PERCENTAGE" envDefault:"10"`
-	MinKeywords int     `env:"DRY_RUN_MIN_KEYWORDS" envDefault:"3"`
-	MaxKeywords int     `env:"DRY_RUN_MAX_KEYWORDS" envDefault:"5"`
-
-	// Timing configuration
-	KeywordTimeEstimate string `env:"DRY_RUN_KEYWORD_TIME_ESTIMATE" envDefault:"16s"`
-
-	// Strategy selection
-	DefaultStrategy string `env:"DRY_RUN_SAMPLING_STRATEGY" envDefault:"percentage"`
-
-	// Emergency fallback
-	EmergencyThreshold string `env:"DRY_RUN_EMERGENCY_THRESHOLD" envDefault:"70s"`
-	EmergencyKeywords  int    `env:"DRY_RUN_EMERGENCY_KEYWORDS" envDefault:"3"`
-}
-
-// Load is the function to load the configuration from the environment variables.
+// Load loads configuration using Viper
 func Load() (*Config, error) {
-	cfg := &Config{}
-	err := env.Parse(cfg)
-	if err != nil {
-		fmt.Printf("Error loading configuration: %v", err)
-		return nil, err
+	// Set config file name and paths
+	viper.SetConfigName("project-config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath("./config")
+	viper.AddConfigPath(".")
+	viper.AddConfigPath("/etc/smap/")
+
+	// Enable environment variable override
+	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	// Set defaults
+	setDefaults()
+
+	// Read config file (optional - will use env vars if file not found)
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			return nil, fmt.Errorf("error reading config file: %w", err)
+		}
+		// Config file not found; using environment variables
 	}
 
-	// Auto-sync: Use INTERNAL_KEY for Identity service internal calls
-	cfg.Identity.InternalAPIKey = cfg.InternalConfig.InternalKey
+	cfg := &Config{}
 
-	// Validate DryRun Sampling configuration
-	if err := cfg.validateDryRunSampling(); err != nil {
-		return nil, fmt.Errorf("invalid dry-run sampling configuration: %w", err)
+	// Environment
+	cfg.Environment.Name = viper.GetString("environment.name")
+
+	// HTTP Server
+	cfg.HTTPServer.Host = viper.GetString("http_server.host")
+	cfg.HTTPServer.Port = viper.GetInt("http_server.port")
+	cfg.HTTPServer.Mode = viper.GetString("http_server.mode")
+
+	// Logger
+	cfg.Logger.Level = viper.GetString("logger.level")
+	cfg.Logger.Mode = viper.GetString("logger.mode")
+	cfg.Logger.Encoding = viper.GetString("logger.encoding")
+	cfg.Logger.ColorEnabled = viper.GetBool("logger.color_enabled")
+
+	// Postgres
+	cfg.Postgres.Host = viper.GetString("postgres.host")
+	cfg.Postgres.Port = viper.GetInt("postgres.port")
+	cfg.Postgres.User = viper.GetString("postgres.user")
+	cfg.Postgres.Password = viper.GetString("postgres.password")
+	cfg.Postgres.DBName = viper.GetString("postgres.dbname")
+	cfg.Postgres.SSLMode = viper.GetString("postgres.sslmode")
+	cfg.Postgres.Schema = viper.GetString("postgres.schema")
+
+	// Redis
+	cfg.Redis.Host = viper.GetString("redis.host")
+	cfg.Redis.Port = viper.GetInt("redis.port")
+	cfg.Redis.Password = viper.GetString("redis.password")
+	cfg.Redis.DB = viper.GetInt("redis.db")
+
+	// Kafka
+	cfg.Kafka.Brokers = viper.GetStringSlice("kafka.brokers")
+	cfg.Kafka.Topic = viper.GetString("kafka.topic")
+	cfg.Kafka.GroupID = viper.GetString("kafka.group_id")
+
+	// JWT
+	cfg.JWT.Algorithm = viper.GetString("jwt.algorithm")
+	cfg.JWT.Issuer = viper.GetString("jwt.issuer")
+	cfg.JWT.Audience = viper.GetStringSlice("jwt.audience")
+	cfg.JWT.SecretKey = viper.GetString("jwt.secret_key")
+	cfg.JWT.TTL = viper.GetInt("jwt.ttl")
+
+	// Cookie
+	cfg.Cookie.Domain = viper.GetString("cookie.domain")
+	cfg.Cookie.Secure = viper.GetBool("cookie.secure")
+	cfg.Cookie.SameSite = viper.GetString("cookie.samesite")
+	cfg.Cookie.MaxAge = viper.GetInt("cookie.max_age")
+	cfg.Cookie.MaxAgeRemember = viper.GetInt("cookie.max_age_remember")
+	cfg.Cookie.Name = viper.GetString("cookie.name")
+
+	// Encrypter
+	cfg.Encrypter.Key = viper.GetString("encrypter.key")
+
+	// Internal Service Keys
+	serviceKeys := make(map[string]string)
+	if viper.IsSet("internal.service_keys") {
+		serviceKeysRaw := viper.GetStringMapString("internal.service_keys")
+		for service, key := range serviceKeysRaw {
+			serviceKeys[service] = key
+		}
+	}
+	cfg.InternalConfig.InternalKey = viper.GetString("internal.internal_key")
+	cfg.InternalConfig.ServiceKeys = serviceKeys
+
+	// Discord
+	cfg.Discord.WebhookID = viper.GetString("discord.webhook_id")
+	cfg.Discord.WebhookToken = viper.GetString("discord.webhook_token")
+
+	// Validate required fields
+	if err := validate(cfg); err != nil {
+		return nil, err
 	}
 
 	return cfg, nil
 }
 
-// validateDryRunSampling validates the dry-run sampling configuration
-func (c *Config) validateDryRunSampling() error {
-	cfg := &c.DryRunSampling
+func setDefaults() {
+	// Environment
+	viper.SetDefault("environment.name", "production")
 
-	// Validate percentage range
-	if cfg.Percentage <= 0 || cfg.Percentage > 100 {
-		return fmt.Errorf("percentage must be between 0 and 100, got %f", cfg.Percentage)
+	// HTTP Server
+	viper.SetDefault("http_server.host", "")
+	viper.SetDefault("http_server.port", 8080)
+	viper.SetDefault("http_server.mode", "debug")
+
+	// Logger
+	viper.SetDefault("logger.level", "debug")
+	viper.SetDefault("logger.mode", "debug")
+	viper.SetDefault("logger.encoding", "console")
+	viper.SetDefault("logger.color_enabled", true)
+
+	// Postgres
+	viper.SetDefault("postgres.host", "localhost")
+	viper.SetDefault("postgres.port", 5432)
+	viper.SetDefault("postgres.user", "postgres")
+	viper.SetDefault("postgres.password", "postgres")
+	viper.SetDefault("postgres.dbname", "postgres")
+	viper.SetDefault("postgres.sslmode", "prefer")
+
+	// Redis
+	viper.SetDefault("redis.host", "localhost")
+	viper.SetDefault("redis.port", 6379)
+	viper.SetDefault("redis.password", "")
+	viper.SetDefault("redis.db", 0)
+
+	// Kafka
+	viper.SetDefault("kafka.brokers", []string{"localhost:9092"})
+	viper.SetDefault("kafka.topic", "project.events")
+	viper.SetDefault("kafka.group_id", "project-consumer")
+
+	// JWT
+	viper.SetDefault("jwt.algorithm", "RS256")
+	viper.SetDefault("jwt.issuer", "smap-auth-service")
+	viper.SetDefault("jwt.audience", []string{"identity-srv"})
+	viper.SetDefault("jwt.public_key_path", "")
+	viper.SetDefault("jwt.ttl", 28800) // 8 hours
+
+	// Cookie
+	viper.SetDefault("cookie.domain", ".smap.com")
+	viper.SetDefault("cookie.secure", true)
+	viper.SetDefault("cookie.samesite", "Lax")
+	viper.SetDefault("cookie.max_age", 28800)           // 8 hours
+	viper.SetDefault("cookie.max_age_remember", 604800) // 7 days
+	viper.SetDefault("cookie.name", "smap_auth_token")
+
+}
+
+func validate(cfg *Config) error {
+	// Validate Redirect (Removed)
+
+	// Validate JWT fields
+	if cfg.JWT.SecretKey == "" {
+		return fmt.Errorf("jwt.secret_key is required")
+	}
+	if len(cfg.JWT.SecretKey) < 32 {
+		return fmt.Errorf("jwt.secret_key must be at least 32 characters for security")
+	}
+	if cfg.JWT.Issuer == "" {
+		return fmt.Errorf("jwt.issuer is required")
+	}
+	if len(cfg.JWT.Audience) == 0 {
+		return fmt.Errorf("jwt.audience must have at least one value")
+	}
+	if cfg.JWT.TTL <= 0 {
+		return fmt.Errorf("jwt.ttl must be greater than 0")
 	}
 
-	// Validate minimum keywords
-	if cfg.MinKeywords < 1 {
-		return fmt.Errorf("minimum keywords must be at least 1, got %d", cfg.MinKeywords)
+	// Validate Encrypter
+	if cfg.Encrypter.Key == "" {
+		return fmt.Errorf("encrypter.key is required")
+	}
+	// Validate encrypter key length (Task 4.4)
+	if len(cfg.Encrypter.Key) < 32 {
+		return fmt.Errorf("encrypter.key must be at least 32 characters for security")
 	}
 
-	// Validate max >= min
-	if cfg.MaxKeywords < cfg.MinKeywords {
-		return fmt.Errorf("maximum keywords (%d) cannot be less than minimum (%d)",
-			cfg.MaxKeywords, cfg.MinKeywords)
+	// Validate Database Configuration (Task 4.4)
+	if cfg.Postgres.Host == "" {
+		return fmt.Errorf("postgres.host is required")
+	}
+	if cfg.Postgres.Port == 0 {
+		return fmt.Errorf("postgres.port is required")
+	}
+	if cfg.Postgres.DBName == "" {
+		return fmt.Errorf("postgres.db_name is required")
+	}
+	if cfg.Postgres.User == "" {
+		return fmt.Errorf("postgres.user is required")
 	}
 
-	// Validate emergency settings
-	if cfg.EmergencyKeywords < 1 {
-		return fmt.Errorf("emergency keywords must be at least 1, got %d", cfg.EmergencyKeywords)
+	// Validate Redis Configuration (Task 4.4)
+	if cfg.Redis.Host == "" {
+		return fmt.Errorf("redis.host is required")
+	}
+	if cfg.Redis.Port == 0 {
+		return fmt.Errorf("redis.port is required")
 	}
 
-	// Validate strategy
-	switch cfg.DefaultStrategy {
-	case "percentage", "fixed", "tiered":
-		// Valid strategies
-	default:
-		return fmt.Errorf("invalid sampling strategy: %s", cfg.DefaultStrategy)
+	// Validate Cookie Configuration (Task 4.4)
+	if cfg.Cookie.Name == "" {
+		return fmt.Errorf("cookie.name is required")
 	}
 
 	return nil

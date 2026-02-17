@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"smap-project/config"
+	"project-srv/config"
 
 	_ "github.com/lib/pq" // PostgreSQL driver
 )
@@ -62,8 +62,12 @@ func Connect(ctx context.Context, cfg config.PostgresConfig) (*sql.DB, error) {
 		if sslMode == "" {
 			sslMode = "disable" // Default to disable for local development
 		}
-		dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-			cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.DBName, sslMode)
+		searchPath := cfg.Schema
+		if searchPath == "" {
+			searchPath = "public"
+		}
+		dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s search_path=%s",
+			cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.DBName, sslMode, searchPath)
 
 		fmt.Printf("[PostgreSQL] Attempting to connect to %s:%d/%s (SSL mode: %s)...\n",
 			cfg.Host, cfg.Port, cfg.DBName, sslMode)

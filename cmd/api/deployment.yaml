@@ -5,6 +5,8 @@ metadata:
   namespace: smap
   labels:
     app: smap-project-api
+    service: project-srv
+    version: v1
 spec:
   replicas: 1
   revisionHistoryLimit: 10
@@ -13,19 +15,21 @@ spec:
       app: smap-project-api
   strategy:
     rollingUpdate:
-      maxSurge: 0
-      maxUnavailable: 1
+      maxSurge: 1
+      maxUnavailable: 0
     type: RollingUpdate
   template:
     metadata:
       labels:
         app: smap-project-api
+        service: project-srv
+        version: v1
     spec:
       imagePullSecrets:
         - name: harbor-secret
       containers:
         - name: smap-project-api
-          image: registry.tantai.dev/smap/smap-project:latest
+          image: registry.tantai.dev/smap/project-srv:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -34,10 +38,10 @@ spec:
           resources:
             requests:
               memory: "128Mi"
-              cpu: "50m"
+              cpu: "100m"
             limits:
               memory: "512Mi"
-              cpu: "500m"
+              cpu: "1000m"
           envFrom:
             - configMapRef:
                 name: smap-project-config
@@ -50,22 +54,45 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
           livenessProbe:
             httpGet:
               path: /health
               port: 8080
+              scheme: HTTP
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
+            successThreshold: 1
             failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /health
               port: 8080
+              scheme: HTTP
             initialDelaySeconds: 10
             periodSeconds: 5
             timeoutSeconds: 3
+            successThreshold: 1
             failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 0
+            periodSeconds: 5
+            timeoutSeconds: 3
+            successThreshold: 1
+            failureThreshold: 12
+      terminationGracePeriodSeconds: 30
 
 ---
 apiVersion: v1
@@ -75,6 +102,7 @@ metadata:
   namespace: smap
   labels:
     app: smap-project-api
+    service: project-srv
 spec:
   selector:
     app: smap-project-api
@@ -84,3 +112,4 @@ spec:
       protocol: TCP
       name: http
   type: ClusterIP
+  sessionAffinity: None

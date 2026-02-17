@@ -1,0 +1,79 @@
+# SMAP Auth Service Configuration
+
+# Environment Configuration
+environment:
+  name: development
+
+# HTTP Server Configuration
+http_server:
+  host: "0.0.0.0"
+  port: 8080
+  mode: debug
+
+# Logger Configuration
+logger:
+  level: debug
+  mode: debug
+  encoding: console
+  color_enabled: true
+
+# PostgreSQL Configuration
+postgres:
+  host: 172.16.19.10
+  port: 5432
+  user: project_master
+  password: project_master_pwd
+  dbname: smap
+  sslmode: disable
+  schema: schema_project
+
+# Redis Configuration
+redis:
+  host: redis.tantai.dev
+  port: 6379
+  password: 21042004
+  db: 1
+
+# Kafka Configuration
+# Kafka Configuration
+kafka:
+  brokers:
+    - kafka.tantai.dev:9094
+  topic: project.events
+  group_id: project-consumer
+
+# JWT Configuration
+jwt:
+  algorithm: HS256
+  issuer: smap-auth-service
+  audience:
+    - smap-api
+  secret_key: "smap-secret-key-at-least-32-chars-long" # Must match identity-srv
+  ttl: 28800 # 8 hours in seconds
+
+# Cookie Configuration
+cookie:
+  domain: localhost
+  secure: true # Chrome allows Secure on localhost
+  samesite: None # Required for cross-origin (FE:3000 -> BE:8080)
+  max_age: 28800 # 8 hours
+  max_age_remember: 604800 # 7 days
+  name: smap_auth_token
+
+# Encrypter Configuration
+encrypter:
+  key: test-encryption-key-32-chars-123
+
+# Internal Service Authentication
+internal:
+  internal_key: project-service-key
+  service_keys:
+    project_service: project-service-key
+    ingest_service: ingest-service-key
+    knowledge_service: knowledge-service-key
+    notification_service: notification-service-key
+
+# Discord Webhook (Optional)
+discord:
+  webhook_id: ""
+  webhook_token: ""

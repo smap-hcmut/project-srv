@@ -2,6 +2,7 @@ package response
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,7 +10,7 @@ import (
 	"net/http"
 	"strings"
 
-	"smap-project/pkg/discord"
+	"project-srv/pkg/discord"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,7 +24,7 @@ func sendDiscordMessageAsync(c *gin.Context, d *discord.Discord, message string)
 	go func() {
 		splitMessages := splitMessageForDiscord(message)
 		for _, msg := range splitMessages {
-			err := d.ReportBug(c.Request.Context(), msg)
+			err := d.ReportBug(context.Background(), msg)
 			if err != nil {
 				// Use standard log as fallback since we're in async goroutine
 				log.Printf("pkg.response.sendDiscordMessageAsync.ReportBug: %v\n", err)

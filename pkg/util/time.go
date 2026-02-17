@@ -46,11 +46,7 @@ func StrToDateTime(str string) (time.Time, error) {
 func StrToDate(str string) (time.Time, error) {
 	t, err := time.ParseInLocation(DateFormat, str, GetDefaultTimezone())
 	if err != nil {
-		t, err = time.Parse(time.RFC3339, str)
-		if err != nil {
-			return time.Time{}, err
-		}
-		return t.In(GetDefaultTimezone()), nil
+		return time.Time{}, err
 	}
 
 	return t, nil
