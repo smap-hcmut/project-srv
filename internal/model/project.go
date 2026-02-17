@@ -1,153 +1,102 @@
 package model
 
 import (
-	"encoding/json"
-	"slices"
 	"time"
 
-	"smap-project/internal/sqlboiler"
-
-	"github.com/aarondl/null/v8"
-	"github.com/aarondl/sqlboiler/v4/types"
+	"project-srv/internal/sqlboiler"
 )
 
-// CompetitorKeyword represents a competitor with its keywords
-type CompetitorKeyword struct {
-	CompetitorName string   `json:"competitor_name"`
-	Keywords       []string `json:"keywords"`
-}
+// ProjectStatus represents the operational status of a project
+type ProjectStatus string
 
-// Project represents a project entity in the domain model
+const (
+	ProjectStatusActive   ProjectStatus = "ACTIVE"
+	ProjectStatusPaused   ProjectStatus = "PAUSED"
+	ProjectStatusArchived ProjectStatus = "ARCHIVED"
+)
+
+// ProjectConfigStatus represents the setup wizard status of a project
+type ProjectConfigStatus string
+
+const (
+	ConfigStatusDraft          ProjectConfigStatus = "DRAFT"
+	ConfigStatusConfiguring    ProjectConfigStatus = "CONFIGURING"
+	ConfigStatusOnboarding     ProjectConfigStatus = "ONBOARDING"
+	ConfigStatusOnboardingDone ProjectConfigStatus = "ONBOARDING_DONE"
+	ConfigStatusDryRunRunning  ProjectConfigStatus = "DRYRUN_RUNNING"
+	ConfigStatusDryRunSuccess  ProjectConfigStatus = "DRYRUN_SUCCESS"
+	ConfigStatusDryRunFailed   ProjectConfigStatus = "DRYRUN_FAILED"
+	ConfigStatusActive         ProjectConfigStatus = "ACTIVE"
+	ConfigStatusError          ProjectConfigStatus = "ERROR"
+)
+
+// EntityType represents the type of entity being monitored
+type EntityType string
+
+const (
+	EntityTypeProduct    EntityType = "product"
+	EntityTypeCampaign   EntityType = "campaign"
+	EntityTypeService    EntityType = "service"
+	EntityTypeCompetitor EntityType = "competitor"
+	EntityTypeTopic      EntityType = "topic"
+)
+
+// Project represents a specific entity monitoring unit
 type Project struct {
-	ID                 string
-	Name               string
-	Description        *string
-	Status             string
-	FromDate           time.Time
-	ToDate             time.Time
-	BrandName          string
-	CompetitorNames    []string
-	BrandKeywords      []string
-	CompetitorKeywords []CompetitorKeyword // Array of competitor keywords
-	CreatedBy          string
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
-	DeletedAt          *time.Time
+	ID           string              `json:"id"`
+	CampaignID   string              `json:"campaign_id"`
+	Name         string              `json:"name"`
+	Description  string              `json:"description,omitempty"`
+	Brand        string              `json:"brand,omitempty"`
+	EntityType   EntityType          `json:"entity_type"`
+	EntityName   string              `json:"entity_name"`
+	Status       ProjectStatus       `json:"status"`
+	ConfigStatus ProjectConfigStatus `json:"config_status"`
+	CreatedBy    string              `json:"created_by"`
+	CreatedAt    time.Time           `json:"created_at"`
+	UpdatedAt    time.Time           `json:"updated_at"`
+
+	// Relations
+	Campaign *Campaign `json:"campaign,omitempty"`
 }
 
-// NewProjectFromDB converts SQLBoiler Project to domain Project
-func NewProjectFromDB(p *sqlboiler.Project) *Project {
-	if p == nil {
+// NewProjectFromDB converts a sqlboiler Project to a domain Project.
+// Returns nil if the input is nil.
+func NewProjectFromDB(db *sqlboiler.Project) *Project {
+	if db == nil {
 		return nil
 	}
 
-	project := &Project{
-		ID:              p.ID,
-		Name:            p.Name,
-		Status:          p.Status,
-		FromDate:        p.FromDate,
-		ToDate:          p.ToDate,
-		BrandName:       p.BrandName,
-		CompetitorNames: []string(p.CompetitorNames),
-		BrandKeywords:   []string(p.BrandKeywords),
-		CreatedBy:       p.CreatedBy,
+	p := &Project{
+		ID:         db.ID,
+		CampaignID: db.CampaignID,
+		Name:       db.Name,
+		EntityType: EntityType(db.EntityType),
+		EntityName: db.EntityName,
+		Status:     ProjectStatus(db.Status),
+		CreatedBy:  db.CreatedBy,
 	}
 
-	if p.Description.Valid {
-		desc := p.Description.String
-		project.Description = &desc
+	if db.Description.Valid {
+		p.Description = db.Description.String
+	}
+	if db.Brand.Valid {
+		p.Brand = db.Brand.String
+	}
+	if db.ConfigStatus.Valid {
+		p.ConfigStatus = ProjectConfigStatus(db.ConfigStatus.Val)
+	}
+	if db.CreatedAt.Valid {
+		p.CreatedAt = db.CreatedAt.Time
+	}
+	if db.UpdatedAt.Valid {
+		p.UpdatedAt = db.UpdatedAt.Time
 	}
 
-	if p.CompetitorKeywordsMap.Valid {
-		// Try to unmarshal as array first (new format)
-		var kwArray []CompetitorKeyword
-		if err := json.Unmarshal(p.CompetitorKeywordsMap.JSON, &kwArray); err == nil {
-			project.CompetitorKeywords = kwArray
-		} else {
-			// Fallback: try to unmarshal as map (old format) and convert to array
-			var kwMap map[string][]string
-			if err := json.Unmarshal(p.CompetitorKeywordsMap.JSON, &kwMap); err == nil {
-				kwArray = make([]CompetitorKeyword, 0, len(kwMap))
-				for name, keywords := range kwMap {
-					kwArray = append(kwArray, CompetitorKeyword{
-						CompetitorName: name,
-						Keywords:       keywords,
-					})
-				}
-				project.CompetitorKeywords = kwArray
-			}
-		}
+	// Load relation if eagerly loaded
+	if db.R != nil && db.R.GetCampaign() != nil {
+		p.Campaign = NewCampaignFromDB(db.R.GetCampaign())
 	}
 
-	if p.CreatedAt.Valid {
-		project.CreatedAt = p.CreatedAt.Time
-	}
-
-	if p.UpdatedAt.Valid {
-		project.UpdatedAt = p.UpdatedAt.Time
-	}
-
-	if p.DeletedAt.Valid {
-		deletedAt := p.DeletedAt.Time
-		project.DeletedAt = &deletedAt
-	}
-
-	return project
-}
-
-// ToDBProject converts domain Project to SQLBoiler Project
-func (p *Project) ToDBProject() *sqlboiler.Project {
-	dbProject := &sqlboiler.Project{
-		ID:              p.ID,
-		Name:            p.Name,
-		Status:          p.Status,
-		FromDate:        p.FromDate,
-		ToDate:          p.ToDate,
-		BrandName:       p.BrandName,
-		CompetitorNames: types.StringArray(p.CompetitorNames),
-		BrandKeywords:   types.StringArray(p.BrandKeywords),
-		CreatedBy:       p.CreatedBy,
-	}
-
-	if p.Description != nil {
-		dbProject.Description = null.StringFrom(*p.Description)
-	}
-
-	if len(p.CompetitorKeywords) > 0 {
-		if kwArrayJSON, err := json.Marshal(p.CompetitorKeywords); err == nil {
-			dbProject.CompetitorKeywordsMap = null.JSONFrom(kwArrayJSON)
-		}
-	}
-
-	if !p.CreatedAt.IsZero() {
-		dbProject.CreatedAt = null.TimeFrom(p.CreatedAt)
-	}
-
-	if !p.UpdatedAt.IsZero() {
-		dbProject.UpdatedAt = null.TimeFrom(p.UpdatedAt)
-	}
-
-	if p.DeletedAt != nil {
-		dbProject.DeletedAt = null.TimeFrom(*p.DeletedAt)
-	}
-
-	return dbProject
-}
-
-// ProjectStatus constants
-const (
-	ProjectStatusDraft     = "draft"
-	ProjectStatusProcess   = "process"
-	ProjectStatusCompleted = "completed"
-)
-
-// IsValidProjectStatus checks if the given status is valid
-func IsValidProjectStatus(status string) bool {
-	validStatuses := []string{
-		ProjectStatusDraft,
-		ProjectStatusProcess,
-		ProjectStatusCompleted,
-	}
-
-	return slices.Contains(validStatuses, status)
+	return p
 }

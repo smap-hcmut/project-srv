@@ -1,230 +1,173 @@
-package postgres
+package postgre
 
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"time"
 
-	"smap-project/internal/model"
-	"smap-project/internal/project/repository"
-	"smap-project/internal/sqlboiler"
-	"smap-project/pkg/paginator"
-	postgresPkg "smap-project/pkg/postgre"
+	"project-srv/internal/model"
+	"project-srv/internal/project/repository"
+	"project-srv/internal/sqlboiler"
+	"project-srv/pkg/paginator"
 
+	"github.com/aarondl/null/v8"
 	"github.com/aarondl/sqlboiler/v4/boil"
 	"github.com/aarondl/sqlboiler/v4/queries/qm"
 )
 
-func (r *implRepository) Detail(ctx context.Context, sc model.Scope, id string) (model.Project, error) {
-	mods, err := r.buildDetailQuery(ctx, id)
-	if err != nil {
-		r.l.Errorf(ctx, "internal.project.repository.postgres.Detail.buildDetailQuery: %v", err)
-		return model.Project{}, err
+// Create inserts a new project into the database.
+func (r *implRepository) Create(ctx context.Context, opt repository.CreateOptions) (model.Project, error) {
+	row := &sqlboiler.Project{
+		CampaignID: opt.CampaignID,
+		Name:       opt.Name,
+		EntityType: sqlboiler.EntityType(opt.EntityType),
+		EntityName: opt.EntityName,
+		Status:     sqlboiler.ProjectStatusACTIVE,
+		CreatedBy:  opt.CreatedBy,
 	}
 
-	project, err := sqlboiler.Projects(mods...).One(ctx, r.db)
+	if opt.Description != "" {
+		row.Description = null.StringFrom(opt.Description)
+	}
+	if opt.Brand != "" {
+		row.Brand = null.StringFrom(opt.Brand)
+	}
+
+	row.ConfigStatus = sqlboiler.NullProjectConfigStatusFrom(sqlboiler.ProjectConfigStatusDRAFT)
+	row.CreatedAt = null.TimeFrom(time.Now())
+	row.UpdatedAt = null.TimeFrom(time.Now())
+
+	if err := row.Insert(ctx, r.db, boil.Infer()); err != nil {
+		r.l.Errorf(ctx, "project.repository.Create.Insert: %v", err)
+		return model.Project{}, repository.ErrFailedToInsert
+	}
+
+	result := model.NewProjectFromDB(row)
+	return *result, nil
+}
+
+// Detail fetches a single project by ID.
+func (r *implRepository) Detail(ctx context.Context, id string) (model.Project, error) {
+	row, err := sqlboiler.FindProject(ctx, r.db, id)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return model.Project{}, repository.ErrNotFound
+			r.l.Warnf(ctx, "project.repository.Detail.FindProject: not found id=%s", id)
+			return model.Project{}, repository.ErrFailedToGet
 		}
-		r.l.Errorf(ctx, "internal.project.repository.postgres.Detail.One: %v", err)
-		return model.Project{}, err
+		r.l.Errorf(ctx, "project.repository.Detail.FindProject: %v", err)
+		return model.Project{}, repository.ErrFailedToGet
 	}
 
-	return *model.NewProjectFromDB(project), nil
+	result := model.NewProjectFromDB(row)
+	return *result, nil
 }
 
-func (r *implRepository) List(ctx context.Context, sc model.Scope, opts repository.ListOptions) ([]model.Project, error) {
-	mods, err := r.buildListQuery(ctx, opts)
+// Get fetches projects with pagination and filters.
+func (r *implRepository) Get(ctx context.Context, opt repository.GetOptions) ([]model.Project, paginator.Paginator, error) {
+	mods := r.buildGetQuery(opt)
+
+	// Count total
+	total, err := sqlboiler.Projects(mods...).Count(ctx, r.db)
 	if err != nil {
-		r.l.Errorf(ctx, "internal.project.repository.postgres.List.buildListQuery: %v", err)
-		return nil, err
+		r.l.Errorf(ctx, "project.repository.Get.Count: %v", err)
+		return nil, paginator.Paginator{}, repository.ErrFailedToList
 	}
 
-	projects, err := sqlboiler.Projects(mods...).All(ctx, r.db)
+	// Apply pagination
+	pq := opt.Paginator
+	mods = append(mods,
+		qm.Limit(int(pq.Limit)),
+		qm.Offset(int(pq.Offset())),
+		qm.OrderBy(fmt.Sprintf("%s DESC", sqlboiler.ProjectColumns.CreatedAt)),
+	)
+
+	rows, err := sqlboiler.Projects(mods...).All(ctx, r.db)
 	if err != nil {
-		r.l.Errorf(ctx, "internal.project.repository.postgres.List.All: %v", err)
-		return nil, err
+		r.l.Errorf(ctx, "project.repository.Get.All: %v", err)
+		return nil, paginator.Paginator{}, repository.ErrFailedToList
 	}
 
-	res := make([]model.Project, len(projects))
-	for i, p := range projects {
-		res[i] = *model.NewProjectFromDB(p)
+	projects := make([]model.Project, 0, len(rows))
+	for _, row := range rows {
+		projects = append(projects, *model.NewProjectFromDB(row))
 	}
 
-	return res, nil
+	pag := paginator.Paginator{
+		Total:       total,
+		Count:       int64(len(projects)),
+		PerPage:     pq.Limit,
+		CurrentPage: pq.Page,
+	}
+
+	return projects, pag, nil
 }
 
-func (r *implRepository) Create(ctx context.Context, sc model.Scope, opts repository.CreateOptions) (model.Project, error) {
-	// Build model from options
-	p, err := r.buildModelFromCreateOptions(ctx, sc, opts)
-	if err != nil {
-		r.l.Errorf(ctx, "internal.project.repository.postgres.Create.buildModelFromCreateOptions: %v", err)
-		return model.Project{}, err
-	}
-
-	// Convert to DB model
-	dbProject := p.ToDBProject()
-	if err := dbProject.Insert(ctx, r.db, boil.Infer()); err != nil {
-		r.l.Errorf(ctx, "internal.project.repository.postgres.Create.Insert: %v", err)
-		return model.Project{}, err
-	}
-
-	// Reload from database to get generated ID and timestamps
-	project, err := sqlboiler.Projects(
-		sqlboiler.ProjectWhere.ID.EQ(dbProject.ID),
-	).One(ctx, r.db)
-	if err != nil {
-		r.l.Errorf(ctx, "internal.project.repository.postgres.Create.Reload: %v", err)
-		return model.Project{}, err
-	}
-
-	return *model.NewProjectFromDB(project), nil
-}
-
-func (r *implRepository) Update(ctx context.Context, sc model.Scope, opts repository.UpdateOptions) (model.Project, error) {
-	// Validate ID
-	if err := postgresPkg.IsUUID(opts.ID); err != nil {
-		r.l.Errorf(ctx, "internal.project.repository.postgres.Update.IsUUID: %v", err)
-		return model.Project{}, err
-	}
-
-	// Get existing project
-	existing, err := sqlboiler.Projects(
-		sqlboiler.ProjectWhere.ID.EQ(opts.ID),
-		sqlboiler.ProjectWhere.DeletedAt.IsNull(),
-	).One(ctx, r.db)
+// Update updates a project by ID.
+func (r *implRepository) Update(ctx context.Context, opt repository.UpdateOptions) (model.Project, error) {
+	row, err := sqlboiler.FindProject(ctx, r.db, opt.ID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return model.Project{}, repository.ErrNotFound
+			r.l.Warnf(ctx, "project.repository.Update.FindProject: not found id=%s", opt.ID)
+			return model.Project{}, repository.ErrFailedToGet
 		}
-		r.l.Errorf(ctx, "internal.project.repository.postgres.Update.Find: %v", err)
-		return model.Project{}, err
+		r.l.Errorf(ctx, "project.repository.Update.FindProject: %v", err)
+		return model.Project{}, repository.ErrFailedToUpdate
 	}
 
-	// Convert to domain model
-	existingProject := *model.NewProjectFromDB(existing)
+	if opt.Name != "" {
+		row.Name = opt.Name
+	}
+	if opt.Description != "" {
+		row.Description = null.StringFrom(opt.Description)
+	}
+	if opt.Brand != "" {
+		row.Brand = null.StringFrom(opt.Brand)
+	}
+	if opt.EntityType != "" {
+		row.EntityType = sqlboiler.EntityType(opt.EntityType)
+	}
+	if opt.EntityName != "" {
+		row.EntityName = opt.EntityName
+	}
+	if opt.Status != "" {
+		row.Status = sqlboiler.ProjectStatus(opt.Status)
+	}
 
-	// Build updated model from options
-	updated, err := r.buildModelFromUpdateOptions(ctx, existingProject, opts)
+	row.UpdatedAt = null.TimeFrom(time.Now())
+
+	_, err = row.Update(ctx, r.db, boil.Infer())
 	if err != nil {
-		r.l.Errorf(ctx, "internal.project.repository.postgres.Update.buildModelFromUpdateOptions: %v", err)
-		return model.Project{}, err
+		r.l.Errorf(ctx, "project.repository.Update.Update: %v", err)
+		return model.Project{}, repository.ErrFailedToUpdate
 	}
 
-	// Convert to DB model
-	dbProject := updated.ToDBProject()
-	rows, err := dbProject.Update(ctx, r.db, boil.Infer())
-	if err != nil {
-		r.l.Errorf(ctx, "internal.project.repository.postgres.Update.Update: %v", err)
-		return model.Project{}, err
-	}
-
-	if rows == 0 {
-		return model.Project{}, repository.ErrNotFound
-	}
-
-	// Reload from database
-	project, err := sqlboiler.Projects(
-		sqlboiler.ProjectWhere.ID.EQ(opts.ID),
-	).One(ctx, r.db)
-	if err != nil {
-		r.l.Errorf(ctx, "internal.project.repository.postgres.Update.Reload: %v", err)
-		return model.Project{}, err
-	}
-
-	return *model.NewProjectFromDB(project), nil
+	result := model.NewProjectFromDB(row)
+	return *result, nil
 }
 
-func (r *implRepository) GetOne(ctx context.Context, sc model.Scope, opts repository.GetOneOptions) (model.Project, error) {
-	mods, err := r.buildGetOneQuery(ctx, opts)
-	if err != nil {
-		r.l.Errorf(ctx, "internal.project.repository.postgres.GetOne.buildGetOneQuery: %v", err)
-		return model.Project{}, err
-	}
-
-	project, err := sqlboiler.Projects(mods...).One(ctx, r.db)
+// Archive soft-deletes a project by setting deleted_at.
+func (r *implRepository) Archive(ctx context.Context, id string) error {
+	row, err := sqlboiler.FindProject(ctx, r.db, id)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return model.Project{}, repository.ErrNotFound
+			r.l.Warnf(ctx, "project.repository.Archive.FindProject: not found id=%s", id)
+			return repository.ErrFailedToGet
 		}
-		r.l.Errorf(ctx, "internal.project.repository.postgres.GetOne.One: %v", err)
-		return model.Project{}, err
+		r.l.Errorf(ctx, "project.repository.Archive.FindProject: %v", err)
+		return repository.ErrFailedToDelete
 	}
 
-	return *model.NewProjectFromDB(project), nil
-}
+	row.DeletedAt = null.TimeFrom(time.Now())
+	row.UpdatedAt = null.TimeFrom(time.Now())
 
-func (r *implRepository) Get(ctx context.Context, sc model.Scope, opts repository.GetOptions) ([]model.Project, paginator.Paginator, error) {
-	mods, err := r.buildGetQuery(ctx, opts, opts.PaginateQuery)
+	_, err = row.Update(ctx, r.db, boil.Whitelist(
+		sqlboiler.ProjectColumns.DeletedAt,
+		sqlboiler.ProjectColumns.UpdatedAt,
+	))
 	if err != nil {
-		r.l.Errorf(ctx, "internal.project.repository.postgres.Get.buildGetQuery: %v", err)
-		return nil, paginator.Paginator{}, err
-	}
-
-	cntMods := []qm.QueryMod{
-		sqlboiler.ProjectWhere.DeletedAt.IsNull(),
-	}
-
-	// Apply filters
-	if len(opts.IDs) > 0 {
-		cntMods = append(cntMods, sqlboiler.ProjectWhere.ID.IN(opts.IDs))
-	}
-
-	if len(opts.Statuses) > 0 {
-		cntMods = append(cntMods, sqlboiler.ProjectWhere.Status.IN(opts.Statuses))
-	}
-
-	if opts.CreatedBy != nil && *opts.CreatedBy != "" {
-		cntMods = append(cntMods, sqlboiler.ProjectWhere.CreatedBy.EQ(*opts.CreatedBy))
-	}
-
-	if opts.SearchName != nil && *opts.SearchName != "" {
-		cntMods = append(cntMods, qm.Where("name ILIKE ?", "%"+*opts.SearchName+"%"))
-	}
-
-	cnt, err := sqlboiler.Projects(cntMods...).Count(ctx, r.db)
-	if err != nil {
-		r.l.Errorf(ctx, "internal.project.repository.postgres.Get.Count: %v", err)
-		return nil, paginator.Paginator{}, err
-	}
-
-	projects, err := sqlboiler.Projects(mods...).All(ctx, r.db)
-	if err != nil {
-		r.l.Errorf(ctx, "internal.project.repository.postgres.Get.All: %v", err)
-		return nil, paginator.Paginator{}, err
-	}
-
-	res := make([]model.Project, len(projects))
-	for i, p := range projects {
-		res[i] = *model.NewProjectFromDB(p)
-	}
-
-	pgn := paginator.NewPaginator(int(cnt), opts.PaginateQuery)
-
-	return res, pgn, nil
-}
-
-func (r *implRepository) Delete(ctx context.Context, sc model.Scope, ids []string) error {
-	if err := postgresPkg.ValidateUUIDs(ids); err != nil {
-		r.l.Errorf(ctx, "internal.project.repository.postgres.Delete.ValidateUUIDs: %v", err)
-		return err
-	}
-
-	rowsAffected, err := sqlboiler.Projects(
-		sqlboiler.ProjectWhere.ID.IN(ids),
-		sqlboiler.ProjectWhere.DeletedAt.IsNull(),
-	).UpdateAll(ctx, r.db, sqlboiler.M{
-		sqlboiler.ProjectColumns.DeletedAt: "NOW()",
-	})
-
-	if rowsAffected != int64(len(ids)) {
-		r.l.Warnf(ctx, "internal.project.repository.postgres.Delete.someProjectsNotFound: %v", ids)
-		return repository.ErrNotFound
-	}
-
-	if err != nil {
-		r.l.Errorf(ctx, "internal.project.repository.postgres.Delete.UpdateAll: %v", err)
-		return err
+		r.l.Errorf(ctx, "project.repository.Archive.Update: %v", err)
+		return repository.ErrFailedToDelete
 	}
 
 	return nil

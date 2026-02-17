@@ -27,7 +27,7 @@ type Locale struct{}
 
 // ParseLang parses and validates a language code.
 // It returns the default language if the provided code is not supported.
-// The input is case-insensitive and trimmed of whitespace.
+// The ip is case-insensitive and trimmed of whitespace.
 func ParseLang(lang string) string {
 	lang = strings.TrimSpace(strings.ToLower(lang))
 

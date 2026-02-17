@@ -1,20 +1,27 @@
 package http
 
 import (
-	"smap-project/internal/middleware"
+	"project-srv/internal/middleware"
 
 	"github.com/gin-gonic/gin"
 )
 
-func MapProjectRoutes(r *gin.RouterGroup, h handler, mw middleware.Middleware) {
-	// All routes require authentication
-	r.GET("", mw.Auth(), h.Get)
-	r.GET("/:id", mw.Auth(), h.Detail)
-	r.GET("/:id/progress", mw.Auth(), h.GetProgress)
-	r.GET("/:id/phase-progress", mw.Auth(), h.GetPhaseProgress)
-	r.POST("", mw.Auth(), h.Create)
-	r.POST("/:id/execute", mw.Auth(), h.Execute)
-	r.PATCH("/:id", mw.Auth(), h.Patch)
-	r.DELETE("", mw.Auth(), h.Delete)
-	r.POST("/dryrun", mw.Auth(), h.DryRunKeywords)
+// RegisterRoutes maps project routes to the given router group.
+func (h *handler) RegisterRoutes(r *gin.RouterGroup, mw middleware.Middleware) {
+	// Nested under campaign — uses :id (same wildcard as campaign routes)
+	campaigns := r.Group("/campaigns")
+	campaigns.Use(mw.Auth())
+	{
+		campaigns.POST("/:id/projects", h.Create)
+		campaigns.GET("/:id/projects", h.List)
+	}
+
+	// Direct project routes
+	projects := r.Group("/projects")
+	projects.Use(mw.Auth())
+	{
+		projects.GET("/:projectId", h.Detail)
+		projects.PUT("/:projectId", h.Update)
+		projects.DELETE("/:projectId", h.Archive)
+	}
 }

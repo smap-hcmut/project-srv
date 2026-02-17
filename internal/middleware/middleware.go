@@ -1,24 +1,29 @@
 package middleware
 
 import (
-	"smap-project/pkg/response"
-	"smap-project/pkg/scope"
+	"project-srv/pkg/response"
+	"project-srv/pkg/scope"
 
 	"github.com/gin-gonic/gin"
 )
 
 func (m Middleware) Auth() gin.HandlerFunc {
 	return func(c *gin.Context) {
+
 		// Cookie-first authentication strategy
 		// First, attempt to read token from cookie (preferred method)
 		tokenString, err := c.Cookie(m.cookieConfig.Name)
 
 		// Fallback to Authorization header for backward compatibility
-		// If no token found in cookie, return unauthorized
 		if err != nil || tokenString == "" {
-			response.Unauthorized(c)
-			c.Abort()
-			return
+			authHeader := c.GetHeader("Authorization")
+			if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+				tokenString = authHeader[7:]
+			} else {
+				response.Unauthorized(c)
+				c.Abort()
+				return
+			}
 		}
 
 		payload, err := m.jwtManager.Verify(tokenString)
