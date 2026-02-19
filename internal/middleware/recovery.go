@@ -10,7 +10,7 @@ import (
 
 // Recovery returns a middleware that recovers from panics and logs the error.
 // It uses structured logging and reports panics to Discord if configured.
-func Recovery(logger log.Logger, discordClient *discord.Discord) gin.HandlerFunc {
+func Recovery(logger log.Logger, discordClient discord.IDiscord) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
 			if err := recover(); err != nil {

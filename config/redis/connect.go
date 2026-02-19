@@ -32,22 +32,22 @@ func Connect(ctx context.Context, cfg config.RedisConfig) (redis.IRedis, error) 
 
 	var err error
 	once.Do(func() {
-		clientCfg := redis.RedisConfig{
+		client, e := redis.NewRedis(redis.RedisConfig{
 			Host:     cfg.Host,
 			Port:     cfg.Port,
 			Password: cfg.Password,
 			DB:       cfg.DB,
-		}
-
-		client, e := redis.NewRedis(clientCfg)
+		})
 		if e != nil {
-			err = fmt.Errorf("failed to initialize Redis client: %w", e)
+			err = fmt.Errorf("failed to create Redis client: %w", e)
 			initErr = err
 			return
 		}
-
-		// Verify connection (NewRedis already pings, but we keep this for double check or remove if redundant)
-		// Actually NewRedis does ping. We can assign directly.
+		if e := client.Ping(ctx); e != nil {
+			err = fmt.Errorf("failed to ping Redis: %w", e)
+			initErr = err
+			return
+		}
 		instance = client
 	})
 
@@ -77,7 +77,7 @@ func HealthCheck(ctx context.Context) error {
 	return instance.Ping(ctx)
 }
 
-// Disconnect closes the Redis connection
+// Disconnect closes the Redis client and resets the singleton.
 func Disconnect() error {
 	mu.Lock()
 	defer mu.Unlock()

@@ -1,138 +1,178 @@
--include .env
-export
-BINARY=engine
+.PHONY: help dev-up dev-down dev-logs dev-clean build run test migrate-up migrate-down
 
-models:
-	@echo "Generating models"
-	@sqlboiler psql
+# Colors
+GREEN  := $(shell tput -Txterm setaf 2)
+YELLOW := $(shell tput -Txterm setaf 3)
+WHITE  := $(shell tput -Txterm setaf 7)
+RESET  := $(shell tput -Txterm sgr0)
 
-swagger:
-	@echo "Generating swagger"
-	@swag init -g cmd/api/main.go
+help: ## Show this help
+	@echo ''
+	@echo 'Usage:'
+	@echo '  ${YELLOW}make${RESET} ${GREEN}<target>${RESET}'
+	@echo ''
+	@echo 'Targets:'
+	@awk 'BEGIN {FS = ":.*?## "} { \
+		if (/^[a-zA-Z_-]+:.*?##.*$$/) {printf "    ${YELLOW}%-20s${GREEN}%s${RESET}\n", $$1, $$2} \
+		else if (/^## .*$$/) {printf "  ${WHITE}%s${RESET}\n", substr($$1,4)} \
+		}' $(MAKEFILE_LIST)
 
-run-api:
-	@echo "Generating swagger"
-	@make swagger
-	@echo "Running the application"
-	@go run cmd/api/main.go
+## Development
+dev-up: ## Start all development dependencies (PostgreSQL, Redis, Kafka)
+	@echo "${GREEN}Starting development dependencies...${RESET}"
+	docker-compose up -d
+	@echo "${GREEN}Waiting for services to be healthy...${RESET}"
+	@sleep 5
+	@echo "${GREEN}Services started successfully!${RESET}"
+	@echo "${YELLOW}PostgreSQL:${RESET} localhost:5432"
+	@echo "${YELLOW}Redis:${RESET} localhost:6379"
+	@echo "${YELLOW}Kafka:${RESET} localhost:9092"
+	@echo "${YELLOW}Kafka UI:${RESET} http://localhost:8090"
+	@echo "${YELLOW}Redis Commander:${RESET} http://localhost:8081"
 
-run-consumer:
-	@echo "Running the consumer"
-	@go run cmd/consumer/main.go
+dev-down: ## Stop all development dependencies
+	@echo "${GREEN}Stopping development dependencies...${RESET}"
+	docker-compose down
 
-test:
-	@echo "Running all tests..."
-	@go test -v ./...
+dev-logs: ## Show logs from all services
+	docker-compose logs -f
 
-test-coverage:
-	@echo "Running tests with coverage..."
-	@go test -v -coverprofile=coverage.out ./...
-	@go tool cover -html=coverage.out -o coverage.html
-	@echo "Coverage report generated: coverage.html"
+dev-clean: ## Stop and remove all containers, volumes, and networks
+	@echo "${YELLOW}Warning: This will remove all data!${RESET}"
+	@read -p "Are you sure? [y/N] " -n 1 -r; \
+	echo; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		docker-compose down -v; \
+		echo "${GREEN}Cleaned up successfully!${RESET}"; \
+	fi
 
-test-short:
-	@echo "Running short tests..."
-	@go test -v -short ./...
+dev-restart: dev-down dev-up ## Restart all development dependencies
 
-build-docker-compose:
-	@echo "make models first"
-	@make models
-	@echo "Building docker compose"
-	docker compose up --build -d
+## Database
+migrate-up: ## Run database migrations
+	@echo "${GREEN}Running migrations...${RESET}"
+	@if [ -f migration/init_schema.sql ]; then \
+		PGPASSWORD=postgres psql -h localhost -U postgres -d smap -f migration/init_schema.sql; \
+		echo "${GREEN}Migrations completed!${RESET}"; \
+	else \
+		echo "${YELLOW}No migration files found${RESET}"; \
+	fi
 
-# Docker build targets (using optimized Dockerfile)
-docker-build:
-	@echo "Building Docker image for local platform"
-	@./build.sh local
+migrate-down: ## Rollback database migrations
+	@echo "${YELLOW}Rolling back migrations...${RESET}"
+	@echo "Not implemented yet"
 
-docker-build-amd64:
-	@echo "Building Docker image for AMD64"
-	@./build.sh amd64
+db-shell: ## Connect to PostgreSQL shell
+	PGPASSWORD=postgres psql -h localhost -U postgres -d smap
 
-docker-build-multi:
-	@echo "Building multi-platform Docker image (requires REGISTRY)"
-	@./build.sh multi
+## Build & Run
+build: ## Build the application
+	@echo "${GREEN}Building application...${RESET}"
+	go build -o bin/api cmd/api/main.go
+	go build -o bin/consumer cmd/consumer/main.go
+	@echo "${GREEN}Build completed!${RESET}"
 
-docker-run:
-	@echo "Building and running Docker container"
-	@./build.sh run
+run-api: ## Run API server
+	@echo "${GREEN}Starting API server...${RESET}"
+	go run cmd/api/main.go
 
-docker-clean:
-	@echo "Cleaning Docker images"
-	@./build.sh clean
+run-consumer: ## Run consumer service
+	@echo "${GREEN}Starting consumer service...${RESET}"
+	go run cmd/consumer/main.go
 
-docker-push:
-	@echo "Building and pushing to registry (requires REGISTRY)"
-	@./build.sh push
+## Testing
+test: ## Run tests
+	@echo "${GREEN}Running tests...${RESET}"
+	go test -v -race -coverprofile=coverage.out ./...
+	@echo "${GREEN}Tests completed!${RESET}"
 
-# Consumer Docker build targets (using optimized Dockerfile)
-consumer-build:
-	@echo "Building Consumer Docker image for local platform"
-	@./build-consumer.sh local
+test-coverage: test ## Run tests with coverage report
+	go tool cover -html=coverage.out
 
-consumer-build-amd64:
-	@echo "Building Consumer Docker image for AMD64"
-	@./build-consumer.sh amd64
+## Code Quality
+lint: ## Run linter
+	@echo "${GREEN}Running linter...${RESET}"
+	golangci-lint run
 
-consumer-build-multi:
-	@echo "Building multi-platform Consumer Docker image (requires REGISTRY)"
-	@./build-consumer.sh multi
+fmt: ## Format code
+	@echo "${GREEN}Formatting code...${RESET}"
+	go fmt ./...
+	goimports -w .
 
-consumer-run:
-	@echo "Building and running Consumer Docker container"
-	@./build-consumer.sh run
+## Dependencies
+deps: ## Download dependencies
+	@echo "${GREEN}Downloading dependencies...${RESET}"
+	go mod download
+	go mod tidy
 
-consumer-clean:
-	@echo "Cleaning Consumer Docker images"
-	@./build-consumer.sh clean
+deps-update: ## Update dependencies
+	@echo "${GREEN}Updating dependencies...${RESET}"
+	go get -u ./...
+	go mod tidy
 
-consumer-push:
-	@echo "Building and pushing Consumer to registry (requires REGISTRY)"
-	@./build-consumer.sh push
+## Docker
+docker-build: ## Build Docker image
+	@echo "${GREEN}Building Docker image...${RESET}"
+	docker build -t project-srv:latest -f cmd/api/Dockerfile .
 
-# Show all available targets
-help:
-	@echo "Available targets:"
-	@echo ""
-	@echo "Development:"
-	@echo "  models              - Generate SQLBoiler models"
-	@echo "  swagger             - Generate Swagger documentation"
-	@echo "  run-api             - Run API server locally"
-	@echo "  run-consumer        - Run consumer locally"
-	@echo "  build-docker-compose - Build with docker-compose"
-	@echo ""
-	@echo "Testing:"
-	@echo "  test                - Run all tests"
-	@echo "  test-coverage       - Run tests with coverage report"
-	@echo "  test-short          - Run short tests only"
-	@echo ""
-	@echo "Docker - API Server:"
-	@echo "  docker-build        - Build for local platform"
-	@echo "  docker-build-amd64  - Build for AMD64 servers"
-	@echo "  docker-build-multi  - Build multi-platform (requires REGISTRY env)"
-	@echo "  docker-run          - Build and run container locally"
-	@echo "  docker-clean        - Remove all Docker images"
-	@echo "  docker-push         - Build and push to registry"
-	@echo ""
-	@echo "Docker - Consumer Service:"
-	@echo "  consumer-build      - Build consumer for local platform"
-	@echo "  consumer-build-amd64 - Build consumer for AMD64 servers"
-	@echo "  consumer-build-multi - Build multi-platform (requires REGISTRY env)"
-	@echo "  consumer-run        - Build and run consumer container locally"
-	@echo "  consumer-clean      - Remove all consumer Docker images"
-	@echo "  consumer-push       - Build and push consumer to registry"
-	@echo ""
-	@echo "Examples:"
-	@echo "  make docker-build"
-	@echo "  make docker-run"
-	@echo "  make consumer-build"
-	@echo "  make consumer-run"
-	@echo "  REGISTRY=docker.io/username make docker-push"
-	@echo "  REGISTRY=docker.io/username make consumer-push"
+docker-run: ## Run Docker container
+	@echo "${GREEN}Running Docker container...${RESET}"
+	docker run -p 8080:8080 \
+		-e POSTGRES_HOST=localhost \
+		-e POSTGRES_PASSWORD=postgres \
+		-e REDIS_HOST=localhost \
+		-e JWT_SECRET_KEY=your-secret-key \
+		project-srv:latest
 
-.PHONY: models swagger run-api run-consumer build-docker-compose \
-        docker-build docker-build-amd64 docker-build-multi \
-        docker-run docker-clean docker-push \
-        consumer-build consumer-build-amd64 consumer-build-multi \
-        consumer-run consumer-clean consumer-push \
-        test test-coverage test-short help
+## Kafka
+kafka-topics: ## List Kafka topics
+	docker exec -it project-kafka kafka-topics --bootstrap-server localhost:9092 --list
+
+kafka-create-topic: ## Create Kafka topic (usage: make kafka-create-topic TOPIC=my-topic)
+	docker exec -it project-kafka kafka-topics --bootstrap-server localhost:9092 --create --topic $(TOPIC) --partitions 3 --replication-factor 1
+
+kafka-consume: ## Consume messages from Kafka topic (usage: make kafka-consume TOPIC=project.events)
+	docker exec -it project-kafka kafka-console-consumer --bootstrap-server localhost:9092 --topic $(TOPIC) --from-beginning
+
+kafka-produce: ## Produce messages to Kafka topic (usage: make kafka-produce TOPIC=project.events)
+	docker exec -it project-kafka kafka-console-producer --bootstrap-server localhost:9092 --topic $(TOPIC)
+
+## Redis
+redis-cli: ## Connect to Redis CLI
+	docker exec -it project-redis redis-cli -a redis_password
+
+redis-flush: ## Flush all Redis data
+	@echo "${YELLOW}Warning: This will delete all Redis data!${RESET}"
+	@read -p "Are you sure? [y/N] " -n 1 -r; \
+	echo; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		docker exec -it project-redis redis-cli -a redis_password FLUSHALL; \
+		echo "${GREEN}Redis flushed!${RESET}"; \
+	fi
+
+## Monitoring
+health: ## Check health of all services
+	@echo "${GREEN}Checking service health...${RESET}"
+	@echo "${YELLOW}PostgreSQL:${RESET}"
+	@docker exec project-postgres pg_isready -U postgres || echo "Not ready"
+	@echo "${YELLOW}Redis:${RESET}"
+	@docker exec project-redis redis-cli -a redis_password ping || echo "Not ready"
+	@echo "${YELLOW}Kafka:${RESET}"
+	@docker exec project-kafka kafka-broker-api-versions --bootstrap-server localhost:9092 > /dev/null 2>&1 && echo "PONG" || echo "Not ready"
+
+logs-api: ## Show API logs
+	docker logs -f project-api 2>/dev/null || echo "API container not running"
+
+logs-consumer: ## Show consumer logs
+	docker logs -f project-consumer 2>/dev/null || echo "Consumer container not running"
+
+## Cleanup
+clean: ## Clean build artifacts
+	@echo "${GREEN}Cleaning build artifacts...${RESET}"
+	rm -rf bin/
+	rm -f coverage.out
+	@echo "${GREEN}Cleaned!${RESET}"
+
+clean-all: clean dev-clean ## Clean everything (artifacts + Docker)
+
+.DEFAULT_GOAL := help

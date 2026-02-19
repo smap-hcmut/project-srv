@@ -1,112 +1,68 @@
-# SMAP Auth Service Configuration
+# SMAP Project Service – Example configuration
+# Copy to project-config.yaml and set secrets. Env vars override (e.g. POSTGRES_PASSWORD, JWT_SECRET_KEY).
+# Paths: ./config, ./, /etc/smap/
 
-# Environment Configuration
+# Environment
 environment:
-  name: development
+  name: development # production | staging | development
 
-# HTTP Server Configuration
+# HTTP Server
 http_server:
-  host: ""
   port: 8080
-  mode: debug
+  mode: debug # debug | release | test
 
-# Logger Configuration
+# Logger
 logger:
   level: debug
   mode: debug
-  encoding: console
+  encoding: console # console | json
   color_enabled: true
 
-# PostgreSQL Configuration
+# PostgreSQL
 postgres:
   host: localhost
   port: 5432
   user: postgres
-  password: postgres
-  dbname: smap_auth
-  sslmode: disable
+  password: "postgres"
+  dbname: postgres
+  sslmode: prefer
+  schema: project
 
-# Redis Configuration
+# Redis
 redis:
   host: localhost
   port: 6379
   password: ""
   db: 0
 
-# Kafka Configuration
+# Kafka
 kafka:
   brokers:
-    - localhost:9092
-  topic: project.events
-  group_id: project-consumer
+    - "localhost:9092"
+  topic: "project.events"
+  group_id: "project-consumer"
 
-# OAuth2 Configuration
-oauth2:
-  provider: google
-  client_id: YOUR_GOOGLE_CLIENT_ID
-  client_secret: YOUR_GOOGLE_CLIENT_SECRET
-  redirect_uri: http://localhost:8080/authentication/callback
-  scopes:
-    - openid
-    - email
-    - profile
-
-# JWT Configuration
+# JWT
 jwt:
-  algorithm: HS256
-  issuer: smap-auth-service
-  audience:
-    - identity-srv
-  secret_key: smap-jwt-secret-key-2024-minimum-32-characters-required
-  ttl: 28800 # 8 hours in seconds
+  secret_key: "REPLACE-WITH-SHARED-SECRET-MIN-32-CHARS"
 
-# Cookie Configuration
+# Cookie
 cookie:
-  domain: localhost
+  domain: ".localhost"
   secure: false
-  samesite: Lax
-  max_age: 28800 # 8 hours
-  max_age_remember: 604800 # 7 days
-  name: smap_auth_token
+  samesite: "Lax"
+  max_age: 28800
+  max_age_remember: 604800
+  name: "smap_auth_token"
 
-# Access Control Configuration
-access_control:
-  allowed_domains:
-    - gmail.com
-    - vinfast.com
-  blocked_emails: []
-  user_roles:
-    admin@vinfast.com: ADMIN
-    analyst@vinfast.com: ANALYST
-    viewer@vinfast.com: VIEWER
-    tantai@vinfast.com: ADMIN
-  default_role: VIEWER
-
-# Session Configuration
-session:
-  ttl: 28800 # 8 hours
-  remember_me_ttl: 604800 # 7 days
-  backend: redis
-
-# Token Blacklist Configuration
-blacklist:
-  enabled: true
-  backend: redis
-  key_prefix: "blacklist:"
-
-# Encrypter Configuration
+# Encrypter
 encrypter:
-  key: test-encryption-key-32-characters
+  key: "REPLACE-WITH-32-CHAR-ENCRYPTION-KEY"
 
-# Internal Service Authentication
+# Internal auth
 internal:
-  service_keys:
-    project_service: project-service-key
-    ingest_service: ingest-service-key
-    knowledge_service: knowledge-service-key
-    notification_service: notification-service-key
+  internal_key: ""
 
-# Discord Webhook (Optional)
+# Discord
 discord:
-  webhook_id: ""
-  webhook_token: ""
+  webhook_url: ""

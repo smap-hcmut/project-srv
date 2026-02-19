@@ -1,78 +1,101 @@
 package main
 
-// import (
-// 	"context"
-// 	"fmt"
-// 	"os"
-// 	"os/signal"
-// 	"syscall"
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 
-// 	"project-srv/config"
-// 	configPostgre "project-srv/config/postgre"
-// 	"project-srv/internal/consumer"
-// 	pkgLog "project-srv/pkg/log"
+	"project-srv/config"
+	"project-srv/config/kafka"
+	"project-srv/config/postgre"
+	"project-srv/config/redis"
+	"project-srv/internal/consumer"
+	"project-srv/pkg/discord"
+	"project-srv/pkg/log"
+)
 
-// 	_ "github.com/lib/pq"
-// )
+func main() {
+	// Load configuration
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Println("Failed to load config: ", err)
+		return
+	}
 
-// // @Name SMAP Consumer Service
-// // @description Consumer service for processing async tasks (Audit Logging, etc.)
-// // @version 1.0
-// func main() {
-// 	// 1. Load configuration
-// 	cfg, err := config.Load()
-// 	if err != nil {
-// 		fmt.Printf("Failed to load config: %v\n", err)
-// 		os.Exit(1)
-// 	}
+	// Initialize logger
+	logger := log.Init(log.ZapConfig{
+		Level:        cfg.Logger.Level,
+		Mode:         cfg.Logger.Mode,
+		Encoding:     cfg.Logger.Encoding,
+		ColorEnabled: cfg.Logger.ColorEnabled,
+	})
 
-// 	// 2. Initialize logger
-// 	logger := pkgLog.Init(pkgLog.ZapConfig{
-// 		Level:        cfg.Logger.Level,
-// 		Mode:         cfg.Logger.Mode,
-// 		Encoding:     cfg.Logger.Encoding,
-// 		ColorEnabled: cfg.Logger.ColorEnabled,
-// 	})
+	// Create context with signal handling for graceful shutdown
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
-// 	// 3. Initialize PostgreSQL
-// 	ctx := context.Background()
-// 	postgresDB, err := configPostgre.Connect(ctx, cfg.Postgres)
-// 	if err != nil {
-// 		logger.Errorf(ctx, "Failed to connect to PostgreSQL: %v", err)
-// 		os.Exit(1)
-// 	}
-// 	defer configPostgre.Disconnect(ctx, postgresDB)
-// 	logger.Infof(ctx, "PostgreSQL connected successfully to %s:%d/%s",
-// 		cfg.Postgres.Host, cfg.Postgres.Port, cfg.Postgres.DBName)
+	logger.Info(ctx, "Starting Project Consumer Service...")
 
-// 	// 4. Initialize consumer service
-// 	consumerService, err := consumer.New(logger, consumer.Config{
-// 		PostgresDB:   postgresDB,
-// 		KafkaBrokers: cfg.Kafka.Brokers,
-// 	})
-// 	if err != nil {
-// 		logger.Errorf(ctx, "Failed to initialize consumer service: %v", err)
-// 		os.Exit(1)
-// 	}
-// 	defer consumerService.Close()
+	// Kafka Producer (for publishing events)
+	kafkaProducer, err := kafka.ConnectProducer(cfg.Kafka)
+	if err != nil {
+		logger.Errorf(ctx, "Failed to connect to Kafka producer: %v", err)
+		return
+	}
+	defer kafka.DisconnectProducer()
+	logger.Info(ctx, "Kafka producer initialized")
 
-// 	// 5. Start all consumers
-// 	// Consumers are registered internally in consumer/handler.go
-// 	go func() {
-// 		if err := consumerService.Start(ctx); err != nil {
-// 			logger.Errorf(ctx, "Consumer service error: %v", err)
-// 			os.Exit(1)
-// 		}
-// 	}()
+	// Redis
+	redisClient, err := redis.Connect(ctx, cfg.Redis)
+	if err != nil {
+		logger.Errorf(ctx, "Failed to connect to Redis: %v", err)
+		return
+	}
+	defer redis.Disconnect()
+	logger.Info(ctx, "Redis client initialized")
 
-// 	logger.Info(ctx, "Consumer service ready - processing events from all registered consumers")
+	// PostgreSQL
+	postgresDB, err := postgre.Connect(ctx, cfg.Postgres)
+	if err != nil {
+		logger.Errorf(ctx, "Failed to connect to PostgreSQL: %v", err)
+		return
+	}
+	defer postgre.Disconnect(ctx, postgresDB)
+	logger.Info(ctx, "PostgreSQL client initialized")
 
-// 	// 6. Wait for shutdown signal
-// 	sigChan := make(chan os.Signal, 1)
-// 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-// 	<-sigChan
+	// Discord (optional)
+	var discordClient discord.IDiscord
+	if cfg.Discord.WebhookURL != "" {
+		discordClient, err = discord.New(logger, cfg.Discord.WebhookURL)
+		if err != nil {
+			logger.Warnf(ctx, "Discord webhook not configured (optional): %v", err)
+		} else {
+			logger.Info(ctx, "Discord client initialized")
+		}
+	}
 
-// 	logger.Info(ctx, "Shutting down consumer service gracefully...")
-// 	consumerService.Close()
-// 	logger.Info(ctx, "Consumer service stopped gracefully")
-// }
+	// Consumer server
+	srv, err := consumer.New(consumer.Config{
+		Logger:        logger,
+		KafkaConfig:   cfg.Kafka,
+		RedisClient:   redisClient,
+		PostgresDB:    postgresDB,
+		Discord:       discordClient,
+		KafkaProducer: kafkaProducer,
+	})
+	if err != nil {
+		logger.Errorf(ctx, "Failed to create consumer server: %v", err)
+		return
+	}
+
+	// Run consumer server
+	logger.Info(ctx, "Consumer server starting...")
+	if err := srv.Run(ctx); err != nil {
+		logger.Errorf(ctx, "Consumer server error: %v", err)
+		return
+	}
+
+	logger.Info(ctx, "Consumer server stopped gracefully")
+}

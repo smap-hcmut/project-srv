@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Config holds all service configuration.
 type Config struct {
 	// Environment Configuration
 	Environment EnvironmentConfig
@@ -18,11 +19,11 @@ type Config struct {
 	// Database Configuration
 	Postgres PostgresConfig
 
-	// Message Queue Configuration (Kafka replaces RabbitMQ)
-	Kafka KafkaConfig
-
 	// Cache Configuration
 	Redis RedisConfig
+
+	// Message Queue Configuration
+	Kafka KafkaConfig
 
 	// Authentication & Security Configuration
 	JWT            JWTConfig
@@ -39,43 +40,8 @@ type EnvironmentConfig struct {
 	Name string
 }
 
-// KafkaConfig is the configuration for Kafka
-type KafkaConfig struct {
-	Brokers []string
-	Topic   string
-	GroupID string
-}
-
-// RedisConfig is the configuration for Redis
-type RedisConfig struct {
-	Host     string
-	Port     int
-	Password string
-	DB       int
-}
-
-// CookieConfig is the configuration for the cookie
-type CookieConfig struct {
-	Domain         string
-	Secure         bool
-	SameSite       string
-	MaxAge         int
-	MaxAgeRemember int
-	Name           string
-}
-
-// JWTConfig is the configuration for JWT
-type JWTConfig struct {
-	Algorithm string
-	Issuer    string
-	Audience  []string
-	SecretKey string
-	TTL       int // in seconds
-}
-
 // HTTPServerConfig is the configuration for the HTTP server
 type HTTPServerConfig struct {
-	Host string
 	Port int
 	Mode string
 }
@@ -96,12 +62,37 @@ type PostgresConfig struct {
 	Password string
 	DBName   string
 	SSLMode  string
-	Schema   string // Added Schema support
+	Schema   string
 }
 
-type DiscordConfig struct {
-	WebhookID    string
-	WebhookToken string
+// RedisConfig is the configuration for Redis
+type RedisConfig struct {
+	Host     string
+	Port     int
+	Password string
+	DB       int
+}
+
+// KafkaConfig is the configuration for Kafka
+type KafkaConfig struct {
+	Brokers []string
+	Topic   string
+	GroupID string
+}
+
+// JWTConfig is for verifying tokens only
+type JWTConfig struct {
+	SecretKey string
+}
+
+// CookieConfig configures the auth cookie
+type CookieConfig struct {
+	Domain         string
+	Secure         bool
+	SameSite       string
+	MaxAge         int
+	MaxAgeRemember int
+	Name           string
 }
 
 // EncrypterConfig is the configuration for the encrypter
@@ -112,7 +103,11 @@ type EncrypterConfig struct {
 // InternalConfig is the configuration for internal service authentication
 type InternalConfig struct {
 	InternalKey string
-	ServiceKeys map[string]string
+}
+
+// DiscordConfig: webhook URL from Discord
+type DiscordConfig struct {
+	WebhookURL string
 }
 
 // Load loads configuration using Viper
@@ -141,11 +136,8 @@ func Load() (*Config, error) {
 
 	cfg := &Config{}
 
-	// Environment
+	// Environment & Server
 	cfg.Environment.Name = viper.GetString("environment.name")
-
-	// HTTP Server
-	cfg.HTTPServer.Host = viper.GetString("http_server.host")
 	cfg.HTTPServer.Port = viper.GetInt("http_server.port")
 	cfg.HTTPServer.Mode = viper.GetString("http_server.mode")
 
@@ -155,7 +147,7 @@ func Load() (*Config, error) {
 	cfg.Logger.Encoding = viper.GetString("logger.encoding")
 	cfg.Logger.ColorEnabled = viper.GetBool("logger.color_enabled")
 
-	// Postgres
+	// PostgreSQL
 	cfg.Postgres.Host = viper.GetString("postgres.host")
 	cfg.Postgres.Port = viper.GetInt("postgres.port")
 	cfg.Postgres.User = viper.GetString("postgres.user")
@@ -176,11 +168,7 @@ func Load() (*Config, error) {
 	cfg.Kafka.GroupID = viper.GetString("kafka.group_id")
 
 	// JWT
-	cfg.JWT.Algorithm = viper.GetString("jwt.algorithm")
-	cfg.JWT.Issuer = viper.GetString("jwt.issuer")
-	cfg.JWT.Audience = viper.GetStringSlice("jwt.audience")
 	cfg.JWT.SecretKey = viper.GetString("jwt.secret_key")
-	cfg.JWT.TTL = viper.GetInt("jwt.ttl")
 
 	// Cookie
 	cfg.Cookie.Domain = viper.GetString("cookie.domain")
@@ -193,20 +181,11 @@ func Load() (*Config, error) {
 	// Encrypter
 	cfg.Encrypter.Key = viper.GetString("encrypter.key")
 
-	// Internal Service Keys
-	serviceKeys := make(map[string]string)
-	if viper.IsSet("internal.service_keys") {
-		serviceKeysRaw := viper.GetStringMapString("internal.service_keys")
-		for service, key := range serviceKeysRaw {
-			serviceKeys[service] = key
-		}
-	}
+	// Internal auth
 	cfg.InternalConfig.InternalKey = viper.GetString("internal.internal_key")
-	cfg.InternalConfig.ServiceKeys = serviceKeys
 
 	// Discord
-	cfg.Discord.WebhookID = viper.GetString("discord.webhook_id")
-	cfg.Discord.WebhookToken = viper.GetString("discord.webhook_token")
+	cfg.Discord.WebhookURL = viper.GetString("discord.webhook_url")
 
 	// Validate required fields
 	if err := validate(cfg); err != nil {
@@ -221,7 +200,6 @@ func setDefaults() {
 	viper.SetDefault("environment.name", "production")
 
 	// HTTP Server
-	viper.SetDefault("http_server.host", "")
 	viper.SetDefault("http_server.port", 8080)
 	viper.SetDefault("http_server.mode", "debug")
 
@@ -231,13 +209,14 @@ func setDefaults() {
 	viper.SetDefault("logger.encoding", "console")
 	viper.SetDefault("logger.color_enabled", true)
 
-	// Postgres
+	// PostgreSQL
 	viper.SetDefault("postgres.host", "localhost")
 	viper.SetDefault("postgres.port", 5432)
 	viper.SetDefault("postgres.user", "postgres")
 	viper.SetDefault("postgres.password", "postgres")
 	viper.SetDefault("postgres.dbname", "postgres")
 	viper.SetDefault("postgres.sslmode", "prefer")
+	viper.SetDefault("postgres.schema", "project")
 
 	// Redis
 	viper.SetDefault("redis.host", "localhost")
@@ -250,26 +229,16 @@ func setDefaults() {
 	viper.SetDefault("kafka.topic", "project.events")
 	viper.SetDefault("kafka.group_id", "project-consumer")
 
-	// JWT
-	viper.SetDefault("jwt.algorithm", "RS256")
-	viper.SetDefault("jwt.issuer", "smap-auth-service")
-	viper.SetDefault("jwt.audience", []string{"identity-srv"})
-	viper.SetDefault("jwt.public_key_path", "")
-	viper.SetDefault("jwt.ttl", 28800) // 8 hours
-
 	// Cookie
-	viper.SetDefault("cookie.domain", ".smap.com")
-	viper.SetDefault("cookie.secure", true)
+	viper.SetDefault("cookie.domain", ".localhost")
+	viper.SetDefault("cookie.secure", false)
 	viper.SetDefault("cookie.samesite", "Lax")
 	viper.SetDefault("cookie.max_age", 28800)           // 8 hours
 	viper.SetDefault("cookie.max_age_remember", 604800) // 7 days
 	viper.SetDefault("cookie.name", "smap_auth_token")
-
 }
 
 func validate(cfg *Config) error {
-	// Validate Redirect (Removed)
-
 	// Validate JWT fields
 	if cfg.JWT.SecretKey == "" {
 		return fmt.Errorf("jwt.secret_key is required")
@@ -277,26 +246,16 @@ func validate(cfg *Config) error {
 	if len(cfg.JWT.SecretKey) < 32 {
 		return fmt.Errorf("jwt.secret_key must be at least 32 characters for security")
 	}
-	if cfg.JWT.Issuer == "" {
-		return fmt.Errorf("jwt.issuer is required")
-	}
-	if len(cfg.JWT.Audience) == 0 {
-		return fmt.Errorf("jwt.audience must have at least one value")
-	}
-	if cfg.JWT.TTL <= 0 {
-		return fmt.Errorf("jwt.ttl must be greater than 0")
-	}
 
 	// Validate Encrypter
 	if cfg.Encrypter.Key == "" {
 		return fmt.Errorf("encrypter.key is required")
 	}
-	// Validate encrypter key length (Task 4.4)
 	if len(cfg.Encrypter.Key) < 32 {
 		return fmt.Errorf("encrypter.key must be at least 32 characters for security")
 	}
 
-	// Validate Database Configuration (Task 4.4)
+	// Validate Database Configuration
 	if cfg.Postgres.Host == "" {
 		return fmt.Errorf("postgres.host is required")
 	}
@@ -304,13 +263,13 @@ func validate(cfg *Config) error {
 		return fmt.Errorf("postgres.port is required")
 	}
 	if cfg.Postgres.DBName == "" {
-		return fmt.Errorf("postgres.db_name is required")
+		return fmt.Errorf("postgres.dbname is required")
 	}
 	if cfg.Postgres.User == "" {
 		return fmt.Errorf("postgres.user is required")
 	}
 
-	// Validate Redis Configuration (Task 4.4)
+	// Validate Redis Configuration
 	if cfg.Redis.Host == "" {
 		return fmt.Errorf("redis.host is required")
 	}
@@ -318,7 +277,7 @@ func validate(cfg *Config) error {
 		return fmt.Errorf("redis.port is required")
 	}
 
-	// Validate Cookie Configuration (Task 4.4)
+	// Validate Cookie Configuration
 	if cfg.Cookie.Name == "" {
 		return fmt.Errorf("cookie.name is required")
 	}

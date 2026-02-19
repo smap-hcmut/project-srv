@@ -5,16 +5,17 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"syscall"
+
 	"project-srv/config"
-	configPostgre "project-srv/config/postgre"
+	"project-srv/config/postgre"
+	"project-srv/config/redis"
 
 	_ "project-srv/docs" // Import swagger docs
 	"project-srv/internal/httpserver"
 	"project-srv/pkg/discord"
 	"project-srv/pkg/encrypter"
 	"project-srv/pkg/log"
-	pkgRedis "project-srv/pkg/redis"
-	"syscall"
 )
 
 // @title       SMAP Project Service API
@@ -34,15 +35,14 @@ import (
 // @name Authorization
 // @description Legacy Bearer token authentication (deprecated - use cookie authentication instead). Format: "Bearer {token}"
 func main() {
-	// 1. Load configuration
-	// Reads config from YAML file and environment variables
+	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
 		fmt.Println("Failed to load config: ", err)
 		return
 	}
 
-	// 2. Initialize logger
+	// Initialize logger
 	logger := log.Init(log.ZapConfig{
 		Level:        cfg.Logger.Level,
 		Mode:         cfg.Logger.Mode,
@@ -50,65 +50,57 @@ func main() {
 		ColorEnabled: cfg.Logger.ColorEnabled,
 	})
 
-	// 3. Register graceful shutdown
-	registerGracefulShutdown(logger)
+	// Create context with signal handling for graceful shutdown
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
-	// 4. Initialize encrypter
+	logger.Info(ctx, "Starting Project API Service...")
+
+	// Initialize encrypter
 	encrypterInstance := encrypter.New(cfg.Encrypter.Key)
+	logger.Info(ctx, "Encrypter initialized")
 
-	// 5. Initialize PostgreSQL
-	ctx := context.Background()
-	postgresDB, err := configPostgre.Connect(ctx, cfg.Postgres)
+	// Initialize PostgreSQL
+	postgresDB, err := postgre.Connect(ctx, cfg.Postgres)
 	if err != nil {
-		logger.Error(ctx, "Failed to connect to PostgreSQL: ", err)
+		logger.Errorf(ctx, "Failed to connect to PostgreSQL: %v", err)
 		return
 	}
-	defer configPostgre.Disconnect(ctx, postgresDB)
-	logger.Infof(ctx, "PostgreSQL connected successfully to %s:%d/%s", cfg.Postgres.Host, cfg.Postgres.Port, cfg.Postgres.DBName)
+	defer postgre.Disconnect(ctx, postgresDB)
+	logger.Infof(ctx, "PostgreSQL connected successfully to %s:%d/%s",
+		cfg.Postgres.Host, cfg.Postgres.Port, cfg.Postgres.DBName)
 
-	// 6. Initialize Discord (optional)
-	discordClient, err := discord.New(logger, &discord.DiscordWebhook{
-		ID:    cfg.Discord.WebhookID,
-		Token: cfg.Discord.WebhookToken,
-	})
+	// Initialize Redis
+	redisClient, err := redis.Connect(ctx, cfg.Redis)
 	if err != nil {
-		logger.Warnf(ctx, "Discord webhook not configured (optional): %v", err)
-		discordClient = nil // Continue without Discord
-	} else {
-		logger.Infof(ctx, "Discord webhook initialized successfully")
-	}
-
-	// 7. Initialize Redis
-	// 7. Initialize Redis
-	redisClient, err := pkgRedis.NewRedis(pkgRedis.RedisConfig{
-		Host:     cfg.Redis.Host,
-		Port:     cfg.Redis.Port,
-		Password: cfg.Redis.Password,
-		DB:       cfg.Redis.DB,
-	})
-	if err != nil {
-		logger.Error(ctx, "Failed to connect to Redis: ", err)
+		logger.Errorf(ctx, "Failed to connect to Redis: %v", err)
 		return
 	}
-	logger.Infof(ctx, "Redis connected successfully to %s:%d (DB %d)", cfg.Redis.Host, cfg.Redis.Port, cfg.Redis.DB)
+	defer redis.Disconnect()
+	logger.Infof(ctx, "Redis connected successfully to %s:%d (DB %d)",
+		cfg.Redis.Host, cfg.Redis.Port, cfg.Redis.DB)
 
-	logger.Infof(ctx, "JWT Manager initialized with algorithm: %s", cfg.JWT.Algorithm)
+	// Initialize Discord (optional)
+	var discordClient discord.IDiscord
+	if cfg.Discord.WebhookURL != "" {
+		discordClient, err = discord.New(logger, cfg.Discord.WebhookURL)
+		if err != nil {
+			logger.Warnf(ctx, "Discord webhook not configured (optional): %v", err)
+		} else {
+			logger.Info(ctx, "Discord webhook initialized")
+		}
+	}
 
-	// 11. Initialize HTTP server
-	// 11. Initialize HTTP server
-	// Main application server that handles all HTTP requests and routes
+	// Initialize HTTP server
 	httpServer, err := httpserver.New(logger, httpserver.Config{
 		// Server Configuration
 		Logger:      logger,
-		Host:        cfg.HTTPServer.Host,
 		Port:        cfg.HTTPServer.Port,
 		Mode:        cfg.HTTPServer.Mode,
 		Environment: cfg.Environment.Name,
 
 		// Database Configuration
 		PostgresDB: postgresDB,
-
-		// Storage Configuration
 
 		// Redis Configuration
 		RedisClient: redisClient,
@@ -123,26 +115,18 @@ func main() {
 		Discord: discordClient,
 	})
 	if err != nil {
-		logger.Error(ctx, "Failed to initialize HTTP server: ", err)
+		logger.Errorf(ctx, "Failed to initialize HTTP server: %v", err)
 		return
 	}
 
+	// Start HTTP server
+	logger.Infof(ctx, "Starting HTTP server on port %d (mode: %s)", cfg.HTTPServer.Port, cfg.HTTPServer.Mode)
 	if err := httpServer.Run(); err != nil {
-		logger.Error(ctx, "Failed to run server: ", err)
+		logger.Errorf(ctx, "Failed to run server: %v", err)
 		return
 	}
-}
 
-// registerGracefulShutdown registers a signal handler for graceful shutdown.
-func registerGracefulShutdown(logger log.Logger) {
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-
-	go func() {
-		<-sigChan
-		logger.Info(context.Background(), "Shutting down gracefully...")
-
-		logger.Info(context.Background(), "Cleanup completed")
-		os.Exit(0)
-	}()
+	// Wait for shutdown signal
+	<-ctx.Done()
+	logger.Info(ctx, "Shutting down gracefully...")
 }

@@ -39,14 +39,12 @@ type HTTPServer struct {
 	internalKey  string
 
 	// Monitoring & Notification Configuration
-	// Monitoring & Notification Configuration
-	discord *discord.Discord
+	discord discord.IDiscord
 }
 
 type Config struct {
 	// Server Configuration
 	Logger      log.Logger
-	Host        string
 	Port        int
 	Mode        string
 	Environment string
@@ -54,9 +52,6 @@ type Config struct {
 	// Database Configuration
 	PostgresDB *sql.DB
 
-	// Storage Configuration
-
-	// // Message Queue Configuration
 	// Redis Configuration
 	RedisClient pkgRedis.IRedis
 
@@ -67,8 +62,7 @@ type Config struct {
 	InternalKey  string
 
 	// Monitoring & Notification Configuration
-	// Monitoring & Notification Configuration
-	Discord *discord.Discord
+	Discord discord.IDiscord
 }
 
 // New creates a new HTTPServer instance with the provided configuration.
@@ -79,7 +73,6 @@ func New(logger log.Logger, cfg Config) (*HTTPServer, error) {
 		// Server Configuration
 		l:           logger,
 		gin:         gin.Default(),
-		host:        cfg.Host,
 		port:        cfg.Port,
 		mode:        cfg.Mode,
 		environment: cfg.Environment,
@@ -87,10 +80,6 @@ func New(logger log.Logger, cfg Config) (*HTTPServer, error) {
 		// Database Configuration
 		postgresDB: cfg.PostgresDB,
 
-		// Storage Configuration
-
-		// // Message Queue Configuration
-		// Redis Configuration
 		// Redis Configuration
 		mainRedisClient:  cfg.RedisClient,
 		stateRedisClient: cfg.RedisClient,
@@ -101,7 +90,6 @@ func New(logger log.Logger, cfg Config) (*HTTPServer, error) {
 		encrypter:    cfg.Encrypter,
 		internalKey:  cfg.InternalKey,
 
-		// Monitoring & Notification Configuration
 		// Monitoring & Notification Configuration
 		discord: cfg.Discord,
 	}
@@ -122,9 +110,6 @@ func (srv HTTPServer) validate() error {
 	if srv.mode == "" {
 		return errors.New("mode is required")
 	}
-	if srv.host == "" {
-		return errors.New("host is required")
-	}
 	if srv.port == 0 {
 		return errors.New("port is required")
 	}
@@ -133,13 +118,6 @@ func (srv HTTPServer) validate() error {
 	if srv.postgresDB == nil {
 		return errors.New("postgresDB is required")
 	}
-
-	// Storage Configuration
-
-	// // Message Queue Configuration
-	// if srv.amqpConn == nil {
-	// 	return errors.New("amqp connection is required")
-	// }
 
 	// Authentication & Security Configuration
 	if srv.jwtSecretKey == "" {
@@ -151,16 +129,6 @@ func (srv HTTPServer) validate() error {
 	if srv.internalKey == "" {
 		return errors.New("internalKey is required")
 	}
-
-	// Monitoring & Notification Configuration
-	// if srv.discord == nil {
-	// 	return errors.New("discord is required")
-	// }
-
-	// External Services
-	// if srv.llmConfig.APIKey == "" {
-	// 	return errors.New("LLM API key is required")
-	// }
 
 	return nil
 }

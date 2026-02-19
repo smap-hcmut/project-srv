@@ -1,16 +1,60 @@
-# Dependencies
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.out
+
+# Dependency directories
 vendor/
-.go-version
 
-# Environment variables
-.env
-sqlboiler.toml
+# Go workspace file
+go.work
 
-docs
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
-# OpenSpec
-.cursor/*
-.agent/*
-.claude/*
-AGENTS.md
-CLAUDE.md
+# OS
+.DS_Store
+Thumbs.db
+
+# Config files (keep example)
+config/project-config.yaml
+!config/project-config.example.yaml
+
+# Environment - not needed, use YAML config
+# .env files are not used in this project
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+tmp/
+temp/
+
+# Build artifacts
+dist/
+build/
+
+# Documentation
+docs/swagger.json
+docs/swagger.yaml
+docs/docs.go

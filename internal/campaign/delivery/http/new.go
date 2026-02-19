@@ -17,11 +17,11 @@ type Handler interface {
 type handler struct {
 	l       log.Logger
 	uc      campaign.UseCase
-	discord *discord.Discord
+	discord discord.IDiscord
 }
 
 // New creates a new Campaign HTTP handler.
-func New(l log.Logger, uc campaign.UseCase, discord *discord.Discord) Handler {
+func New(l log.Logger, uc campaign.UseCase, discord discord.IDiscord) Handler {
 	return &handler{
 		l:       l,
 		uc:      uc,
