@@ -3,10 +3,9 @@ package minio
 import (
 	"strings"
 
-	"project-srv/config"
 )
 
-func validateConfig(cfg *config.MinIOConfig) error {
+func validateConfig(cfg *MinIOConfig) error {
 	if cfg.Endpoint == "" {
 		return NewInvalidInputError("endpoint is required")
 	}

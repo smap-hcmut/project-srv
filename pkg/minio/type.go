@@ -6,15 +6,25 @@ import (
 	"sync"
 	"time"
 
-	"project-srv/config"
-
 	"github.com/minio/minio-go/v7"
 )
+
+// MinIOConfig is the configuration for MinIO client
+type MinIOConfig struct {
+	Endpoint             string // MinIO endpoint (e.g., "localhost:9000")
+	AccessKey            string // MinIO access key
+	SecretKey            string // MinIO secret key
+	UseSSL               bool   // Use SSL/TLS connection
+	Region               string // MinIO region (default: "us-east-1")
+	Bucket               string // Default bucket name
+	AsyncUploadWorkers   int    // Number of async upload workers (default: 5)
+	AsyncUploadQueueSize int    // Async upload queue size (default: 100)
+}
 
 // implMinIO implements MinIO.
 type implMinIO struct {
 	minioClient    *minio.Client
-	config         *config.MinIOConfig
+	config         *MinIOConfig
 	mu             sync.RWMutex
 	connected      bool
 	asyncUploadMgr *asyncUploadManager

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"project-srv/config"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -82,7 +81,7 @@ type AsyncUploader interface {
 }
 
 // NewMinIO creates a new MinIO client. Returns the MinIO interface.
-func NewMinIO(cfg *config.MinIOConfig) (MinIO, error) {
+func NewMinIO(cfg *MinIOConfig) (MinIO, error) {
 	if err := validateConfig(cfg); err != nil {
 		return nil, err
 	}
@@ -127,7 +126,7 @@ func NewMinIO(cfg *config.MinIOConfig) (MinIO, error) {
 }
 
 // NewMinIOWithRetry creates a new MinIO client and connects with retry.
-func NewMinIOWithRetry(cfg *config.MinIOConfig, maxRetries int) (MinIO, error) {
+func NewMinIOWithRetry(cfg *MinIOConfig, maxRetries int) (MinIO, error) {
 	client, err := NewMinIO(cfg)
 	if err != nil {
 		return nil, err
