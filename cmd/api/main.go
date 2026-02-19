@@ -5,42 +5,44 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"smap-project/config"
-	"smap-project/config/postgre"
-	"smap-project/internal/httpserver"
-	"smap-project/pkg/discord"
-	"smap-project/pkg/encrypter"
-	"smap-project/pkg/log"
-	"smap-project/pkg/rabbitmq"
-	pkgRedis "smap-project/pkg/redis"
+	"project-srv/config"
+	configPostgre "project-srv/config/postgre"
+
+	_ "project-srv/docs" // Import swagger docs
+	"project-srv/internal/httpserver"
+	"project-srv/pkg/discord"
+	"project-srv/pkg/encrypter"
+	"project-srv/pkg/log"
+	pkgRedis "project-srv/pkg/redis"
 	"syscall"
 )
 
 // @title       SMAP Project Service API
 // @description SMAP Project Service API documentation.
 // @version     1
-// @host        smap-api.tantai.dev
+// @host        project-srv.tantai.dev
 // @schemes     https
 // @BasePath    /project
 //
 // @securityDefinitions.apikey CookieAuth
 // @in cookie
 // @name smap_auth_token
-// @description Authentication token stored in HttpOnly cookie. Set automatically by Identity service /login endpoint.
+// @description Authentication token stored in HttpOnly cookie. Set automatically by /login endpoint.
 //
 // @securityDefinitions.apikey Bearer
 // @in header
 // @name Authorization
 // @description Legacy Bearer token authentication (deprecated - use cookie authentication instead). Format: "Bearer {token}"
 func main() {
-	// Load configuration
+	// 1. Load configuration
+	// Reads config from YAML file and environment variables
 	cfg, err := config.Load()
 	if err != nil {
 		fmt.Println("Failed to load config: ", err)
 		return
 	}
 
-	// Initialize logger
+	// 2. Initialize logger
 	logger := log.Init(log.ZapConfig{
 		Level:        cfg.Logger.Level,
 		Mode:         cfg.Logger.Mode,
@@ -48,61 +50,53 @@ func main() {
 		ColorEnabled: cfg.Logger.ColorEnabled,
 	})
 
-	// Register graceful shutdown
+	// 3. Register graceful shutdown
 	registerGracefulShutdown(logger)
 
-	// Initialize encrypter
+	// 4. Initialize encrypter
 	encrypterInstance := encrypter.New(cfg.Encrypter.Key)
 
-	// Initialize PostgreSQL
+	// 5. Initialize PostgreSQL
 	ctx := context.Background()
-	postgresDB, err := postgre.Connect(ctx, cfg.Postgres)
+	postgresDB, err := configPostgre.Connect(ctx, cfg.Postgres)
 	if err != nil {
 		logger.Error(ctx, "Failed to connect to PostgreSQL: ", err)
 		return
 	}
-	defer postgre.Disconnect(ctx, postgresDB)
+	defer configPostgre.Disconnect(ctx, postgresDB)
 	logger.Infof(ctx, "PostgreSQL connected successfully to %s:%d/%s", cfg.Postgres.Host, cfg.Postgres.Port, cfg.Postgres.DBName)
 
-	// Initialize RabbitMQ
-	amqpConn, err := rabbitmq.Dial(cfg.RabbitMQ.URL, true)
-	if err != nil {
-		logger.Error(ctx, "Failed to connect to RabbitMQ: ", err)
-		return
-	}
-	defer amqpConn.Close()
-
-	// Initialize Redis (Main - DB 0: job mapping, pub/sub)
-	mainRedisOpts := pkgRedis.NewClientOptions().SetOptions(cfg.Redis)
-	mainRedisClient, err := pkgRedis.Connect(mainRedisOpts)
-	if err != nil {
-		logger.Error(ctx, "Failed to connect to Redis (main): ", err)
-		return
-	}
-	defer mainRedisClient.Disconnect()
-	logger.Infof(ctx, "Redis (main) connected successfully to DB %d", cfg.Redis.DB)
-
-	// Initialize Redis (State - DB 1 for project progress tracking)
-	stateRedisOpts := pkgRedis.NewClientOptions().SetOptions(cfg.Redis).SetDB(cfg.Redis.StateDB)
-	stateRedisClient, err := pkgRedis.Connect(stateRedisOpts)
-	if err != nil {
-		logger.Error(ctx, "Failed to connect to Redis (state): ", err)
-		return
-	}
-	defer stateRedisClient.Disconnect()
-	logger.Infof(ctx, "Redis (state) connected successfully to DB %d", cfg.Redis.StateDB)
-
-	// Initialize Discord
+	// 6. Initialize Discord (optional)
 	discordClient, err := discord.New(logger, &discord.DiscordWebhook{
 		ID:    cfg.Discord.WebhookID,
 		Token: cfg.Discord.WebhookToken,
 	})
 	if err != nil {
-		logger.Error(ctx, "Failed to initialize Discord: ", err)
-		return
+		logger.Warnf(ctx, "Discord webhook not configured (optional): %v", err)
+		discordClient = nil // Continue without Discord
+	} else {
+		logger.Infof(ctx, "Discord webhook initialized successfully")
 	}
 
-	// Initialize HTTP server
+	// 7. Initialize Redis
+	// 7. Initialize Redis
+	redisClient, err := pkgRedis.NewRedis(pkgRedis.RedisConfig{
+		Host:     cfg.Redis.Host,
+		Port:     cfg.Redis.Port,
+		Password: cfg.Redis.Password,
+		DB:       cfg.Redis.DB,
+	})
+	if err != nil {
+		logger.Error(ctx, "Failed to connect to Redis: ", err)
+		return
+	}
+	logger.Infof(ctx, "Redis connected successfully to %s:%d (DB %d)", cfg.Redis.Host, cfg.Redis.Port, cfg.Redis.DB)
+
+	logger.Infof(ctx, "JWT Manager initialized with algorithm: %s", cfg.JWT.Algorithm)
+
+	// 11. Initialize HTTP server
+	// 11. Initialize HTTP server
+	// Main application server that handles all HTTP requests and routes
 	httpServer, err := httpserver.New(logger, httpserver.Config{
 		// Server Configuration
 		Logger:      logger,
@@ -114,15 +108,10 @@ func main() {
 		// Database Configuration
 		PostgresDB: postgresDB,
 
-		// // Storage Configuration
-		// MinIO: minioClient,
-
-		// // Message Queue Configuration
-		AmqpConn: amqpConn,
+		// Storage Configuration
 
 		// Redis Configuration
-		MainRedisClient:  mainRedisClient,
-		StateRedisClient: stateRedisClient,
+		RedisClient: redisClient,
 
 		// Authentication & Security Configuration
 		JwtSecretKey: cfg.JWT.SecretKey,
@@ -130,12 +119,8 @@ func main() {
 		Encrypter:    encrypterInstance,
 		InternalKey:  cfg.InternalConfig.InternalKey,
 
-		// External Services
-		Discord:   discordClient,
-		LLMConfig: cfg.LLM,
-
-		// Dry-Run Configuration
-		DryRunSamplingConfig: cfg.DryRunSampling,
+		// Monitoring & Notification Configuration
+		Discord: discordClient,
 	})
 	if err != nil {
 		logger.Error(ctx, "Failed to initialize HTTP server: ", err)

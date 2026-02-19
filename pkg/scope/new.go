@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 const (
@@ -16,13 +16,11 @@ const (
 type Manager interface {
 	// Verify verifies a JWT token and returns the payload if valid.
 	Verify(token string) (Payload, error)
-	// CreateToken creates a new JWT token with the provided payload.
-	CreateToken(payload Payload) (string, error)
 }
 
 // Payload represents the JWT token claims.
 type Payload struct {
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 	UserID   string `json:"sub"`      // Subject (user ID)
 	Username string `json:"username"` // Username
 	Role     string `json:"role"`     // User role (USER, ADMIN)
@@ -59,7 +57,8 @@ func (m implManager) Verify(token string) (Payload, error) {
 		return []byte(m.secretKey), nil
 	}
 
-	jwtToken, err := jwt.ParseWithClaims(token, &Payload{}, keyFunc)
+	var payload Payload
+	jwtToken, err := jwt.ParseWithClaims(token, &payload, keyFunc)
 	if err != nil {
 		return Payload{}, fmt.Errorf("%w: %v", ErrInvalidToken, err)
 	}
@@ -69,26 +68,5 @@ func (m implManager) Verify(token string) (Payload, error) {
 		return Payload{}, fmt.Errorf("%w: token is not valid", ErrInvalidToken)
 	}
 
-	// Extract payload
-	payload, ok := jwtToken.Claims.(*Payload)
-	if !ok {
-		return Payload{}, fmt.Errorf("%w: failed to parse claims", ErrInvalidToken)
-	}
-
-	return *payload, nil
-}
-
-// CreateToken creates a new JWT token with the provided payload.
-// The token expires after TokenExpirationDuration (default: 1 week).
-func (m implManager) CreateToken(payload Payload) (string, error) {
-	now := time.Now()
-	payload.StandardClaims = jwt.StandardClaims{
-		ExpiresAt: now.Add(TokenExpirationDuration).Unix(),
-		Id:        fmt.Sprintf("%d", now.UnixNano()), // Unique token ID
-		NotBefore: now.Unix(),
-		IssuedAt:  now.Unix(),
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, payload)
-	return token.SignedString([]byte(m.secretKey))
+	return payload, nil
 }

@@ -1,49 +1,37 @@
 package repository
 
 import (
-	"smap-project/internal/model"
-	"smap-project/pkg/paginator"
-	"time"
+	"project-srv/pkg/paginator"
 )
 
+// CreateOptions contains the data needed to create a new project.
 type CreateOptions struct {
-	Name               string
-	Description        *string
-	Status             string
-	FromDate           time.Time
-	ToDate             time.Time
-	BrandName          string
-	CompetitorNames    []string
-	BrandKeywords      []string
-	CompetitorKeywords []model.CompetitorKeyword // Array of competitor keywords
-	CreatedBy          string
+	CampaignID  string
+	Name        string
+	Description string
+	Brand       string
+	EntityType  string
+	EntityName  string
+	CreatedBy   string
 }
 
-type UpdateOptions struct {
-	ID                 string
-	Description        *string
-	Status             *string
-	FromDate           *time.Time
-	ToDate             *time.Time
-	BrandKeywords      []string
-	CompetitorKeywords []model.CompetitorKeyword // Array of competitor keywords
-}
-
+// GetOptions contains filters for listing projects.
 type GetOptions struct {
-	IDs           []string
-	Statuses      []string
-	CreatedBy     *string
-	SearchName    *string
-	PaginateQuery paginator.PaginateQuery
+	CampaignID string
+	Status     string
+	Name       string
+	Brand      string
+	EntityType string
+	Paginator  paginator.PaginateQuery
 }
 
-type ListOptions struct {
-	IDs        []string
-	Statuses   []string
-	CreatedBy  *string
-	SearchName *string
-}
-
-type GetOneOptions struct {
-	ID string
+// UpdateOptions contains the data for updating a project.
+type UpdateOptions struct {
+	ID          string
+	Name        string
+	Description string
+	Brand       string
+	EntityType  string
+	EntityName  string
+	Status      string
 }

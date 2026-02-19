@@ -1,24 +1,18 @@
-package postgres
+package postgre
 
 import (
 	"database/sql"
-	"time"
 
-	"smap-project/internal/project/repository"
-	"smap-project/pkg/log"
+	repo "project-srv/internal/project/repository"
+	"project-srv/pkg/log"
 )
 
 type implRepository struct {
-	db    *sql.DB
-	l     log.Logger
-	clock func() time.Time
+	db *sql.DB
+	l  log.Logger
 }
 
-// New creates a new PostgreSQL repository for projects
-func New(db *sql.DB, l log.Logger) repository.Repository {
-	return &implRepository{
-		db:    db,
-		l:     l,
-		clock: time.Now,
-	}
+// New creates a new PostgreSQL project repository.
+func New(db *sql.DB, l log.Logger) repo.Repository {
+	return &implRepository{db: db, l: l}
 }

@@ -1,9 +1,9 @@
 package middleware
 
 import (
-	"smap-project/config"
-	pkgLog "smap-project/pkg/log"
-	pkgScope "smap-project/pkg/scope"
+	"project-srv/config"
+	pkgLog "project-srv/pkg/log"
+	pkgScope "project-srv/pkg/scope"
 )
 
 type Middleware struct {

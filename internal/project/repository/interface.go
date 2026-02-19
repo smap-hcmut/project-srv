@@ -3,17 +3,15 @@ package repository
 import (
 	"context"
 
-	"smap-project/internal/model"
-	"smap-project/pkg/paginator"
+	"project-srv/internal/model"
+	"project-srv/pkg/paginator"
 )
 
-//go:generate mockery --name Repository
+// Repository defines the data access interface for Project.
 type Repository interface {
-	Get(ctx context.Context, sc model.Scope, opts GetOptions) ([]model.Project, paginator.Paginator, error)
-	Detail(ctx context.Context, sc model.Scope, id string) (model.Project, error)
-	List(ctx context.Context, sc model.Scope, opts ListOptions) ([]model.Project, error)
-	Create(ctx context.Context, sc model.Scope, opts CreateOptions) (model.Project, error)
-	Update(ctx context.Context, sc model.Scope, opts UpdateOptions) (model.Project, error)
-	GetOne(ctx context.Context, sc model.Scope, opts GetOneOptions) (model.Project, error)
-	Delete(ctx context.Context, sc model.Scope, ids []string) error
+	Create(ctx context.Context, opt CreateOptions) (model.Project, error)
+	Detail(ctx context.Context, id string) (model.Project, error)
+	Get(ctx context.Context, opt GetOptions) ([]model.Project, paginator.Paginator, error)
+	Update(ctx context.Context, opt UpdateOptions) (model.Project, error)
+	Archive(ctx context.Context, id string) error
 }

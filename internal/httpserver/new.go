@@ -4,12 +4,11 @@ import (
 	"database/sql"
 	"errors"
 
-	"smap-project/config"
-	"smap-project/pkg/discord"
-	"smap-project/pkg/encrypter"
-	"smap-project/pkg/log"
-	pkgRabbitMQ "smap-project/pkg/rabbitmq"
-	pkgRedis "smap-project/pkg/redis"
+	"project-srv/config"
+	"project-srv/pkg/discord"
+	"project-srv/pkg/encrypter"
+	"project-srv/pkg/log"
+	pkgRedis "project-srv/pkg/redis"
 
 	"github.com/gin-gonic/gin"
 )
@@ -26,15 +25,12 @@ type HTTPServer struct {
 	// Database Configuration
 	postgresDB *sql.DB
 
-	// // Storage Configuration
-	// minio miniopkg.MinIO
+	// Storage Configuration
 
 	// // Message Queue Configuration
-	amqpConn *pkgRabbitMQ.Connection
-
 	// Redis Configuration
-	mainRedisClient  pkgRedis.Client // DB 0: job mapping, pub/sub
-	stateRedisClient pkgRedis.Client // DB 1: project progress tracking
+	mainRedisClient  pkgRedis.IRedis // DB 0: job mapping, pub/sub
+	stateRedisClient pkgRedis.IRedis // DB 1: project progress tracking
 
 	// Authentication & Security Configuration
 	jwtSecretKey string
@@ -43,13 +39,8 @@ type HTTPServer struct {
 	internalKey  string
 
 	// Monitoring & Notification Configuration
+	// Monitoring & Notification Configuration
 	discord *discord.Discord
-
-	// External Services
-	llmConfig config.LLMConfig
-
-	// Dry-Run Configuration
-	dryRunSamplingConfig config.DryRunSamplingConfig
 }
 
 type Config struct {
@@ -63,15 +54,11 @@ type Config struct {
 	// Database Configuration
 	PostgresDB *sql.DB
 
-	// // Storage Configuration
-	// MinIO miniopkg.MinIO
+	// Storage Configuration
 
 	// // Message Queue Configuration
-	AmqpConn *pkgRabbitMQ.Connection
-
 	// Redis Configuration
-	MainRedisClient  pkgRedis.Client // DB 0: job mapping, pub/sub
-	StateRedisClient pkgRedis.Client // DB 1: project progress tracking
+	RedisClient pkgRedis.IRedis
 
 	// Authentication & Security Configuration
 	JwtSecretKey string
@@ -80,13 +67,8 @@ type Config struct {
 	InternalKey  string
 
 	// Monitoring & Notification Configuration
+	// Monitoring & Notification Configuration
 	Discord *discord.Discord
-
-	// External Services
-	LLMConfig config.LLMConfig
-
-	// Dry-Run Configuration
-	DryRunSamplingConfig config.DryRunSamplingConfig
 }
 
 // New creates a new HTTPServer instance with the provided configuration.
@@ -105,15 +87,13 @@ func New(logger log.Logger, cfg Config) (*HTTPServer, error) {
 		// Database Configuration
 		postgresDB: cfg.PostgresDB,
 
-		// // Storage Configuration
-		// minio: cfg.MinIO,
+		// Storage Configuration
 
 		// // Message Queue Configuration
-		amqpConn: cfg.AmqpConn,
-
 		// Redis Configuration
-		mainRedisClient:  cfg.MainRedisClient,
-		stateRedisClient: cfg.StateRedisClient,
+		// Redis Configuration
+		mainRedisClient:  cfg.RedisClient,
+		stateRedisClient: cfg.RedisClient,
 
 		// Authentication & Security Configuration
 		jwtSecretKey: cfg.JwtSecretKey,
@@ -122,13 +102,8 @@ func New(logger log.Logger, cfg Config) (*HTTPServer, error) {
 		internalKey:  cfg.InternalKey,
 
 		// Monitoring & Notification Configuration
+		// Monitoring & Notification Configuration
 		discord: cfg.Discord,
-
-		// External Services
-		llmConfig: cfg.LLMConfig,
-
-		// Dry-Run Configuration
-		dryRunSamplingConfig: cfg.DryRunSamplingConfig,
 	}
 
 	if err := srv.validate(); err != nil {
@@ -160,9 +135,6 @@ func (srv HTTPServer) validate() error {
 	}
 
 	// Storage Configuration
-	// if srv.minio == nil {
-	// 	return errors.New("minio is required")
-	// }
 
 	// // Message Queue Configuration
 	// if srv.amqpConn == nil {
@@ -181,14 +153,14 @@ func (srv HTTPServer) validate() error {
 	}
 
 	// Monitoring & Notification Configuration
-	if srv.discord == nil {
-		return errors.New("discord is required")
-	}
+	// if srv.discord == nil {
+	// 	return errors.New("discord is required")
+	// }
 
 	// External Services
-	if srv.llmConfig.APIKey == "" {
-		return errors.New("LLM API key is required")
-	}
+	// if srv.llmConfig.APIKey == "" {
+	// 	return errors.New("LLM API key is required")
+	// }
 
 	return nil
 }
