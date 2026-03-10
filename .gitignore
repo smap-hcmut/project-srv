@@ -58,3 +58,7 @@ build/
 docs/swagger.json
 docs/swagger.yaml
 docs/docs.go
+
+# Kubernetes manifests with real credentials (never commit)
+manifests/secret.yaml
+manifests/configmap.yaml
