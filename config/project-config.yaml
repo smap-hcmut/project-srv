@@ -42,7 +42,7 @@ kafka:
 
 # JWT
 jwt:
-  secret_key: "smap-secret-key-at-least-32-chars-long-for-security"
+  secret_key: "smap-jwt-secret-2026-5cbPq8ZNywUafL3mX2r7HDqE1vS9kC4b0MRgx6VtYzQJKpLn"
 
 # Cookie
 cookie:
@@ -55,11 +55,11 @@ cookie:
 
 # Encrypter
 encrypter:
-  key: "test-encryption-key-32-chars-123"
+  key: "smap-encrypt-key-32-chars-2026!!"
 
 # Internal auth
 internal:
-  internal_key: "project-service-internal-key-change-in-production"
+  internal_key: "smap-internal-key-2026-Yz7Fp4QvBmC9R2Ld"
 
 # Discord
 discord:

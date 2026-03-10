@@ -2,65 +2,52 @@
 
 # =============================================================================
 # STAGE 1: BUILDER
-# Tip: --platform=$BUILDPLATFORM ensures Docker always uses the Go image that matches your machine's chip (e.g. Apple Silicon M4)
-# so the compiler runs at full speed with no need for slow emulation (QEMU).
+# --platform=$BUILDPLATFORM ensures the Go compiler runs natively (no QEMU)
 # =============================================================================
 FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
-# 1. Declare Docker Buildx automatic ARG variables
-# When you build with --platform linux/amd64, Docker will automatically set "linux" for TARGETOS and "amd64" for TARGETARCH
 ARG TARGETOS
 ARG TARGETARCH
 
-# Install git and tzdata (will be copied to runtime image)
 RUN apk add --no-cache git tzdata
 
-# 2. Cache & Download Dependencies
-# Using cache mount prevents downloading dependencies on every build
+# Cache dependencies (layer changes only when go.mod/go.sum change)
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
-# 3. Copy Source Code
 COPY . .
 
-# 4. Build Binary (Explicitly specify GOOS and GOARCH from Docker ARGs)
-# CGO_ENABLED=0: Required to run with Distroless Static (no C libraries needed)
-# -ldflags="-s -w": Remove debug info to reduce binary size (~30-40% smaller)
-# --mount=type=cache: Reuses build cache between builds → Much faster!
+# Build static binary — trimpath for reproducible & smaller output
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 \
     GOOS=${TARGETOS} \
     GOARCH=${TARGETARCH} \
     go build \
+    -trimpath \
     -ldflags="-s -w" \
     -o consumer ./cmd/consumer
 
 # =============================================================================
-# STAGE 2: RUNTIME (Distroless Static - Ultra lightweight & Secure)
-# - No shell, no package manager → Minimal attack surface
-# - Image size ~2MB (vs Alpine ~20MB)
-# - Contains only: binary + ca-certs + timezone + user
+# STAGE 2: RUNTIME (Distroless Static — ~2 MB base, no shell, non-root)
 # =============================================================================
 FROM gcr.io/distroless/static-debian12:nonroot AS runtime
 
+LABEL org.opencontainers.image.source="https://github.com/smap-hcmut/project-srv" \
+      org.opencontainers.image.title="smap-project-consumer"
+
 WORKDIR /app
 
-# Copy timezone data (because distroless static doesn't have it by default)
-COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
+# Only copy the needed timezone instead of all ~5 MB of zoneinfo
+COPY --link --from=builder /usr/share/zoneinfo/Asia/Ho_Chi_Minh /usr/share/zoneinfo/Asia/Ho_Chi_Minh
+COPY --link --from=builder /usr/share/zoneinfo/UTC /usr/share/zoneinfo/UTC
 ENV TZ=Asia/Ho_Chi_Minh
 
-# Copy the compiled binary for the correct architecture
-COPY --from=builder --chown=nonroot:nonroot /app/consumer .
+COPY --link --from=builder --chown=nonroot:nonroot /app/consumer .
 
-# Run as non-root (UID 65532)
 USER nonroot:nonroot
 
-# Consumer service doesn't need exposed ports (processes messages from RabbitMQ)
-# But we can add health check endpoint in the future
-
-# Run the application
 ENTRYPOINT ["./consumer"]

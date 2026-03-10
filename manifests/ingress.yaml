@@ -1,31 +1,33 @@
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+# Traefik Middleware for stripping /project prefix
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
 metadata:
-  name: smap-ingress
+  name: project-stripprefix
   namespace: smap
-  annotations:
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
-    nginx.ingress.kubernetes.io/use-regex: "true"
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
 spec:
-  ingressClassName: nginx
-  tls:
-  - hosts:
-    - smap-api.tantai.dev
-    secretName: smap-api-tls
-  rules:
-  - host: smap-api.tantai.dev
-    http:
-      paths:
-      # Project Service
-      - path: /project(/|$)(.*)
-        pathType: ImplementationSpecific
-        backend:
-          service:
-            name: smap-project-api
-            port:
-              number: 80
+  stripPrefix:
+    prefixes:
+      - /project
+
+---
+# Traefik IngressRoute for project API (K3s uses IngressRoute for middleware support)
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: project-ingress
+  namespace: smap
+  labels:
+    app.kubernetes.io/name: project
+    app.kubernetes.io/part-of: smap
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`smap-api.tantai.dev`) && PathPrefix(`/project`)
+      kind: Rule
+      services:
+        - name: project-api
+          port: 80
+      middlewares:
+        - name: project-stripprefix
 

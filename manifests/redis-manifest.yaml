@@ -51,7 +51,7 @@ metadata:
   namespace: smap
 type: Opaque
 stringData:
-  REDIS_PASSWORD: "21042004"
+  REDIS_PASSWORD: "CHANGE_ME"
 
 ---
 apiVersion: apps/v1

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# SMAP Project API — Build & Push to Harbor Registry
-# Usage: ./scripts/build-api.sh [build-push|login|help]
+# SMAP Project Consumer — Build & Push to Harbor Registry
+# Usage: ./scripts/build-consumer.sh [build-push|login|help]
 
 set -euo pipefail
 
@@ -15,8 +15,8 @@ NC='\033[0m'
 # ── Configuration ─────────────────────────────────────────────
 REGISTRY="${HARBOR_REGISTRY:-registry.tantai.dev}"
 PROJECT="smap"
-SERVICE="project-api"
-DOCKERFILE="cmd/api/Dockerfile"
+SERVICE="project-consumer"
+DOCKERFILE="cmd/consumer/Dockerfile"
 PLATFORM="${PLATFORM:-linux/amd64}"
 REGISTRY_USER="${HARBOR_USERNAME:?HARBOR_USERNAME is not set. Export it in ~/.zshrc}"
 REGISTRY_PASS="${HARBOR_PASSWORD:?HARBOR_PASSWORD is not set. Export it in ~/.zshrc}"
@@ -85,7 +85,7 @@ build_and_push() {
 # ── Help ──────────────────────────────────────────────────────
 show_help() {
     cat <<EOF
-${GREEN}SMAP Project API — Build & Push${NC}
+${GREEN}SMAP Project Consumer — Build & Push${NC}
 
 Usage: $0 [command]
 

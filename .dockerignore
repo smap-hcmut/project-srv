@@ -1,0 +1,36 @@
+# Build outputs
+bin/
+
+# Vendor (modules downloaded via go mod download in Dockerfile)
+vendor/
+
+# Documentation
+docs/
+documents/
+
+# Scripts & configs not needed in build
+scripts/
+manifests/
+migration/
+
+# Docker & CI files
+docker-compose.yml
+Dockerfile
+*.sh
+
+# IDE & OS
+.git/
+.gitignore
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Config examples
+config/project-config.example.yaml
+
+# Misc
+README.md
+Makefile
+template.sqlboiler.toml
