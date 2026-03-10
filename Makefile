@@ -73,7 +73,7 @@ build: ## Build the application
 	@echo "${GREEN}Build completed!${RESET}"
 
 run-api: ## Run API server
-	@echo "${GREEN}Starting API server...${RESET}"
+# 	@echo "${GREEN}Starting API server...${RESET}"
 	go run cmd/api/main.go
 
 run-consumer: ## Run consumer service

@@ -1,0 +1,25 @@
+wipe=true                                 # Clean regeneration
+output="internal/sqlboiler"                # Generated model location
+pkgname="sqlboiler"                        # Package name
+add-global-variant=true                   # Add global helper functions
+add-enum-types=true                       # Generate enum types
+no-hooks=false                            # Enable hooks for advanced features
+no-tests=true                             # Skip test generation (for faster builds)
+add-soft-deletes=true                     # Soft delete support
+auto-columns=["created_at", "updated_at"] # Auto timestamp columns
+
+
+[psql]
+dbname = "smap"                        # Changed to match server
+host = "172.16.19.10"
+port = 5432                       
+user = "project_master"
+pass = "project_master_pwd"
+sslmode = "disable"              
+schema = "schema_project"                 
+blacklist = [
+    "schema_migrations",                  # Migration tables
+    "repmgr_*",                           # Repmgr tables
+    "pg_stat_*",                          # PostgreSQL system tables
+    "information_schema.*"                # System schema
+]
