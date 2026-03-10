@@ -29,7 +29,7 @@ spec:
         - name: harbor-registry
       containers:
         - name: project-api
-          image: registry.tantai.dev/smap/project-api:260310-084423
+          image: registry.tantai.dev/smap/project-api:260310-210422
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
@@ -68,7 +68,7 @@ spec:
               port: 8080
               scheme: HTTP
             initialDelaySeconds: 30
-            periodSeconds: 10800
+            periodSeconds: 10
             timeoutSeconds: 10
             successThreshold: 1
             failureThreshold: 1
@@ -78,7 +78,7 @@ spec:
               port: 8080
               scheme: HTTP
             initialDelaySeconds: 10
-            periodSeconds: 10800
+            periodSeconds: 10
             timeoutSeconds: 10
             successThreshold: 1
             failureThreshold: 1
