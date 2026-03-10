@@ -14,6 +14,7 @@ import (
 	projectrepo "project-srv/internal/project/repository/postgre"
 	projectuc "project-srv/internal/project/usecase"
 	"project-srv/pkg/i18n"
+	pkgMiddleware "project-srv/pkg/middleware"
 	"project-srv/pkg/scope"
 
 	// Import this to execute the init function in docs.go which setups the Swagger docs.
@@ -62,6 +63,9 @@ func (srv HTTPServer) registerMiddlewares(mw middleware.Middleware) {
 
 	corsConfig := middleware.DefaultCORSConfig(srv.environment)
 	srv.gin.Use(middleware.CORS(corsConfig))
+
+	// Tracing middleware for centralized logging (trace_id)
+	srv.gin.Use(pkgMiddleware.Tracing())
 
 	// Log CORS mode for visibility
 	ctx := context.Background()
