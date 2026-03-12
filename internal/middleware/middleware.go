@@ -1,10 +1,9 @@
 package middleware
 
 import (
-	"project-srv/pkg/response"
-	"project-srv/pkg/scope"
-
 	"github.com/gin-gonic/gin"
+	"github.com/smap-hcmut/shared-libs/go/response"
+	"github.com/smap-hcmut/shared-libs/go/scope"
 )
 
 func (m Middleware) Auth() gin.HandlerFunc {

@@ -4,7 +4,8 @@ import (
 	"project-srv/internal/campaign"
 	"project-srv/internal/project"
 	repo "project-srv/internal/project/repository"
-	"project-srv/pkg/log"
+
+	"github.com/smap-hcmut/shared-libs/go/log"
 )
 
 type implUseCase struct {

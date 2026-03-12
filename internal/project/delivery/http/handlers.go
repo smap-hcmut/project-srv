@@ -1,9 +1,8 @@
 package http
 
 import (
-	"project-srv/pkg/response"
-
 	"github.com/gin-gonic/gin"
+	"github.com/smap-hcmut/shared-libs/go/response"
 )
 
 // @Summary Create a project

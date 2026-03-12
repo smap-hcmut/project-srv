@@ -1,10 +1,9 @@
 package middleware
 
 import (
-	"project-srv/pkg/response"
-	"project-srv/pkg/scope"
-
 	"github.com/gin-gonic/gin"
+	"github.com/smap-hcmut/shared-libs/go/response"
+	"github.com/smap-hcmut/shared-libs/go/scope"
 )
 
 // AdminOnly is a middleware that checks if the user has admin role
@@ -13,7 +12,7 @@ func (m Middleware) AdminOnly() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
 		payload, ok := scope.GetPayloadFromContext(ctx)
-		if !ok {	
+		if !ok {
 			response.Unauthorized(c)
 			c.Abort()
 			return

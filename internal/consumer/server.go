@@ -5,10 +5,11 @@ import (
 	"database/sql"
 
 	"project-srv/config"
-	"project-srv/pkg/discord"
-	pkgKafka "project-srv/pkg/kafka"
-	"project-srv/pkg/log"
-	"project-srv/pkg/redis"
+
+	"github.com/smap-hcmut/shared-libs/go/discord"
+	"github.com/smap-hcmut/shared-libs/go/kafka"
+	"github.com/smap-hcmut/shared-libs/go/log"
+	"github.com/smap-hcmut/shared-libs/go/redis"
 )
 
 // ConsumerServer is the Kafka consumer orchestrator
@@ -20,7 +21,7 @@ type ConsumerServer struct {
 	// Infrastructure clients
 	redisClient   redis.IRedis
 	postgresDB    *sql.DB
-	kafkaProducer pkgKafka.IProducer
+	kafkaProducer kafka.IProducer
 
 	// Monitoring & Notification
 	discord discord.IDiscord
@@ -35,7 +36,7 @@ type Config struct {
 	// Infrastructure clients
 	RedisClient   redis.IRedis
 	PostgresDB    *sql.DB
-	KafkaProducer pkgKafka.IProducer
+	KafkaProducer kafka.IProducer
 
 	// Monitoring & Notification
 	Discord discord.IDiscord

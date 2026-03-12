@@ -2,9 +2,9 @@ package repository
 
 import (
 	"context"
-
 	"project-srv/internal/model"
-	"project-srv/pkg/paginator"
+
+	"github.com/smap-hcmut/shared-libs/go/paginator"
 )
 
 // Repository defines the data access interface for Project.

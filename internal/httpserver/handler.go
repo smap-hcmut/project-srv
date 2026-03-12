@@ -13,9 +13,9 @@ import (
 	projecthttp "project-srv/internal/project/delivery/http"
 	projectrepo "project-srv/internal/project/repository/postgre"
 	projectuc "project-srv/internal/project/usecase"
-	"project-srv/pkg/i18n"
-	pkgMiddleware "project-srv/pkg/middleware"
-	"project-srv/pkg/scope"
+
+	"github.com/smap-hcmut/shared-libs/go/scope"
+	"github.com/smap-hcmut/shared-libs/go/tracing"
 
 	// Import this to execute the init function in docs.go which setups the Swagger docs.
 	// Uncomment after running: make swagger
@@ -31,8 +31,6 @@ func (srv HTTPServer) mapHandlers() error {
 
 	srv.registerMiddlewares(mw)
 	srv.registerSystemRoutes()
-
-	i18n.Init()
 
 	// Campaign module
 	campaignRepo := campaignrepo.New(srv.postgresDB, srv.l)
@@ -65,7 +63,8 @@ func (srv HTTPServer) registerMiddlewares(mw middleware.Middleware) {
 	srv.gin.Use(middleware.CORS(corsConfig))
 
 	// Tracing middleware for centralized logging (trace_id)
-	srv.gin.Use(pkgMiddleware.Tracing())
+	tracer := tracing.NewTraceContext()
+	srv.gin.Use(tracing.GinTraceMiddleware(tracer, tracing.NewHTTPPropagator(tracer)))
 
 	// Log CORS mode for visibility
 	ctx := context.Background()

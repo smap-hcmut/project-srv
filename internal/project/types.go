@@ -2,7 +2,8 @@ package project
 
 import (
 	"project-srv/internal/model"
-	"project-srv/pkg/paginator"
+
+	"github.com/smap-hcmut/shared-libs/go/paginator"
 )
 
 // CreateInput is the input for creating a project.

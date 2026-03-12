@@ -5,7 +5,8 @@ import (
 
 	"project-srv/internal/project"
 	repo "project-srv/internal/project/repository"
-	"project-srv/pkg/scope"
+
+	"github.com/smap-hcmut/shared-libs/go/scope"
 )
 
 // Create validates input, checks campaign exists, and creates a new project.

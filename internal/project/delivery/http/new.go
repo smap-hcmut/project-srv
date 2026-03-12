@@ -3,10 +3,10 @@ package http
 import (
 	"project-srv/internal/middleware"
 	"project-srv/internal/project"
-	"project-srv/pkg/discord"
-	"project-srv/pkg/log"
 
 	"github.com/gin-gonic/gin"
+	"github.com/smap-hcmut/shared-libs/go/discord"
+	"github.com/smap-hcmut/shared-libs/go/log"
 )
 
 // Handler defines the HTTP handler interface for Project.

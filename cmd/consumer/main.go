@@ -8,12 +8,13 @@ import (
 	"syscall"
 
 	"project-srv/config"
-	"project-srv/config/kafka"
-	"project-srv/config/postgre"
-	"project-srv/config/redis"
 	"project-srv/internal/consumer"
-	"project-srv/pkg/discord"
-	"project-srv/pkg/log"
+
+	"github.com/smap-hcmut/shared-libs/go/discord"
+	"github.com/smap-hcmut/shared-libs/go/kafka"
+	"github.com/smap-hcmut/shared-libs/go/log"
+	"github.com/smap-hcmut/shared-libs/go/postgres"
+	"github.com/smap-hcmut/shared-libs/go/redis"
 )
 
 func main() {
@@ -25,7 +26,7 @@ func main() {
 	}
 
 	// Initialize logger
-	logger := log.Init(log.ZapConfig{
+	logger := log.NewZapLogger(log.ZapConfig{
 		Level:        cfg.Logger.Level,
 		Mode:         cfg.Logger.Mode,
 		Encoding:     cfg.Logger.Encoding,
@@ -39,30 +40,45 @@ func main() {
 	logger.Info(ctx, "Starting Project Consumer Service...")
 
 	// Kafka Producer (for publishing events)
-	kafkaProducer, err := kafka.ConnectProducer(cfg.Kafka)
+	kafkaProducer, err := kafka.NewProducer(kafka.Config{
+		Brokers: cfg.Kafka.Brokers,
+		Topic:   cfg.Kafka.Topic,
+	})
 	if err != nil {
 		logger.Errorf(ctx, "Failed to connect to Kafka producer: %v", err)
 		return
 	}
-	defer kafka.DisconnectProducer()
+	defer kafkaProducer.Close()
 	logger.Info(ctx, "Kafka producer initialized")
 
 	// Redis
-	redisClient, err := redis.Connect(ctx, cfg.Redis)
+	redisClient, err := redis.New(redis.RedisConfig{
+		Host:     cfg.Redis.Host,
+		Port:     cfg.Redis.Port,
+		Password: cfg.Redis.Password,
+		DB:       cfg.Redis.DB,
+	})
 	if err != nil {
 		logger.Errorf(ctx, "Failed to connect to Redis: %v", err)
 		return
 	}
-	defer redis.Disconnect()
+	defer redisClient.Close()
 	logger.Info(ctx, "Redis client initialized")
 
 	// PostgreSQL
-	postgresDB, err := postgre.Connect(ctx, cfg.Postgres)
+	postgresDB, err := postgres.New(postgres.Config{
+		Host:     cfg.Postgres.Host,
+		Port:     cfg.Postgres.Port,
+		User:     cfg.Postgres.User,
+		Password: cfg.Postgres.Password,
+		DBName:   cfg.Postgres.DBName,
+		SSLMode:  cfg.Postgres.SSLMode,
+	})
 	if err != nil {
 		logger.Errorf(ctx, "Failed to connect to PostgreSQL: %v", err)
 		return
 	}
-	defer postgre.Disconnect(ctx, postgresDB)
+	defer postgresDB.Close()
 	logger.Info(ctx, "PostgreSQL client initialized")
 
 	// Discord (optional)
@@ -81,7 +97,7 @@ func main() {
 		Logger:        logger,
 		KafkaConfig:   cfg.Kafka,
 		RedisClient:   redisClient,
-		PostgresDB:    postgresDB,
+		PostgresDB:    postgresDB.GetDB(),
 		Discord:       discordClient,
 		KafkaProducer: kafkaProducer,
 	})

@@ -9,11 +9,11 @@ import (
 	"project-srv/internal/campaign/repository"
 	"project-srv/internal/model"
 	"project-srv/internal/sqlboiler"
-	"project-srv/pkg/paginator"
 
 	"github.com/aarondl/null/v8"
 	"github.com/aarondl/sqlboiler/v4/boil"
 	"github.com/aarondl/sqlboiler/v4/queries/qm"
+	"github.com/smap-hcmut/shared-libs/go/paginator"
 )
 
 // Create inserts a new campaign into the database.

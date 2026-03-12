@@ -4,16 +4,15 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
-
 	"project-srv/internal/model"
 	"project-srv/internal/project/repository"
 	"project-srv/internal/sqlboiler"
-	"project-srv/pkg/paginator"
+	"time"
 
 	"github.com/aarondl/null/v8"
 	"github.com/aarondl/sqlboiler/v4/boil"
 	"github.com/aarondl/sqlboiler/v4/queries/qm"
+	"github.com/smap-hcmut/shared-libs/go/paginator"
 )
 
 // Create inserts a new project into the database.

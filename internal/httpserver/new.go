@@ -3,16 +3,16 @@ package httpserver
 import (
 	"database/sql"
 	"errors"
-
 	"project-srv/config"
-	"project-srv/pkg/discord"
-	"project-srv/pkg/encrypter"
-	"project-srv/pkg/log"
-	pkgRedis "project-srv/pkg/redis"
+
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/smap-hcmut/shared-libs/go/discord"
+	"github.com/smap-hcmut/shared-libs/go/encrypter"
+	"github.com/smap-hcmut/shared-libs/go/log"
+	"github.com/smap-hcmut/shared-libs/go/redis"
 	"go.uber.org/zap"
-	"time"
 )
 
 type HTTPServer struct {
@@ -31,8 +31,8 @@ type HTTPServer struct {
 
 	// // Message Queue Configuration
 	// Redis Configuration
-	mainRedisClient  pkgRedis.IRedis // DB 0: job mapping, pub/sub
-	stateRedisClient pkgRedis.IRedis // DB 1: project progress tracking
+	mainRedisClient  redis.IRedis // DB 0: job mapping, pub/sub
+	stateRedisClient redis.IRedis // DB 1: project progress tracking
 
 	// Authentication & Security Configuration
 	jwtSecretKey string
@@ -55,7 +55,7 @@ type Config struct {
 	PostgresDB *sql.DB
 
 	// Redis Configuration
-	RedisClient pkgRedis.IRedis
+	RedisClient redis.IRedis
 
 	// Authentication & Security Configuration
 	JwtSecretKey string

@@ -8,14 +8,15 @@ import (
 	"syscall"
 
 	"project-srv/config"
-	"project-srv/config/postgre"
-	"project-srv/config/redis"
 
 	_ "project-srv/docs" // Import swagger docs
 	"project-srv/internal/httpserver"
-	"project-srv/pkg/discord"
-	"project-srv/pkg/encrypter"
-	"project-srv/pkg/log"
+
+	"github.com/smap-hcmut/shared-libs/go/discord"
+	"github.com/smap-hcmut/shared-libs/go/encrypter"
+	"github.com/smap-hcmut/shared-libs/go/log"
+	"github.com/smap-hcmut/shared-libs/go/postgres"
+	"github.com/smap-hcmut/shared-libs/go/redis"
 )
 
 // @title       SMAP Project Service API
@@ -43,7 +44,7 @@ func main() {
 	}
 
 	// Initialize logger
-	logger := log.Init(log.ZapConfig{
+	logger := log.NewZapLogger(log.ZapConfig{
 		Level:        cfg.Logger.Level,
 		Mode:         cfg.Logger.Mode,
 		Encoding:     cfg.Logger.Encoding,
@@ -61,22 +62,34 @@ func main() {
 	logger.Info(ctx, "Encrypter initialized")
 
 	// Initialize PostgreSQL
-	postgresDB, err := postgre.Connect(ctx, cfg.Postgres)
+	postgresDB, err := postgres.New(postgres.Config{
+		Host:     cfg.Postgres.Host,
+		Port:     cfg.Postgres.Port,
+		User:     cfg.Postgres.User,
+		Password: cfg.Postgres.Password,
+		DBName:   cfg.Postgres.DBName,
+		SSLMode:  cfg.Postgres.SSLMode,
+	})
 	if err != nil {
 		logger.Errorf(ctx, "Failed to connect to PostgreSQL: %v", err)
 		return
 	}
-	defer postgre.Disconnect(ctx, postgresDB)
+	defer postgresDB.Close()
 	logger.Infof(ctx, "PostgreSQL connected successfully to %s:%d/%s",
 		cfg.Postgres.Host, cfg.Postgres.Port, cfg.Postgres.DBName)
 
 	// Initialize Redis
-	redisClient, err := redis.Connect(ctx, cfg.Redis)
+	redisClient, err := redis.New(redis.RedisConfig{
+		Host:     cfg.Redis.Host,
+		Port:     cfg.Redis.Port,
+		Password: cfg.Redis.Password,
+		DB:       cfg.Redis.DB,
+	})
 	if err != nil {
 		logger.Errorf(ctx, "Failed to connect to Redis: %v", err)
 		return
 	}
-	defer redis.Disconnect()
+	defer redisClient.Close()
 	logger.Infof(ctx, "Redis connected successfully to %s:%d (DB %d)",
 		cfg.Redis.Host, cfg.Redis.Port, cfg.Redis.DB)
 
@@ -100,7 +113,7 @@ func main() {
 		Environment: cfg.Environment.Name,
 
 		// Database Configuration
-		PostgresDB: postgresDB,
+		PostgresDB: postgresDB.GetDB(),
 
 		// Redis Configuration
 		RedisClient: redisClient,

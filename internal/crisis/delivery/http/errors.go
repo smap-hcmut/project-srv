@@ -2,7 +2,8 @@ package http
 
 import (
 	"project-srv/internal/crisis"
-	pkgErrors "project-srv/pkg/errors"
+
+	pkgErrors "github.com/smap-hcmut/shared-libs/go/errors"
 )
 
 // Delivery-layer HTTP errors — all known errors are 400-level.

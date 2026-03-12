@@ -1,9 +1,8 @@
 package httpserver
 
 import (
-	"project-srv/pkg/response"
-
 	"github.com/gin-gonic/gin"
+	"github.com/smap-hcmut/shared-libs/go/response"
 )
 
 // healthCheck handles health check requests

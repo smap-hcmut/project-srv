@@ -6,7 +6,8 @@ import (
 	"sync"
 
 	"project-srv/config"
-	"project-srv/pkg/redis"
+
+	"github.com/smap-hcmut/shared-libs/go/redis"
 )
 
 var (
@@ -32,7 +33,7 @@ func Connect(ctx context.Context, cfg config.RedisConfig) (redis.IRedis, error) 
 
 	var err error
 	once.Do(func() {
-		client, e := redis.NewRedis(redis.RedisConfig{
+		client, e := redis.New(redis.RedisConfig{
 			Host:     cfg.Host,
 			Port:     cfg.Port,
 			Password: cfg.Password,
@@ -40,11 +41,6 @@ func Connect(ctx context.Context, cfg config.RedisConfig) (redis.IRedis, error) 
 		})
 		if e != nil {
 			err = fmt.Errorf("failed to create Redis client: %w", e)
-			initErr = err
-			return
-		}
-		if e := client.Ping(ctx); e != nil {
-			err = fmt.Errorf("failed to ping Redis: %w", e)
 			initErr = err
 			return
 		}

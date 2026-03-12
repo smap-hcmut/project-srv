@@ -3,7 +3,8 @@ package http
 import (
 	"project-srv/internal/model"
 	"project-srv/internal/project"
-	"project-srv/pkg/paginator"
+
+	"github.com/smap-hcmut/shared-libs/go/paginator"
 )
 
 // --- Request DTOs ---

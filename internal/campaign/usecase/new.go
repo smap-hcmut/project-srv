@@ -3,7 +3,8 @@ package usecase
 import (
 	"project-srv/internal/campaign"
 	repo "project-srv/internal/campaign/repository"
-	"project-srv/pkg/log"
+
+	"github.com/smap-hcmut/shared-libs/go/log"
 )
 
 type implUseCase struct {

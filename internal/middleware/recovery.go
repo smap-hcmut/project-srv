@@ -1,15 +1,15 @@
 package middleware
 
 import (
-	"project-srv/pkg/discord"
-	"project-srv/pkg/log"
-	"project-srv/pkg/response"
+	"fmt"
 
 	"github.com/gin-gonic/gin"
+	"github.com/smap-hcmut/shared-libs/go/discord"
+	"github.com/smap-hcmut/shared-libs/go/log"
+	"github.com/smap-hcmut/shared-libs/go/response"
 )
 
-// Recovery returns a middleware that recovers from panics and logs the error.
-// It uses structured logging and reports panics to Discord if configured.
+// Recovery recovers from panics and logs the error to Discord.
 func Recovery(logger log.Logger, discordClient discord.IDiscord) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
@@ -18,7 +18,7 @@ func Recovery(logger log.Logger, discordClient discord.IDiscord) gin.HandlerFunc
 				logger.Errorf(ctx, "Panic recovered: %v | Method: %s | Path: %s",
 					err, c.Request.Method, c.Request.URL.Path)
 
-				response.PanicError(c, err, discordClient)
+				response.Error(c, fmt.Errorf("%v", err), discordClient)
 				c.Abort()
 			}
 		}()

@@ -1,7 +1,7 @@
 package repository
 
 import (
-	"project-srv/pkg/paginator"
+	"github.com/smap-hcmut/shared-libs/go/paginator"
 )
 
 // CreateOptions contains the data needed to create a new project.
