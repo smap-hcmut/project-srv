@@ -72,9 +72,13 @@ build: ## Build the application
 	go build -o bin/consumer cmd/consumer/main.go
 	@echo "${GREEN}Build completed!${RESET}"
 
-run-api: ## Run API server
-	@echo "${GREEN}Starting API server...${RESET}"
-	go run cmd/api/main.go
+run-api:
+	@echo "Generating swagger"
+	@swag init -g cmd/api/main.go --parseVendor
+	@sed -i '' '/LeftDelim:/d' docs/docs.go
+	@sed -i '' '/RightDelim:/d' docs/docs.go
+	@echo "Running the application"
+	@go run cmd/api/main.go
 
 run-consumer: ## Run consumer service
 	@echo "${GREEN}Starting consumer service...${RESET}"
