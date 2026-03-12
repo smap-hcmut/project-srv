@@ -2,7 +2,7 @@
 bin/
 
 # Vendor (modules downloaded via go mod download in Dockerfile)
-vendor/
+# vendor/
 
 # Documentation
 docs/

@@ -18,25 +18,25 @@ logger:
 
 # PostgreSQL
 postgres:
-  host: localhost
+  host: 172.16.19.10
   port: 5432
-  user: postgres
-  password: postgres
+  user: project_prod
+  password: project_prod_pwd
   dbname: smap
   sslmode: disable
   schema: schema_project
 
 # Redis
 redis:
-  host: localhost
+  host: redis.tantai.dev
   port: 6379
-  password: "redis_password"
+  password: "21042004"
   db: 0
 
 # Kafka
 kafka:
   brokers:
-    - localhost:9092
+    - kafka.tantai.dev:9094
   topic: "project.events"
   group_id: "project-consumer"
 
