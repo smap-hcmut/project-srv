@@ -288,7 +288,7 @@ github.com/redis/go-redis/v9 v9.18.0/go.mod h1:k3ufPphLU5YXwNTUcCRXGxUoF1fqxnhFQ
 github.com/rogpeppe/go-internal v1.3.0/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFRclV5y23lUDJ4=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=
 github.com/rogpeppe/go-internal v1.14.1/go.mod h1:MaRKkUm5W0goXpeCfT7UZI6fk/L7L7so1lCWt35ZSgc=
-github.com/smap-hcmut/shared-libs/go v1.0.0 h1:DsPoAB1obFJI3cLtnchRcW8Evwt0Vpu5Yl3qldLz9qA=
+github.com/smap-hcmut/shared-libs/go v1.0.0 h1:SZe6/QYFXG45OnnMjVJ6lGi43y/3qc0toiZ7mah2jEQ=
 github.com/smap-hcmut/shared-libs/go v1.0.0/go.mod h1:yOhGS568myW3CaXP4y62hPuP8Ij70gdRNHsR9OZovSs=
 github.com/spf13/afero v1.9.2 h1:j49Hj62F0n+DaZ1dDCvhABaPNSGNkt32oRFxI33IEMw=
 github.com/spf13/afero v1.9.2/go.mod h1:iUV7ddyEEZPO5gA3zD4fJt6iStLlL+Lg4m2cihcDf8Y=
