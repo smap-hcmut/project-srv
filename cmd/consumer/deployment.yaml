@@ -29,7 +29,7 @@ spec:
         - name: harbor-registry
       containers:
         - name: project-consumer
-          image: registry.tantai.dev/smap/project-consumer:260313-003226
+          image: registry.tantai.dev/smap/project-consumer:260313-144106
           imagePullPolicy: IfNotPresent
           resources:
             requests:

@@ -15,8 +15,7 @@ RUN apk add --no-cache git tzdata
 
 # Cache dependencies (layer changes only when go.mod/go.sum change)
 COPY go.mod go.sum ./
-RUN --mount=type=cache,target=/go/pkg/mod \
-    go mod download
+COPY vendor/ vendor/
 
 COPY . .
 
@@ -27,6 +26,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     GOOS=${TARGETOS} \
     GOARCH=${TARGETARCH} \
     go build \
+    -mod=vendor \
     -trimpath \
     -ldflags="-s -w" \
     -o consumer ./cmd/consumer
