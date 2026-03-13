@@ -1,5 +1,9 @@
 # Project Service - Service Interactions
 
+> Legacy planning note (not source of truth for ownership).
+> As of 2026-03-13, Data Source/Target/Dryrun/Dispatch runtime ownership is in `dispatcher-srv` (`ingest-srv`), not `project-srv`.
+> Use `project-srv/README.md` and `dispatcher-srv/README.md` as canonical boundary references.
+
 **Ngày tạo:** 18/02/2026  
 **Phiên bản:** v1.0  
 **Mục đích:** Mô tả chi tiết cách `project-srv` tương tác với các microservices khác trong hệ thống SMAP Enterprise.

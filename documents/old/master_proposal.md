@@ -1,5 +1,9 @@
 # MASTER PROPOSAL: Project Service — Centralized Management \u0026 Orchestration
 
+> Legacy planning note (not source of truth for ownership).
+> As of 2026-03-13, Data Source/Target/Dryrun/Dispatch runtime ownership is in `dispatcher-srv` (`ingest-srv`), not `project-srv`.
+> Use `project-srv/README.md` and `dispatcher-srv/README.md` as canonical boundary references.
+
 **Phiên bản:** 1.0
 **Ngày tạo:** 19/02/2026
 **Repo:** project-srv (Go)
