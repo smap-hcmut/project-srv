@@ -10,11 +10,12 @@ import (
 	crisisrepo "project-srv/internal/crisis/repository/postgre"
 	crisisuc "project-srv/internal/crisis/usecase"
 	"project-srv/internal/middleware"
+	sharedmw "github.com/smap-hcmut/shared-libs/go/middleware"
 	projecthttp "project-srv/internal/project/delivery/http"
 	projectrepo "project-srv/internal/project/repository/postgre"
 	projectuc "project-srv/internal/project/usecase"
 
-	"github.com/smap-hcmut/shared-libs/go/scope"
+	"github.com/smap-hcmut/shared-libs/go/auth"
 	"github.com/smap-hcmut/shared-libs/go/tracing"
 
 	// Import this to execute the init function in docs.go which setups the Swagger docs.
@@ -26,7 +27,7 @@ import (
 )
 
 func (srv HTTPServer) mapHandlers() error {
-	scopeManager := scope.New(srv.jwtSecretKey)
+	scopeManager := auth.NewManager(srv.jwtSecretKey)
 	mw := middleware.New(srv.l, scopeManager, srv.cookieConfig, srv.internalKey)
 
 	srv.registerMiddlewares(mw)
@@ -57,10 +58,10 @@ func (srv HTTPServer) mapHandlers() error {
 }
 
 func (srv HTTPServer) registerMiddlewares(mw middleware.Middleware) {
-	srv.gin.Use(middleware.Recovery(srv.l, srv.discord))
+	srv.gin.Use(sharedmw.Recovery(srv.l, srv.discord))
 
-	corsConfig := middleware.DefaultCORSConfig(srv.environment)
-	srv.gin.Use(middleware.CORS(corsConfig))
+	corsConfig := sharedmw.DefaultCORSConfig(srv.environment)
+	srv.gin.Use(sharedmw.CORS(corsConfig))
 
 	// Tracing middleware for centralized logging (trace_id)
 	tracer := tracing.NewTraceContext()
@@ -75,7 +76,7 @@ func (srv HTTPServer) registerMiddlewares(mw middleware.Middleware) {
 	}
 
 	// Add locale middleware to extract and set locale from request header
-	srv.gin.Use(mw.Locale())
+	srv.gin.Use(sharedmw.Locale())
 }
 
 func (srv HTTPServer) registerSystemRoutes() {

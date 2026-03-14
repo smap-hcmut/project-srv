@@ -7,7 +7,7 @@ import (
 	"project-srv/internal/campaign"
 	repo "project-srv/internal/campaign/repository"
 
-	"github.com/smap-hcmut/shared-libs/go/scope"
+	"github.com/smap-hcmut/shared-libs/go/auth"
 )
 
 // Create validates input and creates a new campaign.
@@ -42,7 +42,7 @@ func (uc *implUseCase) Create(ctx context.Context, input campaign.CreateInput) (
 	}
 
 	// Get user from context
-	userID, _ := scope.GetUserIDFromContext(ctx)
+	userID, _ := auth.GetUserIDFromContext(ctx)
 
 	// Convert Input → Options
 	opt := repo.CreateOptions{
