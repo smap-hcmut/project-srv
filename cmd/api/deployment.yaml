@@ -29,7 +29,7 @@ spec:
         - name: harbor-registry
       containers:
         - name: project-api
-          image: registry.tantai.dev/smap/project-api:260315-010515
+          image: registry.tantai.dev/smap/project-api:260316-234430
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
