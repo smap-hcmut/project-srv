@@ -9,28 +9,30 @@ import (
 	crisishttp "project-srv/internal/crisis/delivery/http"
 	crisisrepo "project-srv/internal/crisis/repository/postgre"
 	crisisuc "project-srv/internal/crisis/usecase"
-	"project-srv/internal/middleware"
-	sharedmw "github.com/smap-hcmut/shared-libs/go/middleware"
+	"project-srv/internal/model"
 	projecthttp "project-srv/internal/project/delivery/http"
 	projectrepo "project-srv/internal/project/repository/postgre"
 	projectuc "project-srv/internal/project/usecase"
 
 	"github.com/smap-hcmut/shared-libs/go/auth"
-	"github.com/smap-hcmut/shared-libs/go/tracing"
+	"github.com/smap-hcmut/shared-libs/go/middleware"
 
 	// Import this to execute the init function in docs.go which setups the Swagger docs.
 	// Uncomment after running: make swagger
 	// _ "project-srv/docs"
-
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 func (srv HTTPServer) mapHandlers() error {
-	scopeManager := auth.NewManager(srv.jwtSecretKey)
-	mw := middleware.New(srv.l, scopeManager, srv.cookieConfig, srv.internalKey)
+	mw := middleware.New(middleware.Config{
+		JWTManager:       auth.NewManager(srv.jwtSecretKey),
+		CookieName:       srv.cookieConfig.Name,
+		ProductionDomain: srv.cookieConfig.Domain,
+		InternalKey:      srv.internalKey,
+	})
 
-	srv.registerMiddlewares(mw)
+	srv.registerMiddlewares()
 	srv.registerSystemRoutes()
 
 	// Campaign module
@@ -49,23 +51,21 @@ func (srv HTTPServer) mapHandlers() error {
 	crisisHandler := crisishttp.New(srv.l, crisisUC, srv.discord)
 
 	// Map routes
-	api := srv.gin.Group("/api/v1")
-	campaignHandler.RegisterRoutes(api, mw)
-	projectHandler.RegisterRoutes(api, mw)
-	crisisHandler.RegisterRoutes(api, mw)
+	apiV1 := srv.gin.Group(model.APIV1Prefix)
+	campaignHandler.RegisterRoutes(apiV1, mw)
+	projectHandler.RegisterRoutes(apiV1, mw)
+	crisisHandler.RegisterRoutes(apiV1, mw)
 
 	return nil
 }
 
-func (srv HTTPServer) registerMiddlewares(mw middleware.Middleware) {
-	srv.gin.Use(sharedmw.Recovery(srv.l, srv.discord))
+func (srv HTTPServer) registerMiddlewares() {
+	srv.gin.Use(middleware.Recovery(srv.l, srv.discord))
 
-	corsConfig := sharedmw.DefaultCORSConfig(srv.environment)
-	srv.gin.Use(sharedmw.CORS(corsConfig))
+	corsConfig := middleware.DefaultCORSConfig(srv.environment)
+	srv.gin.Use(middleware.CORS(corsConfig))
 
-	// Tracing middleware for centralized logging (trace_id)
-	tracer := tracing.NewTraceContext()
-	srv.gin.Use(tracing.GinTraceMiddleware(tracer, tracing.NewHTTPPropagator(tracer)))
+	srv.gin.Use(middleware.Tracing())
 
 	// Log CORS mode for visibility
 	ctx := context.Background()
@@ -76,7 +76,7 @@ func (srv HTTPServer) registerMiddlewares(mw middleware.Middleware) {
 	}
 
 	// Add locale middleware to extract and set locale from request header
-	srv.gin.Use(sharedmw.Locale())
+	srv.gin.Use(middleware.Locale())
 }
 
 func (srv HTTPServer) registerSystemRoutes() {

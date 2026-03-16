@@ -1,13 +1,12 @@
 package http
 
 import (
-	"project-srv/internal/middleware"
-
 	"github.com/gin-gonic/gin"
+	"github.com/smap-hcmut/shared-libs/go/middleware"
 )
 
 // RegisterRoutes maps campaign routes to the given router group.
-func (h *handler) RegisterRoutes(r *gin.RouterGroup, mw middleware.Middleware) {
+func (h *handler) RegisterRoutes(r *gin.RouterGroup, mw *middleware.Middleware) {
 	campaigns := r.Group("/campaigns")
 	campaigns.Use(mw.Auth())
 	{

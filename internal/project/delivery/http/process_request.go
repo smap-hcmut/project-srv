@@ -21,7 +21,7 @@ func (h *handler) processCreateReq(c *gin.Context) (createReq, error) {
 
 // processDetailReq extracts path param for detail.
 func (h *handler) processDetailReq(c *gin.Context) (detailReq, error) {
-	return detailReq{ID: c.Param("projectId")}, nil
+	return detailReq{ID: c.Param("project_id")}, nil
 }
 
 // processListReq binds query params and extracts path param for listing.
@@ -42,7 +42,7 @@ func (h *handler) processUpdateReq(c *gin.Context) (updateReq, error) {
 		h.l.Warnf(c.Request.Context(), "project.delivery.processUpdateReq.ShouldBindJSON: %v", err)
 		return req, errWrongBody
 	}
-	req.ID = c.Param("projectId")
+	req.ID = c.Param("project_id")
 	if err := req.validate(); err != nil {
 		h.l.Warnf(c.Request.Context(), "project.delivery.processUpdateReq.validate: %v", err)
 		return req, errWrongBody
@@ -52,5 +52,5 @@ func (h *handler) processUpdateReq(c *gin.Context) (updateReq, error) {
 
 // processArchiveReq extracts path param for archive.
 func (h *handler) processArchiveReq(c *gin.Context) (archiveReq, error) {
-	return archiveReq{ID: c.Param("projectId")}, nil
+	return archiveReq{ID: c.Param("project_id")}, nil
 }

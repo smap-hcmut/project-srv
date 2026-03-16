@@ -10,12 +10,12 @@ import (
 // @Tags CrisisConfig
 // @Accept json
 // @Produce json
-// @Param projectId path string true "Project ID"
+// @Param project_id path string true "Project ID"
 // @Param body body upsertReq true "Crisis config data"
 // @Success 200 {object} upsertResp
 // @Failure 400 {object} response.Resp
 // @Failure 500 {object} response.Resp
-// @Router /projects/{projectId}/crisis-config [put]
+// @Router /projects/{project_id}/crisis-config [put]
 func (h *handler) Upsert(c *gin.Context) {
 	ctx := c.Request.Context()
 
@@ -26,7 +26,7 @@ func (h *handler) Upsert(c *gin.Context) {
 		return
 	}
 
-	projectID := c.Param("projectId")
+	projectID := c.Param("project_id")
 	o, err := h.uc.Upsert(ctx, req.toInput(projectID))
 	if err != nil {
 		h.l.Errorf(ctx, "crisis.delivery.Upsert.uc.Upsert: %v", err)
@@ -41,14 +41,14 @@ func (h *handler) Upsert(c *gin.Context) {
 // @Description Return crisis detection config for a project
 // @Tags CrisisConfig
 // @Produce json
-// @Param projectId path string true "Project ID"
+// @Param project_id path string true "Project ID"
 // @Success 200 {object} detailResp
 // @Failure 400 {object} response.Resp
 // @Failure 500 {object} response.Resp
-// @Router /projects/{projectId}/crisis-config [get]
+// @Router /projects/{project_id}/crisis-config [get]
 func (h *handler) Detail(c *gin.Context) {
 	ctx := c.Request.Context()
-	projectID := c.Param("projectId")
+	projectID := c.Param("project_id")
 
 	o, err := h.uc.Detail(ctx, projectID)
 	if err != nil {
@@ -64,14 +64,14 @@ func (h *handler) Detail(c *gin.Context) {
 // @Description Remove crisis detection config for a project
 // @Tags CrisisConfig
 // @Produce json
-// @Param projectId path string true "Project ID"
+// @Param project_id path string true "Project ID"
 // @Success 200 {object} response.Resp
 // @Failure 400 {object} response.Resp
 // @Failure 500 {object} response.Resp
-// @Router /projects/{projectId}/crisis-config [delete]
+// @Router /projects/{project_id}/crisis-config [delete]
 func (h *handler) Delete(c *gin.Context) {
 	ctx := c.Request.Context()
-	projectID := c.Param("projectId")
+	projectID := c.Param("project_id")
 
 	if err := h.uc.Delete(ctx, projectID); err != nil {
 		h.l.Errorf(ctx, "crisis.delivery.Delete.uc.Delete: project_id=%s err=%v", projectID, err)

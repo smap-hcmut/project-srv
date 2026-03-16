@@ -40,11 +40,11 @@ func (h *handler) Create(c *gin.Context) {
 // @Description Return project info by ID
 // @Tags Project
 // @Produce json
-// @Param projectId path string true "Project ID"
+// @Param project_id path string true "Project ID"
 // @Success 200 {object} detailResp
 // @Failure 400 {object} response.Resp
 // @Failure 500 {object} response.Resp
-// @Router /projects/{projectId} [get]
+// @Router /projects/{project_id} [get]
 func (h *handler) Detail(c *gin.Context) {
 	ctx := c.Request.Context()
 
@@ -105,12 +105,12 @@ func (h *handler) List(c *gin.Context) {
 // @Tags Project
 // @Accept json
 // @Produce json
-// @Param projectId path string true "Project ID"
+// @Param project_id path string true "Project ID"
 // @Param body body updateReq true "Update project request"
 // @Success 200 {object} updateResp
 // @Failure 400 {object} response.Resp
 // @Failure 500 {object} response.Resp
-// @Router /projects/{projectId} [put]
+// @Router /projects/{project_id} [put]
 func (h *handler) Update(c *gin.Context) {
 	ctx := c.Request.Context()
 
@@ -135,11 +135,11 @@ func (h *handler) Update(c *gin.Context) {
 // @Description Soft-delete a project by ID
 // @Tags Project
 // @Produce json
-// @Param projectId path string true "Project ID"
+// @Param project_id path string true "Project ID"
 // @Success 200 {object} response.Resp
 // @Failure 400 {object} response.Resp
 // @Failure 500 {object} response.Resp
-// @Router /projects/{projectId} [delete]
+// @Router /projects/{project_id} [delete]
 func (h *handler) Archive(c *gin.Context) {
 	ctx := c.Request.Context()
 
