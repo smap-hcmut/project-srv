@@ -227,7 +227,7 @@ func setDefaults() {
 
 	// Cookie
 	viper.SetDefault("cookie.name", "smap_auth_token")
-	viper.SetDefault("cookie.max_age", 28800)    // 8 hours
+	viper.SetDefault("cookie.max_age", 28800) // 8 hours
 	viper.SetDefault("cookie.domain", ".tantai.dev")
 }
 
