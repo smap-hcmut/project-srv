@@ -13,5 +13,6 @@ type Repository interface {
 	Detail(ctx context.Context, id string) (model.Project, error)
 	Get(ctx context.Context, opt GetOptions) ([]model.Project, paginator.Paginator, error)
 	Update(ctx context.Context, opt UpdateOptions) (model.Project, error)
+	UpdateStatus(ctx context.Context, opt UpdateStatusOptions) (model.Project, error)
 	Archive(ctx context.Context, id string) error
 }

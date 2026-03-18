@@ -132,7 +132,152 @@ func (h *handler) Update(c *gin.Context) {
 }
 
 // @Summary Archive a project
-// @Description Soft-delete a project by ID
+// @Description Transition a project into ARCHIVED status
+// @Tags Project
+// @Produce json
+// @Param project_id path string true "Project ID"
+// @Success 200 {object} lifecycleResp
+// @Failure 400 {object} response.Resp
+// @Failure 500 {object} response.Resp
+// @Router /projects/{project_id}/archive [post]
+func (h *handler) Archive(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	req, err := h.processLifecycleReq(c)
+	if err != nil {
+		h.l.Warnf(ctx, "project.delivery.Archive.processArchiveReq: %v", err)
+		response.Error(c, err, h.discord)
+		return
+	}
+
+	o, err := h.uc.Archive(ctx, req.toInput())
+	if err != nil {
+		h.l.Errorf(ctx, "project.delivery.Archive.uc.Archive: id=%s err=%v", req.ID, err)
+		response.Error(c, h.mapError(err), h.discord)
+		return
+	}
+
+	response.OK(c, h.newLifecycleResp(o.Project))
+}
+
+// @Summary Activate a project
+// @Description Transition a project into ACTIVE status
+// @Tags Project
+// @Produce json
+// @Param project_id path string true "Project ID"
+// @Success 200 {object} lifecycleResp
+// @Failure 400 {object} response.Resp
+// @Failure 500 {object} response.Resp
+// @Router /projects/{project_id}/activate [post]
+func (h *handler) Activate(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	req, err := h.processLifecycleReq(c)
+	if err != nil {
+		h.l.Warnf(ctx, "project.delivery.Activate.processLifecycleReq: %v", err)
+		response.Error(c, err, h.discord)
+		return
+	}
+
+	o, err := h.uc.Activate(ctx, req.toInput())
+	if err != nil {
+		h.l.Errorf(ctx, "project.delivery.Activate.uc.Activate: id=%s err=%v", req.ID, err)
+		response.Error(c, h.mapError(err), h.discord)
+		return
+	}
+
+	response.OK(c, h.newLifecycleResp(o.Project))
+}
+
+// @Summary Pause a project
+// @Description Transition a project into PAUSED status
+// @Tags Project
+// @Produce json
+// @Param project_id path string true "Project ID"
+// @Success 200 {object} lifecycleResp
+// @Failure 400 {object} response.Resp
+// @Failure 500 {object} response.Resp
+// @Router /projects/{project_id}/pause [post]
+func (h *handler) Pause(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	req, err := h.processLifecycleReq(c)
+	if err != nil {
+		h.l.Warnf(ctx, "project.delivery.Pause.processLifecycleReq: %v", err)
+		response.Error(c, err, h.discord)
+		return
+	}
+
+	o, err := h.uc.Pause(ctx, req.toInput())
+	if err != nil {
+		h.l.Errorf(ctx, "project.delivery.Pause.uc.Pause: id=%s err=%v", req.ID, err)
+		response.Error(c, h.mapError(err), h.discord)
+		return
+	}
+
+	response.OK(c, h.newLifecycleResp(o.Project))
+}
+
+// @Summary Resume a project
+// @Description Transition a project back into ACTIVE status from PAUSED
+// @Tags Project
+// @Produce json
+// @Param project_id path string true "Project ID"
+// @Success 200 {object} lifecycleResp
+// @Failure 400 {object} response.Resp
+// @Failure 500 {object} response.Resp
+// @Router /projects/{project_id}/resume [post]
+func (h *handler) Resume(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	req, err := h.processLifecycleReq(c)
+	if err != nil {
+		h.l.Warnf(ctx, "project.delivery.Resume.processLifecycleReq: %v", err)
+		response.Error(c, err, h.discord)
+		return
+	}
+
+	o, err := h.uc.Resume(ctx, req.toInput())
+	if err != nil {
+		h.l.Errorf(ctx, "project.delivery.Resume.uc.Resume: id=%s err=%v", req.ID, err)
+		response.Error(c, h.mapError(err), h.discord)
+		return
+	}
+
+	response.OK(c, h.newLifecycleResp(o.Project))
+}
+
+// @Summary Unarchive a project
+// @Description Transition an archived project back into PAUSED status
+// @Tags Project
+// @Produce json
+// @Param project_id path string true "Project ID"
+// @Success 200 {object} lifecycleResp
+// @Failure 400 {object} response.Resp
+// @Failure 500 {object} response.Resp
+// @Router /projects/{project_id}/unarchive [post]
+func (h *handler) Unarchive(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	req, err := h.processLifecycleReq(c)
+	if err != nil {
+		h.l.Warnf(ctx, "project.delivery.Unarchive.processLifecycleReq: %v", err)
+		response.Error(c, err, h.discord)
+		return
+	}
+
+	o, err := h.uc.Unarchive(ctx, req.toInput())
+	if err != nil {
+		h.l.Errorf(ctx, "project.delivery.Unarchive.uc.Unarchive: id=%s err=%v", req.ID, err)
+		response.Error(c, h.mapError(err), h.discord)
+		return
+	}
+
+	response.OK(c, h.newLifecycleResp(o.Project))
+}
+
+// @Summary Delete a project
+// @Description Soft-delete a project after it has been archived
 // @Tags Project
 // @Produce json
 // @Param project_id path string true "Project ID"
@@ -140,18 +285,18 @@ func (h *handler) Update(c *gin.Context) {
 // @Failure 400 {object} response.Resp
 // @Failure 500 {object} response.Resp
 // @Router /projects/{project_id} [delete]
-func (h *handler) Archive(c *gin.Context) {
+func (h *handler) Delete(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	req, err := h.processArchiveReq(c)
 	if err != nil {
-		h.l.Warnf(ctx, "project.delivery.Archive.processArchiveReq: %v", err)
+		h.l.Warnf(ctx, "project.delivery.Delete.processArchiveReq: %v", err)
 		response.Error(c, err, h.discord)
 		return
 	}
 
-	if err := h.uc.Archive(ctx, req.toInput()); err != nil {
-		h.l.Errorf(ctx, "project.delivery.Archive.uc.Archive: id=%s err=%v", req.ID, err)
+	if err := h.uc.Delete(ctx, req.toInput()); err != nil {
+		h.l.Errorf(ctx, "project.delivery.Delete.uc.Delete: id=%s err=%v", req.ID, err)
 		response.Error(c, h.mapError(err), h.discord)
 		return
 	}

@@ -140,7 +140,7 @@ func (h *handler) newCreateResp(output indexing.CreateOutput) CreateResp { ... }
 **Goal**: Translate Domain Errors to HTTP Status Codes.
 
 - **Pattern**: Use `pkg/errors` and `switch` statements.
-- **Unknown Errors**: `panic` in DEV/TEST (to catch bugs), `500` in PROD.
+- **Unknown Errors**: `default` **MUST** be `panic(err)` only. Không return fallback `500` trong `mapError`.
 
 ```go
 func (h *handler) mapError(err error) error {
@@ -150,11 +150,8 @@ func (h *handler) mapError(err error) error {
     case errors.Is(err, uc.ErrEmailDuplicate):
         return pkgErrors.NewHTTPError(409, "Email already exists")
     default:
-        // Critical: Force developers to handle errors during development!
-        if config.IsDev() {
-            panic(err)
-        }
-        return pkgErrors.ErrInternalServerError // 500
+        // Critical: fail-fast to force explicit error mapping
+        panic(err)
     }
 }
 ```
@@ -166,7 +163,7 @@ func (h *handler) mapError(err error) error {
 - [ ] **Swagger Check**: Did I add a full Swagger block? (Summary, Param, Success, Failure).
 - [ ] **Validation Check**: Did I restrict inputs? (e.g., `limit` max 100, `offset` min 0).
 - [ ] **Business Logic Check**: Did I accidentally put logic in the handler? (e.g., `if status == "active"`). **MOVE IT TO USECASE**.
-- [ ] **Error Map Check**: Did I map the UseCase error in `errors.go`? Or it falls to default 500?
+- [ ] **Error Map Check**: Did I map every UseCase error in `errors.go`? Unknown errors must hit `panic(err)`.
 - [ ] **Naming Check**: Are handler methods simple? (`Create`, `Detail` - NOT `CreateUser`).
 
 ---

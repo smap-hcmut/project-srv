@@ -10,6 +10,7 @@ import (
 type ProjectStatus string
 
 const (
+	ProjectStatusDraft    ProjectStatus = "DRAFT"
 	ProjectStatusActive   ProjectStatus = "ACTIVE"
 	ProjectStatusPaused   ProjectStatus = "PAUSED"
 	ProjectStatusArchived ProjectStatus = "ARCHIVED"

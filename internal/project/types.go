@@ -50,10 +50,47 @@ type UpdateInput struct {
 	Brand       string
 	EntityType  string
 	EntityName  string
-	Status      string
 }
 
 // UpdateOutput is the output after updating a project.
 type UpdateOutput struct {
+	Project model.Project
+}
+
+// ActivationReadiness is the local readiness contract used by LifecycleManager.
+type ActivationReadiness struct {
+	ProjectID   string
+	CanActivate bool
+	Errors      []ActivationReadinessError
+}
+
+// ActivationReadinessError describes one readiness blocker.
+type ActivationReadinessError struct {
+	Code    string
+	Message string
+}
+
+// ActivateOutput is the output after activating a project.
+type ActivateOutput struct {
+	Project model.Project
+}
+
+// PauseOutput is the output after pausing a project.
+type PauseOutput struct {
+	Project model.Project
+}
+
+// ResumeOutput is the output after resuming a project.
+type ResumeOutput struct {
+	Project model.Project
+}
+
+// ArchiveOutput is the output after archiving a project.
+type ArchiveOutput struct {
+	Project model.Project
+}
+
+// UnarchiveOutput is the output after unarchiving a project.
+type UnarchiveOutput struct {
 	Project model.Project
 }

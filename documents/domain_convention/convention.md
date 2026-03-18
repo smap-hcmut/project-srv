@@ -137,7 +137,7 @@ This layer handles all transport concerns (HTTP, Job, RabbitMQ). It **MUST NOT**
 - **`errors.go`**: Error Mapping (Crucial).
   - **Responsibility**: Maps UseCase errors to HTTP errors (using `pkg/errors`).
   - **Pattern**: `func (h handler) mapError(err error) error`.
-  - **Rule**: **MUST** panic on unknown errors (`default: panic(err)`). This guarantees all domain errors are explicitly handled during development.
+  - **Rule**: **MUST** panic on unknown errors (`default: panic(err)`) and **MUST NOT** return fallback error in default branch. This guarantees all domain errors are explicitly handled during development.
   - **Constants**: Define local `var` constants like `errEventNotFound = pkgErrors.NewHTTPError(141004, "Event not found")`.
 
 #### 1.2 Job (`delivery/job`)

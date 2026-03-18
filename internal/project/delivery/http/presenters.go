@@ -68,7 +68,6 @@ type updateReq struct {
 	Brand       string `json:"brand" example:"VinFast"`                                                         // Brand name
 	EntityType  string `json:"entity_type" example:"product" enums:"product,campaign,service,competitor,topic"` // Entity type
 	EntityName  string `json:"entity_name" example:"VF8"`                                                       // Specific entity name
-	Status      string `json:"status" example:"ACTIVE" enums:"ACTIVE,PAUSED,ARCHIVED"`                          // Project status
 }
 
 func (r updateReq) validate() error {
@@ -78,14 +77,6 @@ func (r updateReq) validate() error {
 			// valid
 		default:
 			return errInvalidEntity
-		}
-	}
-	if r.Status != "" {
-		switch model.ProjectStatus(r.Status) {
-		case model.ProjectStatusActive, model.ProjectStatusPaused, model.ProjectStatusArchived:
-			// valid
-		default:
-			return errInvalidStatus
 		}
 	}
 	return nil
@@ -99,7 +90,6 @@ func (r updateReq) toInput() project.UpdateInput {
 		Brand:       r.Brand,
 		EntityType:  r.EntityType,
 		EntityName:  r.EntityName,
-		Status:      r.Status,
 	}
 }
 
@@ -143,7 +133,7 @@ type projectResp struct {
 	Brand        string `json:"brand,omitempty" example:"VinFast"`                                                                                                                     // Brand name for UI grouping
 	EntityType   string `json:"entity_type" example:"product" enums:"product,campaign,service,competitor,topic"`                                                                       // Entity type
 	EntityName   string `json:"entity_name" example:"VF8"`                                                                                                                             // Specific entity name
-	Status       string `json:"status" example:"ACTIVE" enums:"ACTIVE,PAUSED,ARCHIVED"`                                                                                                // Project status
+	Status       string `json:"status" example:"DRAFT" enums:"DRAFT,ACTIVE,PAUSED,ARCHIVED"`                                                                                           // Project status
 	ConfigStatus string `json:"config_status,omitempty" example:"DRAFT" enums:"DRAFT,CONFIGURING,ONBOARDING,ONBOARDING_DONE,DRYRUN_RUNNING,DRYRUN_SUCCESS,DRYRUN_FAILED,ACTIVE,ERROR"` // Project configuration status
 	CreatedBy    string `json:"created_by" example:"550e8400-e29b-41d4-a716-446655440001"`                                                                                             // Creator user UUID
 	CreatedAt    string `json:"created_at" example:"2026-02-18T00:00:00Z"`                                                                                                             // Creation timestamp
@@ -171,6 +161,11 @@ type updateResp struct {
 	Project projectResp `json:"project"` // Updated project data
 }
 
+// lifecycleResp wraps project lifecycle response.
+type lifecycleResp struct {
+	Project projectResp `json:"project"`
+}
+
 // --- Response Mappers ---
 
 func (h *handler) newCreateResp(o project.CreateOutput) createResp {
@@ -194,6 +189,10 @@ func (h *handler) newListResp(o project.ListOutput) listResp {
 
 func (h *handler) newUpdateResp(o project.UpdateOutput) updateResp {
 	return updateResp{Project: toProjectResp(o.Project)}
+}
+
+func (h *handler) newLifecycleResp(p model.Project) lifecycleResp {
+	return lifecycleResp{Project: toProjectResp(p)}
 }
 
 // --- Internal Mapper ---

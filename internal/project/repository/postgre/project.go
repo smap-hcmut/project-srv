@@ -22,7 +22,7 @@ func (r *implRepository) Create(ctx context.Context, opt repository.CreateOption
 		Name:       opt.Name,
 		EntityType: sqlboiler.EntityType(opt.EntityType),
 		EntityName: opt.EntityName,
-		Status:     sqlboiler.ProjectStatusACTIVE,
+		Status:     sqlboiler.ProjectStatusDRAFT,
 		CreatedBy:  opt.CreatedBy,
 	}
 
@@ -52,7 +52,7 @@ func (r *implRepository) Detail(ctx context.Context, id string) (model.Project, 
 	if err != nil {
 		if err == sql.ErrNoRows {
 			r.l.Warnf(ctx, "project.repository.Detail.FindProject: not found id=%s", id)
-			return model.Project{}, repository.ErrFailedToGet
+			return model.Project{}, repository.ErrNotFound
 		}
 		r.l.Errorf(ctx, "project.repository.Detail.FindProject: %v", err)
 		return model.Project{}, repository.ErrFailedToGet
@@ -108,7 +108,7 @@ func (r *implRepository) Update(ctx context.Context, opt repository.UpdateOption
 	if err != nil {
 		if err == sql.ErrNoRows {
 			r.l.Warnf(ctx, "project.repository.Update.FindProject: not found id=%s", opt.ID)
-			return model.Project{}, repository.ErrFailedToGet
+			return model.Project{}, repository.ErrNotFound
 		}
 		r.l.Errorf(ctx, "project.repository.Update.FindProject: %v", err)
 		return model.Project{}, repository.ErrFailedToUpdate
@@ -129,15 +129,39 @@ func (r *implRepository) Update(ctx context.Context, opt repository.UpdateOption
 	if opt.EntityName != "" {
 		row.EntityName = opt.EntityName
 	}
-	if opt.Status != "" {
-		row.Status = sqlboiler.ProjectStatus(opt.Status)
-	}
-
 	row.UpdatedAt = null.TimeFrom(time.Now())
 
 	_, err = row.Update(ctx, r.db, boil.Infer())
 	if err != nil {
 		r.l.Errorf(ctx, "project.repository.Update.Update: %v", err)
+		return model.Project{}, repository.ErrFailedToUpdate
+	}
+
+	result := model.NewProjectFromDB(row)
+	return *result, nil
+}
+
+// UpdateStatus updates only the lifecycle status of a project.
+func (r *implRepository) UpdateStatus(ctx context.Context, opt repository.UpdateStatusOptions) (model.Project, error) {
+	row, err := sqlboiler.FindProject(ctx, r.db, opt.ID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			r.l.Warnf(ctx, "project.repository.UpdateStatus.FindProject: not found id=%s", opt.ID)
+			return model.Project{}, repository.ErrNotFound
+		}
+		r.l.Errorf(ctx, "project.repository.UpdateStatus.FindProject: %v", err)
+		return model.Project{}, repository.ErrFailedToUpdate
+	}
+
+	row.Status = sqlboiler.ProjectStatus(opt.Status)
+	row.UpdatedAt = null.TimeFrom(time.Now())
+
+	_, err = row.Update(ctx, r.db, boil.Whitelist(
+		sqlboiler.ProjectColumns.Status,
+		sqlboiler.ProjectColumns.UpdatedAt,
+	))
+	if err != nil {
+		r.l.Errorf(ctx, "project.repository.UpdateStatus.Update: %v", err)
 		return model.Project{}, repository.ErrFailedToUpdate
 	}
 
@@ -151,7 +175,7 @@ func (r *implRepository) Archive(ctx context.Context, id string) error {
 	if err != nil {
 		if err == sql.ErrNoRows {
 			r.l.Warnf(ctx, "project.repository.Archive.FindProject: not found id=%s", id)
-			return repository.ErrFailedToGet
+			return repository.ErrNotFound
 		}
 		r.l.Errorf(ctx, "project.repository.Archive.FindProject: %v", err)
 		return repository.ErrFailedToDelete
