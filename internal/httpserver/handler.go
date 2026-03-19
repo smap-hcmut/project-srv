@@ -11,8 +11,10 @@ import (
 	crisisuc "project-srv/internal/crisis/usecase"
 	"project-srv/internal/model"
 	projecthttp "project-srv/internal/project/delivery/http"
+	projectkafkaproducer "project-srv/internal/project/delivery/kafka/producer"
 	projectrepo "project-srv/internal/project/repository/postgre"
 	projectuc "project-srv/internal/project/usecase"
+	ingestsrv "project-srv/pkg/microservice/ingest"
 
 	"github.com/smap-hcmut/shared-libs/go/auth"
 	"github.com/smap-hcmut/shared-libs/go/middleware"
@@ -43,7 +45,9 @@ func (srv HTTPServer) mapHandlers() error {
 
 	// Project module
 	projectRepo := projectrepo.New(srv.postgresDB, srv.l)
-	projectUC := projectuc.New(srv.l, projectRepo, campaignUC)
+	ingestSrv := ingestsrv.New(srv.l, srv.microservice.Ingest.BaseURL, srv.microservice.Ingest.TimeoutMS, srv.internalKey)
+	lifecyclePublisher := projectkafkaproducer.New(srv.l, srv.kafkaProducer)
+	projectUC := projectuc.New(srv.l, projectRepo, campaignUC, ingestSrv, lifecyclePublisher)
 	projectHandler := projecthttp.New(srv.l, projectUC, srv.discord)
 
 	// Crisis Config module

@@ -156,6 +156,22 @@ func (h *handler) mapError(err error) error {
 }
 ```
 
+### 3.5 `internal/httpserver/handler.go` Wiring Convention
+
+For downstream microservice injection, follow `tanca-connect` style:
+
+- Instantiate microservice clients near the top of `mapHandlers()` once, then pass to usecase constructors.
+- Constructor calls in `handler.go` should stay concise; avoid long inline config literals.
+- Convert technical config details (timeout conversion, endpoint normalization, default values) inside `pkg/microservice/<service>/new.go`, not in `handler.go`.
+- `handler.go` only orchestrates dependency graph: repos → microservices/producers → usecases → handlers.
+
+Example (expected shape):
+
+```go
+ingestSvc := ingestsrv.New(srv.l, srv.microservice.Ingest.BaseURL, srv.microservice.Ingest.TimeoutMS, srv.internalKey)
+projectUC := projectuc.New(srv.l, projectRepo, campaignUC, ingestSvc, lifecyclePublisher)
+```
+
 ---
 
 ## 4. Intern Checklist (Read before PR)
@@ -185,8 +201,17 @@ internal/<module>/delivery/kafka/consumer/
 └── presenters.go  # Message DTO → UseCase input: toIndexInput(msg) IndexInput
 ```
 
+For producer-only modules (event publishing without consumer), the required structure is:
+
+```text
+internal/<module>/delivery/kafka/producer/
+├── new.go          # Factory: New(logger, producer) <module>.Publisher
+└── producer.go     # Publish methods
+```
+
 - **Interface** (in `new.go`): Define `Consumer` with `ConsumeXxx(ctx, topic) error` and `Close() error`. `New(cfg) (Consumer, error)` returns the **interface**, not `*Consumer`. Caller (e.g. `internal/consumer`) depends on `Consumer`, so tests and wiring stay clean.
 - **Concrete type**: Use lowercase `consumer` (unexported struct) that implements `Consumer`. Same pattern as HTTP: `Handler` interface, `handler` struct, `New(...) Handler`.
+- **Producer Placement Rule**: Event publisher implementation belongs to `delivery/kafka/producer`, not `usecase/` and not custom `publisher/` root folders.
 
 ### 5.2 Naming Convention (Kafka)
 

@@ -165,6 +165,27 @@ type lifecycleResp struct {
 	Project projectResp `json:"project"`
 }
 
+// activationReadinessErrorResp describes one readiness blocker.
+type activationReadinessErrorResp struct {
+	Code         string `json:"code" example:"TARGET_DRYRUN_MISSING"`
+	Message      string `json:"message" example:"crawl target has never been dry-run"`
+	DataSourceID string `json:"data_source_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440011"`
+	TargetID     string `json:"target_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440012"`
+}
+
+// activationReadinessResp wraps readiness output from project lifecycle manager + local status.
+type activationReadinessResp struct {
+	ProjectID                string                         `json:"project_id" example:"550e8400-e29b-41d4-a716-446655440002"`
+	ProjectStatus            string                         `json:"project_status" example:"DRAFT" enums:"DRAFT,ACTIVE,PAUSED,ARCHIVED"`
+	DataSourceCount          int                            `json:"data_source_count" example:"2"`
+	HasDatasource            bool                           `json:"has_datasource" example:"true"`
+	PassiveUnconfirmedCount  int                            `json:"passive_unconfirmed_count" example:"0"`
+	MissingTargetDryrunCount int                            `json:"missing_target_dryrun_count" example:"1"`
+	FailedTargetDryrunCount  int                            `json:"failed_target_dryrun_count" example:"0"`
+	CanActivate              bool                           `json:"can_activate" example:"false"`
+	Errors                   []activationReadinessErrorResp `json:"errors"`
+}
+
 // --- Response Mappers ---
 
 func (h *handler) newCreateResp(o project.CreateOutput) createResp {
@@ -192,6 +213,30 @@ func (h *handler) newUpdateResp(o project.UpdateOutput) updateResp {
 
 func (h *handler) newLifecycleResp(p model.Project) lifecycleResp {
 	return lifecycleResp{Project: toProjectResp(p)}
+}
+
+func (h *handler) newActivationReadinessResp(o project.ActivationReadiness) activationReadinessResp {
+	errors := make([]activationReadinessErrorResp, 0, len(o.Errors))
+	for _, e := range o.Errors {
+		errors = append(errors, activationReadinessErrorResp{
+			Code:         e.Code,
+			Message:      e.Message,
+			DataSourceID: e.DataSourceID,
+			TargetID:     e.TargetID,
+		})
+	}
+
+	return activationReadinessResp{
+		ProjectID:                o.ProjectID,
+		ProjectStatus:            string(o.ProjectStatus),
+		DataSourceCount:          o.DataSourceCount,
+		HasDatasource:            o.HasDatasource,
+		PassiveUnconfirmedCount:  o.PassiveUnconfirmedCount,
+		MissingTargetDryrunCount: o.MissingTargetDryrunCount,
+		FailedTargetDryrunCount:  o.FailedTargetDryrunCount,
+		CanActivate:              o.CanActivate,
+		Errors:                   errors,
+	}
 }
 
 // --- Internal Mapper ---

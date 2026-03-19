@@ -61,6 +61,44 @@ type Project struct {
 	Campaign *Campaign `json:"campaign,omitempty"`
 }
 
+func IsValidProjectStatus(status string) bool {
+	switch ProjectStatus(status) {
+	case ProjectStatusDraft, ProjectStatusActive, ProjectStatusPaused, ProjectStatusArchived:
+		return true
+	default:
+		return false
+	}
+}
+
+func IsValidEntityType(entityType string) bool {
+	switch EntityType(entityType) {
+	case EntityTypeProduct, EntityTypeCampaign, EntityTypeService, EntityTypeCompetitor, EntityTypeTopic:
+		return true
+	default:
+		return false
+	}
+}
+
+func CanActivateProjectStatus(status ProjectStatus) bool {
+	return status == ProjectStatusDraft || status == ProjectStatusPaused
+}
+
+func CanPauseProjectStatus(status ProjectStatus) bool {
+	return status == ProjectStatusActive
+}
+
+func CanResumeProjectStatus(status ProjectStatus) bool {
+	return status == ProjectStatusPaused
+}
+
+func CanArchiveProjectStatus(status ProjectStatus) bool {
+	return status == ProjectStatusDraft || status == ProjectStatusActive || status == ProjectStatusPaused
+}
+
+func CanUnarchiveProjectStatus(status ProjectStatus) bool {
+	return status == ProjectStatusArchived
+}
+
 // NewProjectFromDB converts a sqlboiler Project to a domain Project.
 // Returns nil if the input is nil.
 func NewProjectFromDB(db *sqlboiler.Project) *Project {

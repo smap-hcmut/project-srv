@@ -9,11 +9,12 @@ import (
 )
 
 func (uc *implUseCase) Activate(ctx context.Context, id string) (project.ActivateOutput, error) {
-	current, err := uc.getProjectForLifecycle(ctx, id, "Activate")
+	detail, err := uc.Detail(ctx, id)
 	if err != nil {
 		return project.ActivateOutput{}, err
 	}
-	if !canActivate(current.Status) {
+	current := detail.Project
+	if !model.CanActivateProjectStatus(current.Status) {
 		uc.l.Warnf(ctx, "project.usecase.Activate: id=%s status=%s not eligible", current.ID, current.Status)
 		return project.ActivateOutput{}, project.ErrActivateNotAllowed
 	}
@@ -21,16 +22,21 @@ func (uc *implUseCase) Activate(ctx context.Context, id string) (project.Activat
 	readiness, err := uc.GetActivationReadiness(ctx, current.ID)
 	if err != nil {
 		uc.l.Errorf(ctx, "project.usecase.Activate.GetActivationReadiness: id=%s err=%v", current.ID, err)
-		return project.ActivateOutput{}, project.ErrLifecycleManagerFailed
+		return project.ActivateOutput{}, err
 	}
 	if !readiness.CanActivate {
 		uc.l.Warnf(ctx, "project.usecase.Activate: id=%s readiness blocked", current.ID)
 		return project.ActivateOutput{}, project.ErrReadinessFailed
 	}
 
-	if err := uc.ActivateProject(ctx, current.ID); err != nil {
-		uc.l.Errorf(ctx, "project.usecase.Activate.ActivateProject: id=%s err=%v", current.ID, err)
+	if uc.ingest == nil {
+		uc.l.Errorf(ctx, "project.usecase.Activate: ingest client is nil")
 		return project.ActivateOutput{}, project.ErrLifecycleManagerFailed
+	}
+	if err := uc.ingest.Activate(ctx, current.ID); err != nil {
+		mappedErr := project.MapLifecycleClientError(err)
+		uc.l.Errorf(ctx, "project.usecase.Activate.ingest.Activate: id=%s err=%v mapped=%v", current.ID, err, mappedErr)
+		return project.ActivateOutput{}, mappedErr
 	}
 
 	updated, err := uc.repo.UpdateStatus(ctx, repo.UpdateStatusOptions{
@@ -46,22 +52,32 @@ func (uc *implUseCase) Activate(ctx context.Context, id string) (project.Activat
 		return project.ActivateOutput{}, project.ErrUpdateFailed
 	}
 
+	if err := uc.publishLifecycleEvent(ctx, project.ProjectLifecycleEventActivated, updated); err != nil {
+		uc.l.Errorf(ctx, "project.usecase.Activate.publishLifecycleEvent: id=%s event=%s err=%v", updated.ID, project.ProjectLifecycleEventActivated, err)
+	}
+
 	return project.ActivateOutput{Project: updated}, nil
 }
 
 func (uc *implUseCase) Pause(ctx context.Context, id string) (project.PauseOutput, error) {
-	current, err := uc.getProjectForLifecycle(ctx, id, "Pause")
+	detail, err := uc.Detail(ctx, id)
 	if err != nil {
 		return project.PauseOutput{}, err
 	}
-	if !canPause(current.Status) {
+	current := detail.Project
+	if !model.CanPauseProjectStatus(current.Status) {
 		uc.l.Warnf(ctx, "project.usecase.Pause: id=%s status=%s not eligible", current.ID, current.Status)
 		return project.PauseOutput{}, project.ErrPauseNotAllowed
 	}
 
-	if err := uc.PauseProject(ctx, current.ID); err != nil {
-		uc.l.Errorf(ctx, "project.usecase.Pause.PauseProject: id=%s err=%v", current.ID, err)
+	if uc.ingest == nil {
+		uc.l.Errorf(ctx, "project.usecase.Pause: ingest client is nil")
 		return project.PauseOutput{}, project.ErrLifecycleManagerFailed
+	}
+	if err := uc.ingest.Pause(ctx, current.ID); err != nil {
+		mappedErr := project.MapLifecycleClientError(err)
+		uc.l.Errorf(ctx, "project.usecase.Pause.ingest.Pause: id=%s err=%v mapped=%v", current.ID, err, mappedErr)
+		return project.PauseOutput{}, mappedErr
 	}
 
 	updated, err := uc.repo.UpdateStatus(ctx, repo.UpdateStatusOptions{
@@ -76,15 +92,20 @@ func (uc *implUseCase) Pause(ctx context.Context, id string) (project.PauseOutpu
 		return project.PauseOutput{}, project.ErrUpdateFailed
 	}
 
+	if err := uc.publishLifecycleEvent(ctx, project.ProjectLifecycleEventPaused, updated); err != nil {
+		uc.l.Errorf(ctx, "project.usecase.Pause.publishLifecycleEvent: id=%s event=%s err=%v", updated.ID, project.ProjectLifecycleEventPaused, err)
+	}
+
 	return project.PauseOutput{Project: updated}, nil
 }
 
 func (uc *implUseCase) Resume(ctx context.Context, id string) (project.ResumeOutput, error) {
-	current, err := uc.getProjectForLifecycle(ctx, id, "Resume")
+	detail, err := uc.Detail(ctx, id)
 	if err != nil {
 		return project.ResumeOutput{}, err
 	}
-	if !canResume(current.Status) {
+	current := detail.Project
+	if !model.CanResumeProjectStatus(current.Status) {
 		uc.l.Warnf(ctx, "project.usecase.Resume: id=%s status=%s not eligible", current.ID, current.Status)
 		return project.ResumeOutput{}, project.ErrResumeNotAllowed
 	}
@@ -92,16 +113,21 @@ func (uc *implUseCase) Resume(ctx context.Context, id string) (project.ResumeOut
 	readiness, err := uc.GetActivationReadiness(ctx, current.ID)
 	if err != nil {
 		uc.l.Errorf(ctx, "project.usecase.Resume.GetActivationReadiness: id=%s err=%v", current.ID, err)
-		return project.ResumeOutput{}, project.ErrLifecycleManagerFailed
+		return project.ResumeOutput{}, err
 	}
 	if !readiness.CanActivate {
 		uc.l.Warnf(ctx, "project.usecase.Resume: id=%s readiness blocked", current.ID)
 		return project.ResumeOutput{}, project.ErrReadinessFailed
 	}
 
-	if err := uc.ResumeProject(ctx, current.ID); err != nil {
-		uc.l.Errorf(ctx, "project.usecase.Resume.ResumeProject: id=%s err=%v", current.ID, err)
+	if uc.ingest == nil {
+		uc.l.Errorf(ctx, "project.usecase.Resume: ingest client is nil")
 		return project.ResumeOutput{}, project.ErrLifecycleManagerFailed
+	}
+	if err := uc.ingest.Resume(ctx, current.ID); err != nil {
+		mappedErr := project.MapLifecycleClientError(err)
+		uc.l.Errorf(ctx, "project.usecase.Resume.ingest.Resume: id=%s err=%v mapped=%v", current.ID, err, mappedErr)
+		return project.ResumeOutput{}, mappedErr
 	}
 
 	updated, err := uc.repo.UpdateStatus(ctx, repo.UpdateStatusOptions{
@@ -116,22 +142,34 @@ func (uc *implUseCase) Resume(ctx context.Context, id string) (project.ResumeOut
 		return project.ResumeOutput{}, project.ErrUpdateFailed
 	}
 
+	if err := uc.publishLifecycleEvent(ctx, project.ProjectLifecycleEventResumed, updated); err != nil {
+		uc.l.Errorf(ctx, "project.usecase.Resume.publishLifecycleEvent: id=%s event=%s err=%v", updated.ID, project.ProjectLifecycleEventResumed, err)
+	}
+
 	return project.ResumeOutput{Project: updated}, nil
 }
 
 func (uc *implUseCase) Archive(ctx context.Context, id string) (project.ArchiveOutput, error) {
-	current, err := uc.getProjectForLifecycle(ctx, id, "Archive")
+	detail, err := uc.Detail(ctx, id)
 	if err != nil {
 		return project.ArchiveOutput{}, err
 	}
-	if !canArchive(current.Status) {
+	current := detail.Project
+	if !model.CanArchiveProjectStatus(current.Status) {
 		uc.l.Warnf(ctx, "project.usecase.Archive: id=%s status=%s not eligible", current.ID, current.Status)
 		return project.ArchiveOutput{}, project.ErrInvalidTransition
 	}
 
-	if err := uc.PauseProject(ctx, current.ID); err != nil {
-		uc.l.Errorf(ctx, "project.usecase.Archive.PauseProject: id=%s err=%v", current.ID, err)
-		return project.ArchiveOutput{}, project.ErrLifecycleManagerFailed
+	if current.Status == model.ProjectStatusActive {
+		if uc.ingest == nil {
+			uc.l.Errorf(ctx, "project.usecase.Archive: ingest client is nil")
+			return project.ArchiveOutput{}, project.ErrLifecycleManagerFailed
+		}
+		if err := uc.ingest.Pause(ctx, current.ID); err != nil {
+			mappedErr := project.MapLifecycleClientError(err)
+			uc.l.Errorf(ctx, "project.usecase.Archive.ingest.Pause: id=%s err=%v mapped=%v", current.ID, err, mappedErr)
+			return project.ArchiveOutput{}, mappedErr
+		}
 	}
 
 	updated, err := uc.repo.UpdateStatus(ctx, repo.UpdateStatusOptions{
@@ -146,15 +184,20 @@ func (uc *implUseCase) Archive(ctx context.Context, id string) (project.ArchiveO
 		return project.ArchiveOutput{}, project.ErrUpdateFailed
 	}
 
+	if err := uc.publishLifecycleEvent(ctx, project.ProjectLifecycleEventArchived, updated); err != nil {
+		uc.l.Errorf(ctx, "project.usecase.Archive.publishLifecycleEvent: id=%s event=%s err=%v", updated.ID, project.ProjectLifecycleEventArchived, err)
+	}
+
 	return project.ArchiveOutput{Project: updated}, nil
 }
 
 func (uc *implUseCase) Unarchive(ctx context.Context, id string) (project.UnarchiveOutput, error) {
-	current, err := uc.getProjectForLifecycle(ctx, id, "Unarchive")
+	detail, err := uc.Detail(ctx, id)
 	if err != nil {
 		return project.UnarchiveOutput{}, err
 	}
-	if !canUnarchive(current.Status) {
+	current := detail.Project
+	if !model.CanUnarchiveProjectStatus(current.Status) {
 		uc.l.Warnf(ctx, "project.usecase.Unarchive: id=%s status=%s not eligible", current.ID, current.Status)
 		return project.UnarchiveOutput{}, project.ErrUnarchiveNotAllowed
 	}
@@ -171,28 +214,52 @@ func (uc *implUseCase) Unarchive(ctx context.Context, id string) (project.Unarch
 		return project.UnarchiveOutput{}, project.ErrUpdateFailed
 	}
 
+	if err := uc.publishLifecycleEvent(ctx, project.ProjectLifecycleEventUnarchived, updated); err != nil {
+		uc.l.Errorf(ctx, "project.usecase.Unarchive.publishLifecycleEvent: id=%s event=%s err=%v", updated.ID, project.ProjectLifecycleEventUnarchived, err)
+	}
+
 	return project.UnarchiveOutput{Project: updated}, nil
 }
 
-// GetActivationReadiness is a phase-1 noop implementation.
-func (uc *implUseCase) GetActivationReadiness(_ context.Context, projectID string) (project.ActivationReadiness, error) {
+// GetActivationReadiness evaluates project readiness by querying ingest internals and local status.
+func (uc *implUseCase) GetActivationReadiness(ctx context.Context, projectID string) (project.ActivationReadiness, error) {
+	detail, err := uc.Detail(ctx, projectID)
+	if err != nil {
+		return project.ActivationReadiness{}, err
+	}
+	current := detail.Project
+
+	if uc.ingest == nil {
+		uc.l.Errorf(ctx, "project.usecase.GetActivationReadiness: ingest client is nil")
+		return project.ActivationReadiness{}, project.ErrLifecycleManagerFailed
+	}
+
+	readiness, err := uc.ingest.GetActivationReadiness(ctx, current.ID)
+	if err != nil {
+		mappedErr := project.MapLifecycleClientError(err)
+		uc.l.Errorf(ctx, "project.usecase.GetActivationReadiness.ingest.GetActivationReadiness: id=%s err=%v mapped=%v", current.ID, err, mappedErr)
+		return project.ActivationReadiness{}, mappedErr
+	}
+
+	errorsOut := make([]project.ActivationReadinessError, 0, len(readiness.Errors))
+	for _, e := range readiness.Errors {
+		errorsOut = append(errorsOut, project.ActivationReadinessError{
+			Code:         e.Code,
+			Message:      e.Message,
+			DataSourceID: e.DataSourceID,
+			TargetID:     e.TargetID,
+		})
+	}
+
 	return project.ActivationReadiness{
-		ProjectID:   projectID,
-		CanActivate: true,
+		ProjectID:                current.ID,
+		ProjectStatus:            current.Status,
+		DataSourceCount:          readiness.DataSourceCount,
+		HasDatasource:            readiness.HasDatasource,
+		PassiveUnconfirmedCount:  readiness.PassiveUnconfirmedCount,
+		MissingTargetDryrunCount: readiness.MissingTargetDryrunCount,
+		FailedTargetDryrunCount:  readiness.FailedTargetDryrunCount,
+		CanActivate:              readiness.CanActivate,
+		Errors:                   errorsOut,
 	}, nil
-}
-
-// ActivateProject is a phase-1 noop implementation.
-func (uc *implUseCase) ActivateProject(_ context.Context, _ string) error {
-	return nil
-}
-
-// PauseProject is a phase-1 noop implementation.
-func (uc *implUseCase) PauseProject(_ context.Context, _ string) error {
-	return nil
-}
-
-// ResumeProject is a phase-1 noop implementation.
-func (uc *implUseCase) ResumeProject(_ context.Context, _ string) error {
-	return nil
 }

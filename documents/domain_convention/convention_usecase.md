@@ -23,6 +23,9 @@ graph TD
 2.  **Interface Driven**: Dependencies are injected.
 3.  **Strict Inputs/Outputs**: Every public method uses a dedicated struct in `types.go`.
 4.  **One File, One Concern**: Logic files contain ONLY logic. Struct definitions live in type files.
+5.  **No Magic Event Names**: Event names **MUST** be typed constants (enum style) in module `types.go`, never hardcoded strings inside usecase methods.
+6.  **Microservice Dependency Rule**: Usecase must depend on interfaces in `pkg/microservice` root package, not concrete service packages.
+7.  **Downstream Error Mapping Rule**: Mapping from downstream client errors to module domain errors belongs to module `errors.go` (root), then usecase reuses that mapper.
 
 ---
 
@@ -215,6 +218,14 @@ func (uc *implUseCase) Dashboard(ctx context.Context, id string) (DashboardOut, 
   - A single `usecase.go` with 800+ lines handling multiple concerns. Split by entity/concern.
 - ❌ **Defining interfaces in `new.go`**:
   - `new.go` is factory-only. Dependency interfaces belong in `pkg/` or `interface.go`.
+- ❌ **Usecase depending on `pkg/microservice/<service>` contract types**:
+  - Contract interface/types must come from `pkg/microservice` root package.
+- ❌ **Placing downstream error mapping in arbitrary usecase files**:
+  - Keep downstream-to-domain mapping centralized in module `errors.go`.
+- ❌ **Magic strings for event names in usecase files**:
+  - Event names must use typed constants from `types.go` (e.g., `LifecycleEventName`), not `"module.event.name"` literals.
+- ❌ **Scattering helper functions across usecase files**:
+  - Private helper methods must live in `helpers.go` (except truly method-local private closures).
 
 ---
 

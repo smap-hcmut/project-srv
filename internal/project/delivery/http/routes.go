@@ -22,6 +22,7 @@ func (h *handler) RegisterRoutes(r *gin.RouterGroup, mw *middleware.Middleware) 
 	{
 		projects.GET("/:project_id", h.Detail)
 		projects.PUT("/:project_id", h.Update)
+		projects.GET("/:project_id/activation-readiness", h.ActivationReadiness)
 		projects.POST("/:project_id/activate", h.Activate)
 		projects.POST("/:project_id/pause", h.Pause)
 		projects.POST("/:project_id/resume", h.Resume)

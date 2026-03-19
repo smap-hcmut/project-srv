@@ -247,6 +247,37 @@ func (h *handler) Resume(c *gin.Context) {
 	response.OK(c, h.newLifecycleResp(o.Project))
 }
 
+// @Summary Get project activation readiness
+// @Description Return activation readiness from ingest plus local project status
+// @Tags Project
+// @Produce json
+// @Param project_id path string true "Project ID"
+// @Success 200 {object} activationReadinessResp
+// @Failure 400 {object} response.Resp
+// @Failure 401 {object} response.Resp
+// @Failure 403 {object} response.Resp
+// @Failure 500 {object} response.Resp
+// @Router /projects/{project_id}/activation-readiness [get]
+func (h *handler) ActivationReadiness(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	req, err := h.processLifecycleReq(c)
+	if err != nil {
+		h.l.Warnf(ctx, "project.delivery.ActivationReadiness.processLifecycleReq: %v", err)
+		response.Error(c, err, h.discord)
+		return
+	}
+
+	o, err := h.uc.GetActivationReadiness(ctx, req.toInput())
+	if err != nil {
+		h.l.Errorf(ctx, "project.delivery.ActivationReadiness.uc.GetActivationReadiness: id=%s err=%v", req.ID, err)
+		response.Error(c, h.mapError(err), h.discord)
+		return
+	}
+
+	response.OK(c, h.newActivationReadinessResp(o))
+}
+
 // @Summary Unarchive a project
 // @Description Transition an archived project back into PAUSED status
 // @Tags Project

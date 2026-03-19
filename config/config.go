@@ -23,7 +23,8 @@ type Config struct {
 	Redis RedisConfig
 
 	// Message Queue Configuration
-	Kafka KafkaConfig
+	Kafka        KafkaConfig
+	Microservice MicroserviceConfig
 
 	// Authentication & Security Configuration
 	JWT            JWTConfig
@@ -78,6 +79,17 @@ type KafkaConfig struct {
 	Brokers []string
 	Topic   string
 	GroupID string
+}
+
+// MicroserviceConfig is the configuration for downstream microservices.
+type MicroserviceConfig struct {
+	Ingest IngestMicroserviceConfig
+}
+
+// IngestMicroserviceConfig is the configuration for internal ingest service integration.
+type IngestMicroserviceConfig struct {
+	BaseURL   string
+	TimeoutMS int
 }
 
 // JWTConfig is for verifying tokens only
@@ -166,6 +178,10 @@ func Load() (*Config, error) {
 	cfg.Kafka.Topic = viper.GetString("kafka.topic")
 	cfg.Kafka.GroupID = viper.GetString("kafka.group_id")
 
+	// Microservice
+	cfg.Microservice.Ingest.BaseURL = viper.GetString("microservice.ingest.base_url")
+	cfg.Microservice.Ingest.TimeoutMS = viper.GetInt("microservice.ingest.timeout_ms")
+
 	// JWT
 	cfg.JWT.SecretKey = viper.GetString("jwt.secret_key")
 
@@ -225,6 +241,10 @@ func setDefaults() {
 	viper.SetDefault("kafka.topic", "project.events")
 	viper.SetDefault("kafka.group_id", "project-consumer")
 
+	// Microservice
+	viper.SetDefault("microservice.ingest.base_url", "http://localhost:8081")
+	viper.SetDefault("microservice.ingest.timeout_ms", 5000)
+
 	// Cookie
 	viper.SetDefault("cookie.name", "smap_auth_token")
 	viper.SetDefault("cookie.max_age", 28800) // 8 hours
@@ -273,6 +293,12 @@ func validate(cfg *Config) error {
 	// Validate Cookie Configuration
 	if cfg.Cookie.Name == "" {
 		return fmt.Errorf("cookie.name is required")
+	}
+	if cfg.Microservice.Ingest.BaseURL == "" {
+		return fmt.Errorf("microservice.ingest.base_url is required")
+	}
+	if cfg.Microservice.Ingest.TimeoutMS <= 0 {
+		return fmt.Errorf("microservice.ingest.timeout_ms must be greater than 0")
 	}
 
 	return nil

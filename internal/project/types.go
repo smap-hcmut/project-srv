@@ -2,6 +2,7 @@ package project
 
 import (
 	"project-srv/internal/model"
+	"time"
 
 	"github.com/smap-hcmut/shared-libs/go/paginator"
 )
@@ -59,15 +60,44 @@ type UpdateOutput struct {
 
 // ActivationReadiness is the local readiness contract used by LifecycleManager.
 type ActivationReadiness struct {
-	ProjectID   string
-	CanActivate bool
-	Errors      []ActivationReadinessError
+	ProjectID                string
+	ProjectStatus            model.ProjectStatus
+	DataSourceCount          int
+	HasDatasource            bool
+	PassiveUnconfirmedCount  int
+	MissingTargetDryrunCount int
+	FailedTargetDryrunCount  int
+	CanActivate              bool
+	Errors                   []ActivationReadinessError
 }
 
 // ActivationReadinessError describes one readiness blocker.
 type ActivationReadinessError struct {
-	Code    string
-	Message string
+	Code         string
+	Message      string
+	DataSourceID string
+	TargetID     string
+}
+
+// LifecycleEventName is a typed event name for project lifecycle.
+type LifecycleEventName string
+
+const (
+	ProjectLifecycleEventActivated  LifecycleEventName = "project.lifecycle.activated"
+	ProjectLifecycleEventPaused     LifecycleEventName = "project.lifecycle.paused"
+	ProjectLifecycleEventResumed    LifecycleEventName = "project.lifecycle.resumed"
+	ProjectLifecycleEventArchived   LifecycleEventName = "project.lifecycle.archived"
+	ProjectLifecycleEventUnarchived LifecycleEventName = "project.lifecycle.unarchived"
+)
+
+// LifecycleEvent is emitted to Kafka after local lifecycle status transitions.
+type LifecycleEvent struct {
+	EventName   LifecycleEventName `json:"event_name"`
+	ProjectID   string             `json:"project_id"`
+	CampaignID  string             `json:"campaign_id"`
+	Status      string             `json:"status"`
+	TriggeredBy string             `json:"triggered_by"`
+	OccurredAt  time.Time          `json:"occurred_at"`
 }
 
 // ActivateOutput is the output after activating a project.

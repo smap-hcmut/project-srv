@@ -690,7 +690,7 @@ func NewServiceClients(cfg *config.Config) *ServiceClients {
 ### 7.3 Retry \u0026 Circuit Breaker
 
 ```go
-// internal/client/ingest_client.go
+// pkg/microservice/ingest/lifecycle_client.go
 func (c *IngestClient) TriggerDryRun(ctx context.Context, projectID string) (*DryRunJob, error) {
     req, _ := http.NewRequestWithContext(ctx, "POST",
         c.baseURL+"/internal/dryrun",

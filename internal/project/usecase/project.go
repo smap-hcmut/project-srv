@@ -22,9 +22,9 @@ func (uc *implUseCase) Create(ctx context.Context, input project.CreateInput) (p
 		return project.CreateOutput{}, project.ErrNameRequired
 	}
 	if input.EntityType != "" {
-		if err := validateEntityType(input.EntityType); err != nil {
+		if !model.IsValidEntityType(input.EntityType) {
 			uc.l.Warnf(ctx, "project.usecase.Create.validateEntityType: invalid entity_type=%s", input.EntityType)
-			return project.CreateOutput{}, err
+			return project.CreateOutput{}, project.ErrInvalidEntity
 		}
 	}
 
@@ -70,6 +70,7 @@ func (uc *implUseCase) Detail(ctx context.Context, id string) (project.DetailOut
 	if err != nil {
 		uc.l.Errorf(ctx, "project.usecase.Detail.repo.Detail: id=%s err=%v", id, err)
 		if err == repo.ErrNotFound {
+			uc.l.Warnf(ctx, "project.usecase.Detail: project not found id=%s", id)
 			return project.DetailOutput{}, project.ErrNotFound
 		}
 		return project.DetailOutput{}, project.ErrDetailFailed
@@ -81,15 +82,15 @@ func (uc *implUseCase) Detail(ctx context.Context, id string) (project.DetailOut
 // List fetches projects with pagination and filters.
 func (uc *implUseCase) List(ctx context.Context, input project.ListInput) (project.ListOutput, error) {
 	if input.Status != "" {
-		if err := validateStatus(input.Status); err != nil {
+		if !model.IsValidProjectStatus(input.Status) {
 			uc.l.Warnf(ctx, "project.usecase.List.validateStatus: invalid status=%s", input.Status)
-			return project.ListOutput{}, err
+			return project.ListOutput{}, project.ErrInvalidStatus
 		}
 	}
 	if input.EntityType != "" {
-		if err := validateEntityType(input.EntityType); err != nil {
+		if !model.IsValidEntityType(input.EntityType) {
 			uc.l.Warnf(ctx, "project.usecase.List.validateEntityType: invalid entity_type=%s", input.EntityType)
-			return project.ListOutput{}, err
+			return project.ListOutput{}, project.ErrInvalidEntity
 		}
 	}
 
@@ -123,9 +124,9 @@ func (uc *implUseCase) Update(ctx context.Context, input project.UpdateInput) (p
 	}
 
 	if input.EntityType != "" {
-		if err := validateEntityType(input.EntityType); err != nil {
+		if !model.IsValidEntityType(input.EntityType) {
 			uc.l.Warnf(ctx, "project.usecase.Update.validateEntityType: invalid entity_type=%s", input.EntityType)
-			return project.UpdateOutput{}, err
+			return project.UpdateOutput{}, project.ErrInvalidEntity
 		}
 	}
 

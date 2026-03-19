@@ -96,6 +96,29 @@ type UseCase interface {
 }
 ```
 
+**UseCase + Sub-interface rule**:
+- Sub-interfaces (embedded in `UseCase`) must represent a distinct concern only (e.g., readiness query, event publishing).
+- Do **NOT** duplicate the same business action in both `UseCase` and an embedded sub-interface (example anti-pattern: `UseCase.Activate` and `LifecycleManager.Activate` together).
+
+### Microservice Integration Convention (`pkg/microservice`)
+
+When a module calls another service (internal HTTP), follow this exact pattern:
+
+1. **Root contract package**: define shared interfaces/types/errors in `pkg/microservice`.
+   - `uc_interface.go`: interface contracts (e.g., `IngestUseCase`)
+   - `*_types.go`: DTO/config shared with consumers
+   - `errors.go`: sentinel errors for downstream status mapping
+2. **Service implementation package**: each downstream service lives in `pkg/microservice/<service>`.
+   - Keep implementation files in pattern: `new.go`, `endpoint.go`, `usecase.go`, `constants.go`
+   - `New(...)` must return interface from root package (`pkg/microservice`), not local interface
+3. **No duplicated contract in implementation package**:
+   - Do not redeclare exported interface/types/errors in `pkg/microservice/<service>`
+   - Implementation package only maps transport details to root contract types/errors
+4. **HTTP server wiring style (same as tanca-connect)**:
+   - Instantiate microservice clients at top of `mapHandlers()`
+   - Inject created clients into usecases through constructor parameters
+   - Avoid long inline struct literals in `handler.go`; keep constructor call concise
+
 ### 1. Delivery Layer
 
 This layer handles all transport concerns (HTTP, Job, RabbitMQ). It **MUST NOT** contain business logic.
