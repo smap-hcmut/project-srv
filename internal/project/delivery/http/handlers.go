@@ -70,7 +70,7 @@ func (h *handler) Detail(c *gin.Context) {
 // @Tags Project
 // @Produce json
 // @Param id path string true "Campaign ID"
-// @Param status query string false "Filter by status (ACTIVE, PAUSED, ARCHIVED)"
+// @Param status query string false "Filter by status (DRAFT, ACTIVE, PAUSED, ARCHIVED)"
 // @Param name query string false "Filter by name (ILIKE)"
 // @Param brand query string false "Filter by brand (ILIKE)"
 // @Param entity_type query string false "Filter by entity type"

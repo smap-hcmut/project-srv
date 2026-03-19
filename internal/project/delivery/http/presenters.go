@@ -126,18 +126,17 @@ func (r listReq) toInput() project.ListInput {
 
 // projectResp represents project data in API responses
 type projectResp struct {
-	ID           string `json:"id" example:"550e8400-e29b-41d4-a716-446655440002"`                                                                                                     // Project UUID
-	CampaignID   string `json:"campaign_id" example:"550e8400-e29b-41d4-a716-446655440000"`                                                                                            // Parent campaign UUID
-	Name         string `json:"name" example:"VinFast VF8 Monitoring"`                                                                                                                 // Project name
-	Description  string `json:"description,omitempty" example:"Monitor discussions about VF8 electric SUV"`                                                                            // Project description
-	Brand        string `json:"brand,omitempty" example:"VinFast"`                                                                                                                     // Brand name for UI grouping
-	EntityType   string `json:"entity_type" example:"product" enums:"product,campaign,service,competitor,topic"`                                                                       // Entity type
-	EntityName   string `json:"entity_name" example:"VF8"`                                                                                                                             // Specific entity name
-	Status       string `json:"status" example:"DRAFT" enums:"DRAFT,ACTIVE,PAUSED,ARCHIVED"`                                                                                           // Project status
-	ConfigStatus string `json:"config_status,omitempty" example:"DRAFT" enums:"DRAFT,CONFIGURING,ONBOARDING,ONBOARDING_DONE,DRYRUN_RUNNING,DRYRUN_SUCCESS,DRYRUN_FAILED,ACTIVE,ERROR"` // Project configuration status
-	CreatedBy    string `json:"created_by" example:"550e8400-e29b-41d4-a716-446655440001"`                                                                                             // Creator user UUID
-	CreatedAt    string `json:"created_at" example:"2026-02-18T00:00:00Z"`                                                                                                             // Creation timestamp
-	UpdatedAt    string `json:"updated_at" example:"2026-02-18T00:00:00Z"`                                                                                                             // Last update timestamp
+	ID          string `json:"id" example:"550e8400-e29b-41d4-a716-446655440002"`                               // Project UUID
+	CampaignID  string `json:"campaign_id" example:"550e8400-e29b-41d4-a716-446655440000"`                      // Parent campaign UUID
+	Name        string `json:"name" example:"VinFast VF8 Monitoring"`                                           // Project name
+	Description string `json:"description,omitempty" example:"Monitor discussions about VF8 electric SUV"`      // Project description
+	Brand       string `json:"brand,omitempty" example:"VinFast"`                                               // Brand name for UI grouping
+	EntityType  string `json:"entity_type" example:"product" enums:"product,campaign,service,competitor,topic"` // Entity type
+	EntityName  string `json:"entity_name" example:"VF8"`                                                       // Specific entity name
+	Status      string `json:"status" example:"DRAFT" enums:"DRAFT,ACTIVE,PAUSED,ARCHIVED"`                     // Project status
+	CreatedBy   string `json:"created_by" example:"550e8400-e29b-41d4-a716-446655440001"`                       // Creator user UUID
+	CreatedAt   string `json:"created_at" example:"2026-02-18T00:00:00Z"`                                       // Creation timestamp
+	UpdatedAt   string `json:"updated_at" example:"2026-02-18T00:00:00Z"`                                       // Last update timestamp
 }
 
 // createResp wraps project creation response
@@ -215,9 +214,6 @@ func toProjectResp(p model.Project) projectResp {
 	}
 	if p.Brand != "" {
 		resp.Brand = p.Brand
-	}
-	if p.ConfigStatus != "" {
-		resp.ConfigStatus = string(p.ConfigStatus)
 	}
 
 	return resp
