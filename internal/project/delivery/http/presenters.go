@@ -3,7 +3,9 @@ package http
 import (
 	"project-srv/internal/model"
 	"project-srv/internal/project"
+	"strings"
 
+	"github.com/google/uuid"
 	"github.com/smap-hcmut/shared-libs/go/paginator"
 )
 
@@ -25,6 +27,9 @@ func (r createReq) validate() error {
 	}
 	if r.CampaignID == "" {
 		return errCampaignRequired
+	}
+	if !isValidUUID(r.CampaignID) {
+		return errWrongBody
 	}
 	if r.EntityType == "" {
 		return errEntityTypeRequired
@@ -56,6 +61,13 @@ type detailReq struct {
 	ID string
 }
 
+func (r detailReq) validate() error {
+	if !isValidUUID(r.ID) {
+		return errWrongBody
+	}
+	return nil
+}
+
 func (r detailReq) toInput() string {
 	return r.ID
 }
@@ -71,6 +83,9 @@ type updateReq struct {
 }
 
 func (r updateReq) validate() error {
+	if !isValidUUID(r.ID) {
+		return errWrongBody
+	}
 	if r.EntityType != "" {
 		switch model.EntityType(r.EntityType) {
 		case model.EntityTypeProduct, model.EntityTypeCampaign, model.EntityTypeService, model.EntityTypeCompetitor, model.EntityTypeTopic:
@@ -97,6 +112,13 @@ type archiveReq struct {
 	ID string
 }
 
+func (r archiveReq) validate() error {
+	if !isValidUUID(r.ID) {
+		return errWrongBody
+	}
+	return nil
+}
+
 func (r archiveReq) toInput() string {
 	return r.ID
 }
@@ -107,6 +129,9 @@ type activationReadinessReq struct {
 }
 
 func (r activationReadinessReq) validate() error {
+	if !isValidUUID(r.ID) {
+		return errWrongBody
+	}
 	switch r.Command {
 	case "", string(project.ActivationReadinessCommandActivate), string(project.ActivationReadinessCommandResume):
 		return nil
@@ -129,6 +154,13 @@ type listReq struct {
 	Name       string `form:"name"`
 	Brand      string `form:"brand"`
 	EntityType string `form:"entity_type"`
+}
+
+func (r listReq) validate() error {
+	if !isValidUUID(r.CampaignID) {
+		return errWrongBody
+	}
+	return nil
 }
 
 func (r listReq) toInput() project.ListInput {
@@ -210,17 +242,17 @@ type activationReadinessResp struct {
 // --- Response Mappers ---
 
 func (h *handler) newCreateResp(o project.CreateOutput) createResp {
-	return createResp{Project: toProjectResp(o.Project)}
+	return createResp{Project: h.toProjectResp(o.Project)}
 }
 
 func (h *handler) newDetailResp(o project.DetailOutput) detailResp {
-	return detailResp{Project: toProjectResp(o.Project)}
+	return detailResp{Project: h.toProjectResp(o.Project)}
 }
 
 func (h *handler) newListResp(o project.ListOutput) listResp {
 	projects := make([]projectResp, len(o.Projects))
 	for i, p := range o.Projects {
-		projects[i] = toProjectResp(p)
+		projects[i] = h.toProjectResp(p)
 	}
 	return listResp{
 		Projects:  projects,
@@ -229,11 +261,11 @@ func (h *handler) newListResp(o project.ListOutput) listResp {
 }
 
 func (h *handler) newUpdateResp(o project.UpdateOutput) updateResp {
-	return updateResp{Project: toProjectResp(o.Project)}
+	return updateResp{Project: h.toProjectResp(o.Project)}
 }
 
 func (h *handler) newLifecycleResp(p model.Project) lifecycleResp {
-	return lifecycleResp{Project: toProjectResp(p)}
+	return lifecycleResp{Project: h.toProjectResp(p)}
 }
 
 func (h *handler) newActivationReadinessResp(o project.ActivationReadiness) activationReadinessResp {
@@ -262,7 +294,7 @@ func (h *handler) newActivationReadinessResp(o project.ActivationReadiness) acti
 
 // --- Internal Mapper ---
 
-func toProjectResp(p model.Project) projectResp {
+func (h *handler) toProjectResp(p model.Project) projectResp {
 	resp := projectResp{
 		ID:         p.ID,
 		CampaignID: p.CampaignID,
@@ -283,4 +315,9 @@ func toProjectResp(p model.Project) projectResp {
 	}
 
 	return resp
+}
+
+func isValidUUID(value string) bool {
+	_, err := uuid.Parse(strings.TrimSpace(value))
+	return err == nil
 }

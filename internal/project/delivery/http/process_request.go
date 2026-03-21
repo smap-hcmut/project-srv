@@ -22,7 +22,7 @@ func (h *handler) processCreateReq(c *gin.Context) (createReq, error) {
 // processDetailReq extracts path param for detail.
 func (h *handler) processDetailReq(c *gin.Context) (detailReq, error) {
 	req := detailReq{ID: c.Param("project_id")}
-	if req.ID == "" {
+	if err := req.validate(); err != nil {
 		return req, errWrongBody
 	}
 	return req, nil
@@ -36,6 +36,10 @@ func (h *handler) processListReq(c *gin.Context) (listReq, error) {
 		return req, errWrongBody
 	}
 	req.CampaignID = c.Param("id")
+	if err := req.validate(); err != nil {
+		h.l.Warnf(c.Request.Context(), "project.delivery.processListReq.validate: %v", err)
+		return req, errWrongBody
+	}
 	return req, nil
 }
 
@@ -57,7 +61,7 @@ func (h *handler) processUpdateReq(c *gin.Context) (updateReq, error) {
 // processArchiveReq extracts path param for archive.
 func (h *handler) processArchiveReq(c *gin.Context) (archiveReq, error) {
 	req := archiveReq{ID: c.Param("project_id")}
-	if req.ID == "" {
+	if err := req.validate(); err != nil {
 		return req, errWrongBody
 	}
 	return req, nil
@@ -66,7 +70,7 @@ func (h *handler) processArchiveReq(c *gin.Context) (archiveReq, error) {
 // processLifecycleReq extracts path param for lifecycle actions.
 func (h *handler) processLifecycleReq(c *gin.Context) (archiveReq, error) {
 	req := archiveReq{ID: c.Param("project_id")}
-	if req.ID == "" {
+	if err := req.validate(); err != nil {
 		return req, errWrongBody
 	}
 	return req, nil
@@ -79,9 +83,6 @@ func (h *handler) processActivationReadinessReq(c *gin.Context) (activationReadi
 		return req, errWrongBody
 	}
 	req.ID = c.Param("project_id")
-	if req.ID == "" {
-		return req, errWrongBody
-	}
 	if err := req.validate(); err != nil {
 		h.l.Warnf(c.Request.Context(), "project.delivery.processActivationReadinessReq.validate: %v", err)
 		return req, errWrongBody
