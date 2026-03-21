@@ -159,6 +159,7 @@ const (
 	ProjectStatusACTIVE   ProjectStatus = "ACTIVE"
 	ProjectStatusPAUSED   ProjectStatus = "PAUSED"
 	ProjectStatusARCHIVED ProjectStatus = "ARCHIVED"
+	ProjectStatusDRAFT    ProjectStatus = "DRAFT"
 )
 
 func AllProjectStatus() []ProjectStatus {
@@ -166,12 +167,13 @@ func AllProjectStatus() []ProjectStatus {
 		ProjectStatusACTIVE,
 		ProjectStatusPAUSED,
 		ProjectStatusARCHIVED,
+		ProjectStatusDRAFT,
 	}
 }
 
 func (e ProjectStatus) IsValid() error {
 	switch e {
-	case ProjectStatusACTIVE, ProjectStatusPAUSED, ProjectStatusARCHIVED:
+	case ProjectStatusACTIVE, ProjectStatusPAUSED, ProjectStatusARCHIVED, ProjectStatusDRAFT:
 		return nil
 	default:
 		return errors.New("enum is not valid")
@@ -190,6 +192,8 @@ func (e ProjectStatus) Ordinal() int {
 		return 1
 	case ProjectStatusARCHIVED:
 		return 2
+	case ProjectStatusDRAFT:
+		return 3
 
 	default:
 		panic(errors.New("enum is not valid"))

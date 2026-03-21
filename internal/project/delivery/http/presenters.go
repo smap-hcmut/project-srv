@@ -3,7 +3,9 @@ package http
 import (
 	"project-srv/internal/model"
 	"project-srv/internal/project"
+	"strings"
 
+	"github.com/google/uuid"
 	"github.com/smap-hcmut/shared-libs/go/paginator"
 )
 
@@ -25,6 +27,9 @@ func (r createReq) validate() error {
 	}
 	if r.CampaignID == "" {
 		return errCampaignRequired
+	}
+	if !isValidUUID(r.CampaignID) {
+		return errWrongBody
 	}
 	if r.EntityType == "" {
 		return errEntityTypeRequired
@@ -56,6 +61,13 @@ type detailReq struct {
 	ID string
 }
 
+func (r detailReq) validate() error {
+	if !isValidUUID(r.ID) {
+		return errWrongBody
+	}
+	return nil
+}
+
 func (r detailReq) toInput() string {
 	return r.ID
 }
@@ -68,24 +80,18 @@ type updateReq struct {
 	Brand       string `json:"brand" example:"VinFast"`                                                         // Brand name
 	EntityType  string `json:"entity_type" example:"product" enums:"product,campaign,service,competitor,topic"` // Entity type
 	EntityName  string `json:"entity_name" example:"VF8"`                                                       // Specific entity name
-	Status      string `json:"status" example:"ACTIVE" enums:"ACTIVE,PAUSED,ARCHIVED"`                          // Project status
 }
 
 func (r updateReq) validate() error {
+	if !isValidUUID(r.ID) {
+		return errWrongBody
+	}
 	if r.EntityType != "" {
 		switch model.EntityType(r.EntityType) {
 		case model.EntityTypeProduct, model.EntityTypeCampaign, model.EntityTypeService, model.EntityTypeCompetitor, model.EntityTypeTopic:
 			// valid
 		default:
 			return errInvalidEntity
-		}
-	}
-	if r.Status != "" {
-		switch model.ProjectStatus(r.Status) {
-		case model.ProjectStatusActive, model.ProjectStatusPaused, model.ProjectStatusArchived:
-			// valid
-		default:
-			return errInvalidStatus
 		}
 	}
 	return nil
@@ -99,7 +105,6 @@ func (r updateReq) toInput() project.UpdateInput {
 		Brand:       r.Brand,
 		EntityType:  r.EntityType,
 		EntityName:  r.EntityName,
-		Status:      r.Status,
 	}
 }
 
@@ -107,8 +112,39 @@ type archiveReq struct {
 	ID string
 }
 
+func (r archiveReq) validate() error {
+	if !isValidUUID(r.ID) {
+		return errWrongBody
+	}
+	return nil
+}
+
 func (r archiveReq) toInput() string {
 	return r.ID
+}
+
+type activationReadinessReq struct {
+	ID      string `form:"-"`
+	Command string `form:"command"`
+}
+
+func (r activationReadinessReq) validate() error {
+	if !isValidUUID(r.ID) {
+		return errWrongBody
+	}
+	switch r.Command {
+	case "", string(project.ActivationReadinessCommandActivate), string(project.ActivationReadinessCommandResume):
+		return nil
+	default:
+		return errWrongBody
+	}
+}
+
+func (r activationReadinessReq) toInput() project.ActivationReadinessInput {
+	return project.ActivationReadinessInput{
+		ProjectID: r.ID,
+		Command:   project.ActivationReadinessCommand(r.Command),
+	}
 }
 
 type listReq struct {
@@ -118,6 +154,13 @@ type listReq struct {
 	Name       string `form:"name"`
 	Brand      string `form:"brand"`
 	EntityType string `form:"entity_type"`
+}
+
+func (r listReq) validate() error {
+	if !isValidUUID(r.CampaignID) {
+		return errWrongBody
+	}
+	return nil
 }
 
 func (r listReq) toInput() project.ListInput {
@@ -136,18 +179,17 @@ func (r listReq) toInput() project.ListInput {
 
 // projectResp represents project data in API responses
 type projectResp struct {
-	ID           string `json:"id" example:"550e8400-e29b-41d4-a716-446655440002"`                                                                                                     // Project UUID
-	CampaignID   string `json:"campaign_id" example:"550e8400-e29b-41d4-a716-446655440000"`                                                                                            // Parent campaign UUID
-	Name         string `json:"name" example:"VinFast VF8 Monitoring"`                                                                                                                 // Project name
-	Description  string `json:"description,omitempty" example:"Monitor discussions about VF8 electric SUV"`                                                                            // Project description
-	Brand        string `json:"brand,omitempty" example:"VinFast"`                                                                                                                     // Brand name for UI grouping
-	EntityType   string `json:"entity_type" example:"product" enums:"product,campaign,service,competitor,topic"`                                                                       // Entity type
-	EntityName   string `json:"entity_name" example:"VF8"`                                                                                                                             // Specific entity name
-	Status       string `json:"status" example:"ACTIVE" enums:"ACTIVE,PAUSED,ARCHIVED"`                                                                                                // Project status
-	ConfigStatus string `json:"config_status,omitempty" example:"DRAFT" enums:"DRAFT,CONFIGURING,ONBOARDING,ONBOARDING_DONE,DRYRUN_RUNNING,DRYRUN_SUCCESS,DRYRUN_FAILED,ACTIVE,ERROR"` // Project configuration status
-	CreatedBy    string `json:"created_by" example:"550e8400-e29b-41d4-a716-446655440001"`                                                                                             // Creator user UUID
-	CreatedAt    string `json:"created_at" example:"2026-02-18T00:00:00Z"`                                                                                                             // Creation timestamp
-	UpdatedAt    string `json:"updated_at" example:"2026-02-18T00:00:00Z"`                                                                                                             // Last update timestamp
+	ID          string `json:"id" example:"550e8400-e29b-41d4-a716-446655440002"`                               // Project UUID
+	CampaignID  string `json:"campaign_id" example:"550e8400-e29b-41d4-a716-446655440000"`                      // Parent campaign UUID
+	Name        string `json:"name" example:"VinFast VF8 Monitoring"`                                           // Project name
+	Description string `json:"description,omitempty" example:"Monitor discussions about VF8 electric SUV"`      // Project description
+	Brand       string `json:"brand,omitempty" example:"VinFast"`                                               // Brand name for UI grouping
+	EntityType  string `json:"entity_type" example:"product" enums:"product,campaign,service,competitor,topic"` // Entity type
+	EntityName  string `json:"entity_name" example:"VF8"`                                                       // Specific entity name
+	Status      string `json:"status" example:"DRAFT" enums:"DRAFT,ACTIVE,PAUSED,ARCHIVED"`                     // Project status
+	CreatedBy   string `json:"created_by" example:"550e8400-e29b-41d4-a716-446655440001"`                       // Creator user UUID
+	CreatedAt   string `json:"created_at" example:"2026-02-18T00:00:00Z"`                                       // Creation timestamp
+	UpdatedAt   string `json:"updated_at" example:"2026-02-18T00:00:00Z"`                                       // Last update timestamp
 }
 
 // createResp wraps project creation response
@@ -171,20 +213,46 @@ type updateResp struct {
 	Project projectResp `json:"project"` // Updated project data
 }
 
+// lifecycleResp wraps project lifecycle response.
+type lifecycleResp struct {
+	Project projectResp `json:"project"`
+}
+
+// activationReadinessErrorResp describes one readiness blocker.
+type activationReadinessErrorResp struct {
+	Code         string `json:"code" example:"TARGET_DRYRUN_MISSING"`
+	Message      string `json:"message" example:"crawl target has never been dry-run"`
+	DataSourceID string `json:"data_source_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440011"`
+	TargetID     string `json:"target_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440012"`
+}
+
+// activationReadinessResp wraps readiness output from project lifecycle manager + local status.
+type activationReadinessResp struct {
+	ProjectID                string                         `json:"project_id" example:"550e8400-e29b-41d4-a716-446655440002"`
+	ProjectStatus            string                         `json:"project_status" example:"DRAFT" enums:"DRAFT,ACTIVE,PAUSED,ARCHIVED"`
+	DataSourceCount          int                            `json:"data_source_count" example:"2"`
+	HasDatasource            bool                           `json:"has_datasource" example:"true"`
+	PassiveUnconfirmedCount  int                            `json:"passive_unconfirmed_count" example:"0"`
+	MissingTargetDryrunCount int                            `json:"missing_target_dryrun_count" example:"1"`
+	FailedTargetDryrunCount  int                            `json:"failed_target_dryrun_count" example:"0"`
+	CanProceed               bool                           `json:"can_proceed" example:"false"`
+	Errors                   []activationReadinessErrorResp `json:"errors"`
+}
+
 // --- Response Mappers ---
 
 func (h *handler) newCreateResp(o project.CreateOutput) createResp {
-	return createResp{Project: toProjectResp(o.Project)}
+	return createResp{Project: h.toProjectResp(o.Project)}
 }
 
 func (h *handler) newDetailResp(o project.DetailOutput) detailResp {
-	return detailResp{Project: toProjectResp(o.Project)}
+	return detailResp{Project: h.toProjectResp(o.Project)}
 }
 
 func (h *handler) newListResp(o project.ListOutput) listResp {
 	projects := make([]projectResp, len(o.Projects))
 	for i, p := range o.Projects {
-		projects[i] = toProjectResp(p)
+		projects[i] = h.toProjectResp(p)
 	}
 	return listResp{
 		Projects:  projects,
@@ -193,12 +261,40 @@ func (h *handler) newListResp(o project.ListOutput) listResp {
 }
 
 func (h *handler) newUpdateResp(o project.UpdateOutput) updateResp {
-	return updateResp{Project: toProjectResp(o.Project)}
+	return updateResp{Project: h.toProjectResp(o.Project)}
+}
+
+func (h *handler) newLifecycleResp(p model.Project) lifecycleResp {
+	return lifecycleResp{Project: h.toProjectResp(p)}
+}
+
+func (h *handler) newActivationReadinessResp(o project.ActivationReadiness) activationReadinessResp {
+	errors := make([]activationReadinessErrorResp, 0, len(o.Errors))
+	for _, e := range o.Errors {
+		errors = append(errors, activationReadinessErrorResp{
+			Code:         string(e.Code),
+			Message:      e.Message,
+			DataSourceID: e.DataSourceID,
+			TargetID:     e.TargetID,
+		})
+	}
+
+	return activationReadinessResp{
+		ProjectID:                o.ProjectID,
+		ProjectStatus:            string(o.ProjectStatus),
+		DataSourceCount:          o.DataSourceCount,
+		HasDatasource:            o.HasDatasource,
+		PassiveUnconfirmedCount:  o.PassiveUnconfirmedCount,
+		MissingTargetDryrunCount: o.MissingTargetDryrunCount,
+		FailedTargetDryrunCount:  o.FailedTargetDryrunCount,
+		CanProceed:               o.CanProceed,
+		Errors:                   errors,
+	}
 }
 
 // --- Internal Mapper ---
 
-func toProjectResp(p model.Project) projectResp {
+func (h *handler) toProjectResp(p model.Project) projectResp {
 	resp := projectResp{
 		ID:         p.ID,
 		CampaignID: p.CampaignID,
@@ -217,9 +313,11 @@ func toProjectResp(p model.Project) projectResp {
 	if p.Brand != "" {
 		resp.Brand = p.Brand
 	}
-	if p.ConfigStatus != "" {
-		resp.ConfigStatus = string(p.ConfigStatus)
-	}
 
 	return resp
+}
+
+func isValidUUID(value string) bool {
+	_, err := uuid.Parse(strings.TrimSpace(value))
+	return err == nil
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/smap-hcmut/shared-libs/go/discord"
 	"github.com/smap-hcmut/shared-libs/go/encrypter"
+	"github.com/smap-hcmut/shared-libs/go/kafka"
 	"github.com/smap-hcmut/shared-libs/go/log"
 	"github.com/smap-hcmut/shared-libs/go/middleware"
 	"github.com/smap-hcmut/shared-libs/go/redis"
@@ -28,6 +29,8 @@ type HTTPServer struct {
 	// Storage Configuration
 
 	// // Message Queue Configuration
+	kafkaProducer kafka.IProducer
+
 	// Redis Configuration
 	mainRedisClient  redis.IRedis // DB 0: job mapping, pub/sub
 	stateRedisClient redis.IRedis // DB 1: project progress tracking
@@ -37,6 +40,7 @@ type HTTPServer struct {
 	cookieConfig config.CookieConfig
 	encrypter    encrypter.Encrypter
 	internalKey  string
+	microservice Microservice
 
 	// Monitoring & Notification Configuration
 	discord discord.IDiscord
@@ -53,16 +57,27 @@ type Config struct {
 	PostgresDB *sql.DB
 
 	// Redis Configuration
-	RedisClient redis.IRedis
+	RedisClient   redis.IRedis
+	KafkaProducer kafka.IProducer
 
 	// Authentication & Security Configuration
 	JwtSecretKey string
 	CookieConfig config.CookieConfig
 	Encrypter    encrypter.Encrypter
 	InternalKey  string
+	Microservice Microservice
 
 	// Monitoring & Notification Configuration
 	Discord discord.IDiscord
+}
+
+type Microservice struct {
+	Ingest IngestService
+}
+
+type IngestService struct {
+	BaseURL   string
+	TimeoutMS int
 }
 
 // New creates a new HTTPServer instance with the provided configuration.
@@ -84,12 +99,14 @@ func New(logger log.Logger, cfg Config) (*HTTPServer, error) {
 		// Redis Configuration
 		mainRedisClient:  cfg.RedisClient,
 		stateRedisClient: cfg.RedisClient,
+		kafkaProducer:    cfg.KafkaProducer,
 
 		// Authentication & Security Configuration
 		jwtSecretKey: cfg.JwtSecretKey,
 		cookieConfig: cfg.CookieConfig,
 		encrypter:    cfg.Encrypter,
 		internalKey:  cfg.InternalKey,
+		microservice: cfg.Microservice,
 
 		// Monitoring & Notification Configuration
 		discord: cfg.Discord,
@@ -133,6 +150,15 @@ func (srv HTTPServer) validate() error {
 	}
 	if srv.internalKey == "" {
 		return errors.New("internalKey is required")
+	}
+	if srv.microservice.Ingest.BaseURL == "" {
+		return errors.New("microservice.ingest.base_url is required")
+	}
+	if srv.microservice.Ingest.TimeoutMS <= 0 {
+		return errors.New("microservice.ingest.timeout_ms must be greater than 0")
+	}
+	if srv.kafkaProducer == nil {
+		return errors.New("kafka producer is required")
 	}
 
 	return nil

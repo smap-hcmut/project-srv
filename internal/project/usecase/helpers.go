@@ -1,27 +1,35 @@
 package usecase
 
-import (
-	"project-srv/internal/model"
-	"project-srv/internal/project"
-)
+import "project-srv/internal/project"
 
-// validateStatus checks if the given status is valid for a project.
-func validateStatus(status string) error {
-	switch model.ProjectStatus(status) {
-	case model.ProjectStatusActive, model.ProjectStatusPaused, model.ProjectStatusArchived:
-		return nil
+func (uc *implUseCase) normalizeActivationReadinessCommand(command project.ActivationReadinessCommand) project.ActivationReadinessCommand {
+	switch command {
+	case project.ActivationReadinessCommandResume:
+		return project.ActivationReadinessCommandResume
 	default:
-		return project.ErrInvalidStatus
+		return project.ActivationReadinessCommandActivate
 	}
 }
 
-// validateEntityType checks if the given entity type is valid.
-func validateEntityType(entityType string) error {
-	switch model.EntityType(entityType) {
-	case model.EntityTypeProduct, model.EntityTypeCampaign, model.EntityTypeService,
-		model.EntityTypeCompetitor, model.EntityTypeTopic:
-		return nil
+func (uc *implUseCase) mapReadinessBlockedError(readiness project.ActivationReadiness) error {
+	if len(readiness.Errors) == 0 {
+		return project.ErrReadinessFailed
+	}
+
+	switch readiness.Errors[0].Code {
+	case project.ActivationReadinessCodeDatasourceRequired:
+		return project.ErrReadinessDatasourceRequired
+	case project.ActivationReadinessCodePassiveUnconfirmed:
+		return project.ErrReadinessPassiveUnconfirmed
+	case project.ActivationReadinessCodeTargetDryrunMissing:
+		return project.ErrReadinessTargetDryrunMissing
+	case project.ActivationReadinessCodeTargetDryrunFailed:
+		return project.ErrReadinessTargetDryrunFailed
+	case project.ActivationReadinessCodeActiveTargetRequired:
+		return project.ErrReadinessActiveTargetMissing
+	case project.ActivationReadinessCodeDatasourceStatus:
+		return project.ErrReadinessDatasourceStatus
 	default:
-		return project.ErrInvalidEntity
+		return project.ErrReadinessFailed
 	}
 }

@@ -2,7 +2,9 @@ package usecase
 
 import (
 	"context"
+	"strings"
 
+	"project-srv/internal/model"
 	"project-srv/internal/project"
 	repo "project-srv/internal/project/repository"
 
@@ -20,9 +22,9 @@ func (uc *implUseCase) Create(ctx context.Context, input project.CreateInput) (p
 		return project.CreateOutput{}, project.ErrNameRequired
 	}
 	if input.EntityType != "" {
-		if err := validateEntityType(input.EntityType); err != nil {
+		if !model.IsValidEntityType(input.EntityType) {
 			uc.l.Warnf(ctx, "project.usecase.Create.validateEntityType: invalid entity_type=%s", input.EntityType)
-			return project.CreateOutput{}, err
+			return project.CreateOutput{}, project.ErrInvalidEntity
 		}
 	}
 
@@ -58,6 +60,7 @@ func (uc *implUseCase) Create(ctx context.Context, input project.CreateInput) (p
 
 // Detail fetches a single project by ID.
 func (uc *implUseCase) Detail(ctx context.Context, id string) (project.DetailOutput, error) {
+	id = strings.TrimSpace(id)
 	if id == "" {
 		uc.l.Warnf(ctx, "project.usecase.Detail: empty id")
 		return project.DetailOutput{}, project.ErrNotFound
@@ -66,7 +69,11 @@ func (uc *implUseCase) Detail(ctx context.Context, id string) (project.DetailOut
 	result, err := uc.repo.Detail(ctx, id)
 	if err != nil {
 		uc.l.Errorf(ctx, "project.usecase.Detail.repo.Detail: id=%s err=%v", id, err)
-		return project.DetailOutput{}, project.ErrNotFound
+		if err == repo.ErrNotFound {
+			uc.l.Warnf(ctx, "project.usecase.Detail: project not found id=%s", id)
+			return project.DetailOutput{}, project.ErrNotFound
+		}
+		return project.DetailOutput{}, project.ErrDetailFailed
 	}
 
 	return project.DetailOutput{Project: result}, nil
@@ -75,15 +82,15 @@ func (uc *implUseCase) Detail(ctx context.Context, id string) (project.DetailOut
 // List fetches projects with pagination and filters.
 func (uc *implUseCase) List(ctx context.Context, input project.ListInput) (project.ListOutput, error) {
 	if input.Status != "" {
-		if err := validateStatus(input.Status); err != nil {
+		if !model.IsValidProjectStatus(input.Status) {
 			uc.l.Warnf(ctx, "project.usecase.List.validateStatus: invalid status=%s", input.Status)
-			return project.ListOutput{}, err
+			return project.ListOutput{}, project.ErrInvalidStatus
 		}
 	}
 	if input.EntityType != "" {
-		if err := validateEntityType(input.EntityType); err != nil {
+		if !model.IsValidEntityType(input.EntityType) {
 			uc.l.Warnf(ctx, "project.usecase.List.validateEntityType: invalid entity_type=%s", input.EntityType)
-			return project.ListOutput{}, err
+			return project.ListOutput{}, project.ErrInvalidEntity
 		}
 	}
 
@@ -116,16 +123,10 @@ func (uc *implUseCase) Update(ctx context.Context, input project.UpdateInput) (p
 		return project.UpdateOutput{}, project.ErrNotFound
 	}
 
-	if input.Status != "" {
-		if err := validateStatus(input.Status); err != nil {
-			uc.l.Warnf(ctx, "project.usecase.Update.validateStatus: invalid status=%s", input.Status)
-			return project.UpdateOutput{}, err
-		}
-	}
 	if input.EntityType != "" {
-		if err := validateEntityType(input.EntityType); err != nil {
+		if !model.IsValidEntityType(input.EntityType) {
 			uc.l.Warnf(ctx, "project.usecase.Update.validateEntityType: invalid entity_type=%s", input.EntityType)
-			return project.UpdateOutput{}, err
+			return project.UpdateOutput{}, project.ErrInvalidEntity
 		}
 	}
 
@@ -137,13 +138,12 @@ func (uc *implUseCase) Update(ctx context.Context, input project.UpdateInput) (p
 		Brand:       input.Brand,
 		EntityType:  input.EntityType,
 		EntityName:  input.EntityName,
-		Status:      input.Status,
 	}
 
 	result, err := uc.repo.Update(ctx, opt)
 	if err != nil {
 		uc.l.Errorf(ctx, "project.usecase.Update.repo.Update: id=%s err=%v", input.ID, err)
-		if err == repo.ErrFailedToGet {
+		if err == repo.ErrNotFound {
 			return project.UpdateOutput{}, project.ErrNotFound
 		}
 		return project.UpdateOutput{}, project.ErrUpdateFailed
@@ -152,16 +152,30 @@ func (uc *implUseCase) Update(ctx context.Context, input project.UpdateInput) (p
 	return project.UpdateOutput{Project: result}, nil
 }
 
-// Archive soft-deletes a project by ID.
-func (uc *implUseCase) Archive(ctx context.Context, id string) error {
+// Delete soft-deletes a project by ID after it has been archived.
+func (uc *implUseCase) Delete(ctx context.Context, id string) error {
+	id = strings.TrimSpace(id)
 	if id == "" {
-		uc.l.Warnf(ctx, "project.usecase.Archive: empty id")
+		uc.l.Warnf(ctx, "project.usecase.Delete: empty id")
 		return project.ErrNotFound
 	}
 
+	current, err := uc.repo.Detail(ctx, id)
+	if err != nil {
+		uc.l.Errorf(ctx, "project.usecase.Delete.repo.Detail: id=%s err=%v", id, err)
+		if err == repo.ErrNotFound {
+			return project.ErrNotFound
+		}
+		return project.ErrDeleteFailed
+	}
+	if current.Status != model.ProjectStatusArchived {
+		uc.l.Warnf(ctx, "project.usecase.Delete: id=%s status=%s must be archived first", id, current.Status)
+		return project.ErrDeleteRequiresArchived
+	}
+
 	if err := uc.repo.Archive(ctx, id); err != nil {
-		uc.l.Errorf(ctx, "project.usecase.Archive.repo.Archive: id=%s err=%v", id, err)
-		if err == repo.ErrFailedToGet {
+		uc.l.Errorf(ctx, "project.usecase.Delete.repo.Archive: id=%s err=%v", id, err)
+		if err == repo.ErrNotFound {
 			return project.ErrNotFound
 		}
 		return project.ErrDeleteFailed

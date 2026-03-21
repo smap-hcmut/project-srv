@@ -42,6 +42,12 @@ kafka:
   topic: "project.events"
   group_id: "project-consumer"
 
+# Microservice Internal API
+microservice:
+  ingest:
+    base_url: "http://localhost:8081"
+    timeout_ms: 5000
+
 # JWT
 jwt:
   secret_key: "REPLACE-WITH-SHARED-SECRET-MIN-32-CHARS"
