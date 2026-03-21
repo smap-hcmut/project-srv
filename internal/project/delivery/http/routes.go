@@ -31,3 +31,11 @@ func (h *handler) RegisterRoutes(r *gin.RouterGroup, mw *middleware.Middleware) 
 		projects.DELETE("/:project_id", h.Delete)
 	}
 }
+
+func (h *handler) RegisterInternalRoutes(r *gin.RouterGroup, mw *middleware.Middleware) {
+	projects := r.Group("/projects")
+	projects.Use(mw.InternalAuth())
+	{
+		projects.GET("/:project_id", h.InternalDetail)
+	}
+}

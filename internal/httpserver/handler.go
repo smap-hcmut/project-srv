@@ -61,6 +61,9 @@ func (srv HTTPServer) mapHandlers() error {
 	projectHandler.RegisterRoutes(apiV1, mw)
 	crisisHandler.RegisterRoutes(apiV1, mw)
 
+	internalAPI := apiV1.Group("/internal")
+	projectHandler.RegisterInternalRoutes(internalAPI, mw)
+
 	return nil
 }
 

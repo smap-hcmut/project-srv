@@ -335,3 +335,23 @@ func (h *handler) Delete(c *gin.Context) {
 
 	response.OK(c, nil)
 }
+
+func (h *handler) InternalDetail(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	req, err := h.processDetailReq(c)
+	if err != nil {
+		h.l.Warnf(ctx, "project.delivery.InternalDetail.processDetailReq: %v", err)
+		response.Error(c, err, h.discord)
+		return
+	}
+
+	o, err := h.uc.Detail(ctx, req.toInput())
+	if err != nil {
+		h.l.Errorf(ctx, "project.delivery.InternalDetail.uc.Detail: id=%s err=%v", req.ID, err)
+		response.Error(c, h.mapError(err), h.discord)
+		return
+	}
+
+	response.OK(c, h.newDetailResp(o))
+}
