@@ -71,6 +71,18 @@ type ActivationReadiness struct {
 	Errors                   []ActivationReadinessError
 }
 
+type ActivationReadinessCommand string
+
+const (
+	ActivationReadinessCommandActivate ActivationReadinessCommand = "activate"
+	ActivationReadinessCommandResume   ActivationReadinessCommand = "resume"
+)
+
+type ActivationReadinessInput struct {
+	ProjectID string
+	Command   ActivationReadinessCommand
+}
+
 type ActivationReadinessCode string
 
 const (

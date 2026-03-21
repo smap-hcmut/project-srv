@@ -17,6 +17,18 @@ type ActivationReadinessError struct {
 	TargetID     string
 }
 
+type ActivationReadinessCommand string
+
+const (
+	ActivationReadinessCommandActivate ActivationReadinessCommand = "activate"
+	ActivationReadinessCommandResume   ActivationReadinessCommand = "resume"
+)
+
+type ActivationReadinessInput struct {
+	ProjectID string
+	Command   ActivationReadinessCommand
+}
+
 // ActivationReadiness is the readiness payload returned from ingest internal API.
 type ActivationReadiness struct {
 	ProjectID                string

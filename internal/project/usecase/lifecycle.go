@@ -6,6 +6,7 @@ import (
 	"project-srv/internal/model"
 	"project-srv/internal/project"
 	repo "project-srv/internal/project/repository"
+	"project-srv/pkg/microservice"
 )
 
 func (uc *implUseCase) Activate(ctx context.Context, id string) (project.ActivateOutput, error) {
@@ -19,7 +20,10 @@ func (uc *implUseCase) Activate(ctx context.Context, id string) (project.Activat
 		return project.ActivateOutput{}, project.ErrActivateNotAllowed
 	}
 
-	readiness, err := uc.GetActivationReadiness(ctx, current.ID)
+	readiness, err := uc.GetActivationReadiness(ctx, project.ActivationReadinessInput{
+		ProjectID: current.ID,
+		Command:   project.ActivationReadinessCommandActivate,
+	})
 	if err != nil {
 		uc.l.Errorf(ctx, "project.usecase.Activate.GetActivationReadiness: id=%s err=%v", current.ID, err)
 		return project.ActivateOutput{}, err
@@ -110,7 +114,10 @@ func (uc *implUseCase) Resume(ctx context.Context, id string) (project.ResumeOut
 		return project.ResumeOutput{}, project.ErrResumeNotAllowed
 	}
 
-	readiness, err := uc.GetActivationReadiness(ctx, current.ID)
+	readiness, err := uc.GetActivationReadiness(ctx, project.ActivationReadinessInput{
+		ProjectID: current.ID,
+		Command:   project.ActivationReadinessCommandResume,
+	})
 	if err != nil {
 		uc.l.Errorf(ctx, "project.usecase.Resume.GetActivationReadiness: id=%s err=%v", current.ID, err)
 		return project.ResumeOutput{}, err
@@ -222,8 +229,8 @@ func (uc *implUseCase) Unarchive(ctx context.Context, id string) (project.Unarch
 }
 
 // GetActivationReadiness evaluates project readiness by querying ingest internals and local status.
-func (uc *implUseCase) GetActivationReadiness(ctx context.Context, projectID string) (project.ActivationReadiness, error) {
-	detail, err := uc.Detail(ctx, projectID)
+func (uc *implUseCase) GetActivationReadiness(ctx context.Context, input project.ActivationReadinessInput) (project.ActivationReadiness, error) {
+	detail, err := uc.Detail(ctx, input.ProjectID)
 	if err != nil {
 		return project.ActivationReadiness{}, err
 	}
@@ -234,7 +241,10 @@ func (uc *implUseCase) GetActivationReadiness(ctx context.Context, projectID str
 		return project.ActivationReadiness{}, project.ErrLifecycleManagerFailed
 	}
 
-	readiness, err := uc.ingest.GetActivationReadiness(ctx, current.ID)
+	readiness, err := uc.ingest.GetActivationReadiness(ctx, microservice.ActivationReadinessInput{
+		ProjectID: current.ID,
+		Command:   microservice.ActivationReadinessCommand(uc.normalizeActivationReadinessCommand(input.Command)),
+	})
 	if err != nil {
 		mappedErr := project.MapLifecycleClientError(err)
 		uc.l.Errorf(ctx, "project.usecase.GetActivationReadiness.ingest.GetActivationReadiness: id=%s err=%v mapped=%v", current.ID, err, mappedErr)

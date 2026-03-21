@@ -101,6 +101,27 @@ func (r archiveReq) toInput() string {
 	return r.ID
 }
 
+type activationReadinessReq struct {
+	ID      string `form:"-"`
+	Command string `form:"command"`
+}
+
+func (r activationReadinessReq) validate() error {
+	switch r.Command {
+	case "", string(project.ActivationReadinessCommandActivate), string(project.ActivationReadinessCommandResume):
+		return nil
+	default:
+		return errWrongBody
+	}
+}
+
+func (r activationReadinessReq) toInput() project.ActivationReadinessInput {
+	return project.ActivationReadinessInput{
+		ProjectID: r.ID,
+		Command:   project.ActivationReadinessCommand(r.Command),
+	}
+}
+
 type listReq struct {
 	paginator.PaginateQuery
 	CampaignID string `form:"-"`

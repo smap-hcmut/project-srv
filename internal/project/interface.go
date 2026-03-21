@@ -22,5 +22,5 @@ type LifecycleManager interface {
 	Resume(ctx context.Context, id string) (ResumeOutput, error)
 	Archive(ctx context.Context, id string) (ArchiveOutput, error)
 	Unarchive(ctx context.Context, id string) (UnarchiveOutput, error)
-	GetActivationReadiness(ctx context.Context, projectID string) (ActivationReadiness, error)
+	GetActivationReadiness(ctx context.Context, input ActivationReadinessInput) (ActivationReadiness, error)
 }

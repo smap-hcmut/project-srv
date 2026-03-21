@@ -2,6 +2,15 @@ package usecase
 
 import "project-srv/internal/project"
 
+func (uc *implUseCase) normalizeActivationReadinessCommand(command project.ActivationReadinessCommand) project.ActivationReadinessCommand {
+	switch command {
+	case project.ActivationReadinessCommandResume:
+		return project.ActivationReadinessCommandResume
+	default:
+		return project.ActivationReadinessCommandActivate
+	}
+}
+
 func (uc *implUseCase) mapReadinessBlockedError(readiness project.ActivationReadiness) error {
 	if len(readiness.Errors) == 0 {
 		return project.ErrReadinessFailed

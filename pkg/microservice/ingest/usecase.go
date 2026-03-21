@@ -10,8 +10,14 @@ import (
 	"strings"
 )
 
-func (uc *implUseCase) GetActivationReadiness(ctx context.Context, projectID string) (microservice.ActivationReadiness, error) {
-	endpoint := uc.buildEndpoint(fmt.Sprintf("/projects/%s/activation-readiness", url.PathEscape(strings.TrimSpace(projectID))))
+func (uc *implUseCase) GetActivationReadiness(ctx context.Context, input microservice.ActivationReadinessInput) (microservice.ActivationReadiness, error) {
+	projectID := strings.TrimSpace(input.ProjectID)
+	endpoint := uc.buildEndpoint(fmt.Sprintf("/projects/%s/activation-readiness", url.PathEscape(projectID)))
+	if command := strings.TrimSpace(string(input.Command)); command != "" {
+		values := url.Values{}
+		values.Set("command", command)
+		endpoint = endpoint + "?" + values.Encode()
+	}
 	body, status, err := uc.doRequest(ctx, http.MethodGet, endpoint)
 	if err != nil {
 		return microservice.ActivationReadiness{}, err

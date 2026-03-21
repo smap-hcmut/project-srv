@@ -80,7 +80,7 @@ func IsValidEntityType(entityType string) bool {
 }
 
 func CanActivateProjectStatus(status ProjectStatus) bool {
-	return status == ProjectStatusDraft || status == ProjectStatusPaused
+	return status == ProjectStatusDraft
 }
 
 func CanPauseProjectStatus(status ProjectStatus) bool {

@@ -252,6 +252,7 @@ func (h *handler) Resume(c *gin.Context) {
 // @Tags Project
 // @Produce json
 // @Param project_id path string true "Project ID"
+// @Param command query string false "Lifecycle command to evaluate" Enums(activate,resume) default(activate)
 // @Success 200 {object} activationReadinessResp
 // @Failure 400 {object} response.Resp
 // @Failure 401 {object} response.Resp
@@ -261,9 +262,9 @@ func (h *handler) Resume(c *gin.Context) {
 func (h *handler) ActivationReadiness(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	req, err := h.processLifecycleReq(c)
+	req, err := h.processActivationReadinessReq(c)
 	if err != nil {
-		h.l.Warnf(ctx, "project.delivery.ActivationReadiness.processLifecycleReq: %v", err)
+		h.l.Warnf(ctx, "project.delivery.ActivationReadiness.processActivationReadinessReq: %v", err)
 		response.Error(c, err, h.discord)
 		return
 	}
