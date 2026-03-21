@@ -71,9 +71,20 @@ type ActivationReadiness struct {
 	Errors                   []ActivationReadinessError
 }
 
+type ActivationReadinessCode string
+
+const (
+	ActivationReadinessCodeDatasourceRequired   ActivationReadinessCode = "DATASOURCE_REQUIRED"
+	ActivationReadinessCodePassiveUnconfirmed   ActivationReadinessCode = "PASSIVE_UNCONFIRMED"
+	ActivationReadinessCodeTargetDryrunMissing  ActivationReadinessCode = "TARGET_DRYRUN_MISSING"
+	ActivationReadinessCodeTargetDryrunFailed   ActivationReadinessCode = "TARGET_DRYRUN_FAILED"
+	ActivationReadinessCodeActiveTargetRequired ActivationReadinessCode = "ACTIVE_TARGET_REQUIRED"
+	ActivationReadinessCodeDatasourceStatus     ActivationReadinessCode = "DATASOURCE_STATUS_INVALID"
+)
+
 // ActivationReadinessError describes one readiness blocker.
 type ActivationReadinessError struct {
-	Code         string
+	Code         ActivationReadinessCode
 	Message      string
 	DataSourceID string
 	TargetID     string

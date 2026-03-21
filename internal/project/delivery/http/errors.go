@@ -30,6 +30,12 @@ var (
 	errResumeNotAllowed             = &pkgErrors.HTTPError{Code: 160017, Message: "Project cannot be resumed in its current state", StatusCode: http.StatusBadRequest}
 	errUnarchiveNotAllowed          = &pkgErrors.HTTPError{Code: 160018, Message: "Project cannot be unarchived in its current state", StatusCode: http.StatusBadRequest}
 	errReadinessFailed              = &pkgErrors.HTTPError{Code: 160019, Message: "Project activation readiness failed", StatusCode: http.StatusBadRequest}
+	errReadinessDatasourceRequired  = &pkgErrors.HTTPError{Code: 160026, Message: "Project must have at least one datasource before lifecycle activation", StatusCode: http.StatusBadRequest}
+	errReadinessPassiveUnconfirmed  = &pkgErrors.HTTPError{Code: 160027, Message: "Project has passive datasource that is not confirmed", StatusCode: http.StatusBadRequest}
+	errReadinessTargetDryrunMissing = &pkgErrors.HTTPError{Code: 160028, Message: "Project has crawl target that has never been dry-run", StatusCode: http.StatusBadRequest}
+	errReadinessTargetDryrunFailed  = &pkgErrors.HTTPError{Code: 160029, Message: "Project has crawl target whose latest dry-run failed", StatusCode: http.StatusBadRequest}
+	errReadinessActiveTargetMissing = &pkgErrors.HTTPError{Code: 160030, Message: "Project has crawl datasource without active target", StatusCode: http.StatusBadRequest}
+	errReadinessDatasourceStatus    = &pkgErrors.HTTPError{Code: 160031, Message: "Project has datasource in invalid status for lifecycle command", StatusCode: http.StatusBadRequest}
 	errLifecycleManagerFailed       = &pkgErrors.HTTPError{Code: 160020, Message: "Project lifecycle manager failed", StatusCode: http.StatusInternalServerError}
 	errDeleteRequiresArchived       = &pkgErrors.HTTPError{Code: 160021, Message: "Project must be archived before delete", StatusCode: http.StatusBadRequest}
 	errDetailFailed                 = &pkgErrors.HTTPError{Code: 160022, Message: "Failed to get project detail", StatusCode: http.StatusInternalServerError}
@@ -73,6 +79,18 @@ func (h *handler) mapError(err error) error {
 		return errResumeNotAllowed
 	case errors.Is(err, project.ErrUnarchiveNotAllowed):
 		return errUnarchiveNotAllowed
+	case errors.Is(err, project.ErrReadinessDatasourceRequired):
+		return errReadinessDatasourceRequired
+	case errors.Is(err, project.ErrReadinessPassiveUnconfirmed):
+		return errReadinessPassiveUnconfirmed
+	case errors.Is(err, project.ErrReadinessTargetDryrunMissing):
+		return errReadinessTargetDryrunMissing
+	case errors.Is(err, project.ErrReadinessTargetDryrunFailed):
+		return errReadinessTargetDryrunFailed
+	case errors.Is(err, project.ErrReadinessActiveTargetMissing):
+		return errReadinessActiveTargetMissing
+	case errors.Is(err, project.ErrReadinessDatasourceStatus):
+		return errReadinessDatasourceStatus
 	case errors.Is(err, project.ErrReadinessFailed):
 		return errReadinessFailed
 	case errors.Is(err, project.ErrLifecycleManagerFailed):

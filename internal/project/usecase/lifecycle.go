@@ -26,7 +26,7 @@ func (uc *implUseCase) Activate(ctx context.Context, id string) (project.Activat
 	}
 	if !readiness.CanProceed {
 		uc.l.Warnf(ctx, "project.usecase.Activate: id=%s readiness blocked", current.ID)
-		return project.ActivateOutput{}, project.ErrReadinessFailed
+		return project.ActivateOutput{}, uc.mapReadinessBlockedError(readiness)
 	}
 
 	if uc.ingest == nil {
@@ -117,7 +117,7 @@ func (uc *implUseCase) Resume(ctx context.Context, id string) (project.ResumeOut
 	}
 	if !readiness.CanProceed {
 		uc.l.Warnf(ctx, "project.usecase.Resume: id=%s readiness blocked", current.ID)
-		return project.ResumeOutput{}, project.ErrReadinessFailed
+		return project.ResumeOutput{}, uc.mapReadinessBlockedError(readiness)
 	}
 
 	if uc.ingest == nil {
@@ -244,7 +244,7 @@ func (uc *implUseCase) GetActivationReadiness(ctx context.Context, projectID str
 	errorsOut := make([]project.ActivationReadinessError, 0, len(readiness.Errors))
 	for _, e := range readiness.Errors {
 		errorsOut = append(errorsOut, project.ActivationReadinessError{
-			Code:         e.Code,
+			Code:         project.ActivationReadinessCode(e.Code),
 			Message:      e.Message,
 			DataSourceID: e.DataSourceID,
 			TargetID:     e.TargetID,
