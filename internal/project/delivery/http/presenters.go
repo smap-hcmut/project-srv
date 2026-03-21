@@ -182,7 +182,7 @@ type activationReadinessResp struct {
 	PassiveUnconfirmedCount  int                            `json:"passive_unconfirmed_count" example:"0"`
 	MissingTargetDryrunCount int                            `json:"missing_target_dryrun_count" example:"1"`
 	FailedTargetDryrunCount  int                            `json:"failed_target_dryrun_count" example:"0"`
-	CanActivate              bool                           `json:"can_activate" example:"false"`
+	CanProceed               bool                           `json:"can_proceed" example:"false"`
 	Errors                   []activationReadinessErrorResp `json:"errors"`
 }
 
@@ -234,7 +234,7 @@ func (h *handler) newActivationReadinessResp(o project.ActivationReadiness) acti
 		PassiveUnconfirmedCount:  o.PassiveUnconfirmedCount,
 		MissingTargetDryrunCount: o.MissingTargetDryrunCount,
 		FailedTargetDryrunCount:  o.FailedTargetDryrunCount,
-		CanActivate:              o.CanActivate,
+		CanProceed:               o.CanProceed,
 		Errors:                   errors,
 	}
 }

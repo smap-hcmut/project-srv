@@ -38,7 +38,7 @@ func (uc *implUseCase) GetActivationReadiness(ctx context.Context, projectID str
 		PassiveUnconfirmedCount:  dto.PassiveUnconfirmedCount,
 		MissingTargetDryrunCount: dto.MissingTargetDryrunCount,
 		FailedTargetDryrunCount:  dto.FailedTargetDryrunCount,
-		CanActivate:              dto.CanActivate,
+		CanProceed:               dto.CanProceed,
 		Errors:                   make([]microservice.ActivationReadinessError, 0, len(dto.Errors)),
 	}
 

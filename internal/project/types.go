@@ -67,7 +67,7 @@ type ActivationReadiness struct {
 	PassiveUnconfirmedCount  int
 	MissingTargetDryrunCount int
 	FailedTargetDryrunCount  int
-	CanActivate              bool
+	CanProceed               bool
 	Errors                   []ActivationReadinessError
 }
 

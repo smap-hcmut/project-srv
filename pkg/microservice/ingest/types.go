@@ -30,7 +30,7 @@ type readinessRespDTO struct {
 	PassiveUnconfirmedCount  int                     `json:"passive_unconfirmed_count"`
 	MissingTargetDryrunCount int                     `json:"missing_target_dryrun_count"`
 	FailedTargetDryrunCount  int                     `json:"failed_target_dryrun_count"`
-	CanActivate              bool                    `json:"can_activate"`
+	CanProceed               bool                    `json:"can_proceed"`
 	Errors                   []readinessErrorRespDTO `json:"errors"`
 }
 

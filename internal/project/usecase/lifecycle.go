@@ -24,7 +24,7 @@ func (uc *implUseCase) Activate(ctx context.Context, id string) (project.Activat
 		uc.l.Errorf(ctx, "project.usecase.Activate.GetActivationReadiness: id=%s err=%v", current.ID, err)
 		return project.ActivateOutput{}, err
 	}
-	if !readiness.CanActivate {
+	if !readiness.CanProceed {
 		uc.l.Warnf(ctx, "project.usecase.Activate: id=%s readiness blocked", current.ID)
 		return project.ActivateOutput{}, project.ErrReadinessFailed
 	}
@@ -115,7 +115,7 @@ func (uc *implUseCase) Resume(ctx context.Context, id string) (project.ResumeOut
 		uc.l.Errorf(ctx, "project.usecase.Resume.GetActivationReadiness: id=%s err=%v", current.ID, err)
 		return project.ResumeOutput{}, err
 	}
-	if !readiness.CanActivate {
+	if !readiness.CanProceed {
 		uc.l.Warnf(ctx, "project.usecase.Resume: id=%s readiness blocked", current.ID)
 		return project.ResumeOutput{}, project.ErrReadinessFailed
 	}
@@ -259,7 +259,7 @@ func (uc *implUseCase) GetActivationReadiness(ctx context.Context, projectID str
 		PassiveUnconfirmedCount:  readiness.PassiveUnconfirmedCount,
 		MissingTargetDryrunCount: readiness.MissingTargetDryrunCount,
 		FailedTargetDryrunCount:  readiness.FailedTargetDryrunCount,
-		CanActivate:              readiness.CanActivate,
+		CanProceed:               readiness.CanProceed,
 		Errors:                   errorsOut,
 	}, nil
 }
