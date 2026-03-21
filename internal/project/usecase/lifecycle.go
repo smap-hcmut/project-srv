@@ -44,14 +44,19 @@ func (uc *implUseCase) Activate(ctx context.Context, id string) (project.Activat
 	}
 
 	updated, err := uc.repo.UpdateStatus(ctx, repo.UpdateStatusOptions{
-		ID:     current.ID,
-		Status: string(model.ProjectStatusActive),
+		ID:               current.ID,
+		Status:           string(model.ProjectStatusActive),
+		ExpectedStatuses: []string{string(model.ProjectStatusDraft)},
 	})
 	if err != nil {
 		uc.l.Errorf(ctx, "project.usecase.Activate.repo.UpdateStatus: id=%s err=%v", current.ID, err)
 		if err == repo.ErrNotFound {
 			uc.l.Warnf(ctx, "project.usecase.Activate: id=%s not found during update", current.ID)
 			return project.ActivateOutput{}, project.ErrNotFound
+		}
+		if err == repo.ErrStatusConflict {
+			uc.l.Warnf(ctx, "project.usecase.Activate: id=%s lost lifecycle race", current.ID)
+			return project.ActivateOutput{}, project.ErrActivateNotAllowed
 		}
 		return project.ActivateOutput{}, project.ErrUpdateFailed
 	}
@@ -85,13 +90,18 @@ func (uc *implUseCase) Pause(ctx context.Context, id string) (project.PauseOutpu
 	}
 
 	updated, err := uc.repo.UpdateStatus(ctx, repo.UpdateStatusOptions{
-		ID:     current.ID,
-		Status: string(model.ProjectStatusPaused),
+		ID:               current.ID,
+		Status:           string(model.ProjectStatusPaused),
+		ExpectedStatuses: []string{string(model.ProjectStatusActive)},
 	})
 	if err != nil {
 		uc.l.Errorf(ctx, "project.usecase.Pause.repo.UpdateStatus: id=%s err=%v", current.ID, err)
 		if err == repo.ErrNotFound {
 			return project.PauseOutput{}, project.ErrNotFound
+		}
+		if err == repo.ErrStatusConflict {
+			uc.l.Warnf(ctx, "project.usecase.Pause: id=%s lost lifecycle race", current.ID)
+			return project.PauseOutput{}, project.ErrPauseNotAllowed
 		}
 		return project.PauseOutput{}, project.ErrUpdateFailed
 	}
@@ -138,13 +148,18 @@ func (uc *implUseCase) Resume(ctx context.Context, id string) (project.ResumeOut
 	}
 
 	updated, err := uc.repo.UpdateStatus(ctx, repo.UpdateStatusOptions{
-		ID:     current.ID,
-		Status: string(model.ProjectStatusActive),
+		ID:               current.ID,
+		Status:           string(model.ProjectStatusActive),
+		ExpectedStatuses: []string{string(model.ProjectStatusPaused)},
 	})
 	if err != nil {
 		uc.l.Errorf(ctx, "project.usecase.Resume.repo.UpdateStatus: id=%s err=%v", current.ID, err)
 		if err == repo.ErrNotFound {
 			return project.ResumeOutput{}, project.ErrNotFound
+		}
+		if err == repo.ErrStatusConflict {
+			uc.l.Warnf(ctx, "project.usecase.Resume: id=%s lost lifecycle race", current.ID)
+			return project.ResumeOutput{}, project.ErrResumeNotAllowed
 		}
 		return project.ResumeOutput{}, project.ErrUpdateFailed
 	}

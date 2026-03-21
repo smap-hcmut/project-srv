@@ -7,6 +7,7 @@ import (
 	"project-srv/internal/model"
 	"project-srv/internal/project/repository"
 	"project-srv/internal/sqlboiler"
+	"strings"
 	"time"
 
 	"github.com/aarondl/null/v8"
@@ -143,6 +144,60 @@ func (r *implRepository) Update(ctx context.Context, opt repository.UpdateOption
 
 // UpdateStatus updates only the lifecycle status of a project.
 func (r *implRepository) UpdateStatus(ctx context.Context, opt repository.UpdateStatusOptions) (model.Project, error) {
+	if len(opt.ExpectedStatuses) > 0 {
+		now := time.Now()
+		mods := []qm.QueryMod{
+			sqlboiler.ProjectWhere.ID.EQ(opt.ID),
+		}
+
+		expected := make([]interface{}, 0, len(opt.ExpectedStatuses))
+		for _, status := range opt.ExpectedStatuses {
+			trimmed := strings.TrimSpace(status)
+			if trimmed == "" {
+				continue
+			}
+			expected = append(expected, trimmed)
+		}
+		if len(expected) > 0 {
+			mods = append(mods, qm.WhereIn(fmt.Sprintf("%s IN ?", sqlboiler.ProjectColumns.Status), expected...))
+		}
+
+		affected, err := sqlboiler.Projects(mods...).UpdateAll(ctx, r.db, sqlboiler.M{
+			sqlboiler.ProjectColumns.Status:    opt.Status,
+			sqlboiler.ProjectColumns.UpdatedAt: null.TimeFrom(now),
+		})
+		if err != nil {
+			r.l.Errorf(ctx, "project.repository.UpdateStatus.UpdateAll: %v", err)
+			return model.Project{}, repository.ErrFailedToUpdate
+		}
+		if affected == 0 {
+			_, err := sqlboiler.FindProject(ctx, r.db, opt.ID)
+			if err != nil {
+				if err == sql.ErrNoRows {
+					r.l.Warnf(ctx, "project.repository.UpdateStatus.FindProjectAfterConflict: not found id=%s", opt.ID)
+					return model.Project{}, repository.ErrNotFound
+				}
+				r.l.Errorf(ctx, "project.repository.UpdateStatus.FindProjectAfterConflict: %v", err)
+				return model.Project{}, repository.ErrFailedToUpdate
+			}
+			r.l.Warnf(ctx, "project.repository.UpdateStatus: status conflict id=%s target_status=%s expected_statuses=%v", opt.ID, opt.Status, opt.ExpectedStatuses)
+			return model.Project{}, repository.ErrStatusConflict
+		}
+
+		row, err := sqlboiler.FindProject(ctx, r.db, opt.ID)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				r.l.Warnf(ctx, "project.repository.UpdateStatus.FindProjectAfterUpdate: not found id=%s", opt.ID)
+				return model.Project{}, repository.ErrNotFound
+			}
+			r.l.Errorf(ctx, "project.repository.UpdateStatus.FindProjectAfterUpdate: %v", err)
+			return model.Project{}, repository.ErrFailedToUpdate
+		}
+
+		result := model.NewProjectFromDB(row)
+		return *result, nil
+	}
+
 	row, err := sqlboiler.FindProject(ctx, r.db, opt.ID)
 	if err != nil {
 		if err == sql.ErrNoRows {

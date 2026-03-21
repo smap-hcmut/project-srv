@@ -37,6 +37,7 @@ type UpdateOptions struct {
 
 // UpdateStatusOptions contains the data for a lifecycle status change.
 type UpdateStatusOptions struct {
-	ID     string
-	Status string
+	ID               string
+	Status           string
+	ExpectedStatuses []string
 }
