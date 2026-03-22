@@ -145,7 +145,7 @@ func (h *handler) Archive(c *gin.Context) {
 
 	req, err := h.processLifecycleReq(c)
 	if err != nil {
-		h.l.Warnf(ctx, "project.delivery.Archive.processArchiveReq: %v", err)
+		h.l.Warnf(ctx, "project.delivery.Archive.processLifecycleReq: %v", err)
 		response.Error(c, err, h.discord)
 		return
 	}
