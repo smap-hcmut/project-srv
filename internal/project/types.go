@@ -2,6 +2,7 @@ package project
 
 import (
 	"project-srv/internal/model"
+	"time"
 
 	"github.com/smap-hcmut/shared-libs/go/paginator"
 )
@@ -50,10 +51,99 @@ type UpdateInput struct {
 	Brand       string
 	EntityType  string
 	EntityName  string
-	Status      string
 }
 
 // UpdateOutput is the output after updating a project.
 type UpdateOutput struct {
+	Project model.Project
+}
+
+// ActivationReadiness is the local readiness contract used by LifecycleManager.
+type ActivationReadiness struct {
+	ProjectID                string
+	ProjectStatus            model.ProjectStatus
+	DataSourceCount          int
+	HasDatasource            bool
+	PassiveUnconfirmedCount  int
+	MissingTargetDryrunCount int
+	FailedTargetDryrunCount  int
+	CanProceed               bool
+	Errors                   []ActivationReadinessError
+}
+
+type ActivationReadinessCommand string
+
+const (
+	ActivationReadinessCommandActivate ActivationReadinessCommand = "activate"
+	ActivationReadinessCommandResume   ActivationReadinessCommand = "resume"
+)
+
+type ActivationReadinessInput struct {
+	ProjectID string
+	Command   ActivationReadinessCommand
+}
+
+type ActivationReadinessCode string
+
+const (
+	ActivationReadinessCodeDatasourceRequired   ActivationReadinessCode = "DATASOURCE_REQUIRED"
+	ActivationReadinessCodePassiveUnconfirmed   ActivationReadinessCode = "PASSIVE_UNCONFIRMED"
+	ActivationReadinessCodeTargetDryrunMissing  ActivationReadinessCode = "TARGET_DRYRUN_MISSING"
+	ActivationReadinessCodeTargetDryrunFailed   ActivationReadinessCode = "TARGET_DRYRUN_FAILED"
+	ActivationReadinessCodeActiveTargetRequired ActivationReadinessCode = "ACTIVE_TARGET_REQUIRED"
+	ActivationReadinessCodeDatasourceStatus     ActivationReadinessCode = "DATASOURCE_STATUS_INVALID"
+)
+
+// ActivationReadinessError describes one readiness blocker.
+type ActivationReadinessError struct {
+	Code         ActivationReadinessCode
+	Message      string
+	DataSourceID string
+	TargetID     string
+}
+
+// LifecycleEventName is a typed event name for project lifecycle.
+type LifecycleEventName string
+
+const (
+	ProjectLifecycleEventActivated  LifecycleEventName = "project.lifecycle.activated"
+	ProjectLifecycleEventPaused     LifecycleEventName = "project.lifecycle.paused"
+	ProjectLifecycleEventResumed    LifecycleEventName = "project.lifecycle.resumed"
+	ProjectLifecycleEventArchived   LifecycleEventName = "project.lifecycle.archived"
+	ProjectLifecycleEventUnarchived LifecycleEventName = "project.lifecycle.unarchived"
+)
+
+// LifecycleEvent is emitted to Kafka after local lifecycle status transitions.
+type LifecycleEvent struct {
+	EventName   LifecycleEventName `json:"event_name"`
+	ProjectID   string             `json:"project_id"`
+	CampaignID  string             `json:"campaign_id"`
+	Status      string             `json:"status"`
+	TriggeredBy string             `json:"triggered_by"`
+	OccurredAt  time.Time          `json:"occurred_at"`
+}
+
+// ActivateOutput is the output after activating a project.
+type ActivateOutput struct {
+	Project model.Project
+}
+
+// PauseOutput is the output after pausing a project.
+type PauseOutput struct {
+	Project model.Project
+}
+
+// ResumeOutput is the output after resuming a project.
+type ResumeOutput struct {
+	Project model.Project
+}
+
+// ArchiveOutput is the output after archiving a project.
+type ArchiveOutput struct {
+	Project model.Project
+}
+
+// UnarchiveOutput is the output after unarchiving a project.
+type UnarchiveOutput struct {
 	Project model.Project
 }

@@ -1,27 +1,29 @@
 package http
 
 import (
+	"net/http"
+
 	"project-srv/internal/crisis"
 
 	pkgErrors "github.com/smap-hcmut/shared-libs/go/errors"
 )
 
-// Delivery-layer HTTP errors — all known errors are 400-level.
+// Delivery-layer HTTP errors.
 var (
-	errNotFound                = pkgErrors.NewHTTPError(160001, "Crisis config not found")
-	errProjectInvalid          = pkgErrors.NewHTTPError(160002, "Invalid project ID")
-	errUpsertFailed            = pkgErrors.NewHTTPError(160003, "Failed to upsert crisis config")
-	errDeleteFailed            = pkgErrors.NewHTTPError(160004, "Failed to delete crisis config")
-	errWrongBody               = pkgErrors.NewHTTPError(160005, "Wrong request body")
-	errNoTrigger               = pkgErrors.NewHTTPError(160006, "At least one trigger must be provided")
-	errInvalidKeywordGroup     = pkgErrors.NewHTTPError(160007, "Keyword group requires non-empty name, at least 1 keyword, and weight > 0")
-	errInvalidVolumeRule       = pkgErrors.NewHTTPError(160008, "Volume rule requires level (WARNING/CRITICAL), threshold > 0, and window > 0")
-	errInvalidSentimentRule    = pkgErrors.NewHTTPError(160009, "Sentiment rule requires non-empty type")
-	errInvalidInfluencerRule   = pkgErrors.NewHTTPError(160010, "Influencer rule requires non-empty type")
-	errKeywordGroupsRequired   = pkgErrors.NewHTTPError(160011, "Enabled keywords trigger requires at least 1 group")
-	errVolumeRulesRequired     = pkgErrors.NewHTTPError(160012, "Enabled volume trigger requires at least 1 rule")
-	errSentimentRulesRequired  = pkgErrors.NewHTTPError(160013, "Enabled sentiment trigger requires at least 1 rule")
-	errInfluencerRulesRequired = pkgErrors.NewHTTPError(160014, "Enabled influencer trigger requires at least 1 rule")
+	errNotFound                = &pkgErrors.HTTPError{Code: 160001, Message: "Crisis config not found", StatusCode: http.StatusBadRequest}
+	errProjectInvalid          = &pkgErrors.HTTPError{Code: 160002, Message: "Invalid project ID", StatusCode: http.StatusBadRequest}
+	errUpsertFailed            = &pkgErrors.HTTPError{Code: 160003, Message: "Failed to upsert crisis config", StatusCode: http.StatusInternalServerError}
+	errDeleteFailed            = &pkgErrors.HTTPError{Code: 160004, Message: "Failed to delete crisis config", StatusCode: http.StatusInternalServerError}
+	errWrongBody               = &pkgErrors.HTTPError{Code: 160005, Message: "Wrong request body", StatusCode: http.StatusBadRequest}
+	errNoTrigger               = &pkgErrors.HTTPError{Code: 160006, Message: "At least one trigger must be provided", StatusCode: http.StatusBadRequest}
+	errInvalidKeywordGroup     = &pkgErrors.HTTPError{Code: 160007, Message: "Keyword group requires non-empty name, at least 1 keyword, and weight > 0", StatusCode: http.StatusBadRequest}
+	errInvalidVolumeRule       = &pkgErrors.HTTPError{Code: 160008, Message: "Volume rule requires level (WARNING/CRITICAL), threshold > 0, and window > 0", StatusCode: http.StatusBadRequest}
+	errInvalidSentimentRule    = &pkgErrors.HTTPError{Code: 160009, Message: "Sentiment rule requires non-empty type", StatusCode: http.StatusBadRequest}
+	errInvalidInfluencerRule   = &pkgErrors.HTTPError{Code: 160010, Message: "Influencer rule requires non-empty type", StatusCode: http.StatusBadRequest}
+	errKeywordGroupsRequired   = &pkgErrors.HTTPError{Code: 160011, Message: "Enabled keywords trigger requires at least 1 group", StatusCode: http.StatusBadRequest}
+	errVolumeRulesRequired     = &pkgErrors.HTTPError{Code: 160012, Message: "Enabled volume trigger requires at least 1 rule", StatusCode: http.StatusBadRequest}
+	errSentimentRulesRequired  = &pkgErrors.HTTPError{Code: 160013, Message: "Enabled sentiment trigger requires at least 1 rule", StatusCode: http.StatusBadRequest}
+	errInfluencerRulesRequired = &pkgErrors.HTTPError{Code: 160014, Message: "Enabled influencer trigger requires at least 1 rule", StatusCode: http.StatusBadRequest}
 )
 
 // mapError maps UseCase domain errors to delivery HTTP errors.

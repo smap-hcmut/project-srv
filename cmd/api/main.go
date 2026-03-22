@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"project-srv/config"
+	configKafka "project-srv/config/kafka"
 
 	_ "project-srv/docs" // Import swagger docs
 	"project-srv/internal/httpserver"
@@ -93,6 +94,15 @@ func main() {
 	logger.Infof(ctx, "Redis connected successfully to %s:%d (DB %d)",
 		cfg.Redis.Host, cfg.Redis.Port, cfg.Redis.DB)
 
+	// Initialize Kafka producer
+	kafkaProducer, err := configKafka.ConnectProducer(cfg.Kafka)
+	if err != nil {
+		logger.Errorf(ctx, "Failed to connect to Kafka producer: %v", err)
+		return
+	}
+	defer configKafka.DisconnectProducer()
+	logger.Info(ctx, "Kafka producer initialized")
+
 	// Initialize Discord (optional)
 	var discordClient discord.IDiscord
 	if cfg.Discord.WebhookURL != "" {
@@ -116,13 +126,20 @@ func main() {
 		PostgresDB: postgresDB.GetDB(),
 
 		// Redis Configuration
-		RedisClient: redisClient,
+		RedisClient:   redisClient,
+		KafkaProducer: kafkaProducer,
 
 		// Authentication & Security Configuration
 		JwtSecretKey: cfg.JWT.SecretKey,
 		CookieConfig: cfg.Cookie,
 		Encrypter:    encrypterInstance,
 		InternalKey:  cfg.InternalConfig.InternalKey,
+		Microservice: httpserver.Microservice{
+			Ingest: httpserver.IngestService{
+				BaseURL:   cfg.Microservice.Ingest.BaseURL,
+				TimeoutMS: cfg.Microservice.Ingest.TimeoutMS,
+			},
+		},
 
 		// Monitoring & Notification Configuration
 		Discord: discordClient,
