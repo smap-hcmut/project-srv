@@ -57,7 +57,7 @@ func (r createReq) toInput() campaign.CreateInput {
 type updateReq struct {
 	Name        string `json:"name" example:"Q1 2026 VinFast Campaign - Updated"`               // Campaign name
 	Description string `json:"description" example:"Monitor VinFast brand sentiment - Updated"` // Campaign description
-	Status      string `json:"status" example:"ACTIVE" enums:"ACTIVE,INACTIVE,ARCHIVED"`        // Campaign status
+	Status      string `json:"status" example:"PENDING" enums:"PENDING,ACTIVE,PAUSED,ARCHIVED"` // Campaign status
 	StartDate   string `json:"start_date" example:"2026-01-01T00:00:00Z"`                       // Campaign start date (RFC3339 format)
 	EndDate     string `json:"end_date" example:"2026-03-31T23:59:59Z"`                         // Campaign end date (RFC3339 format)
 }
@@ -65,7 +65,7 @@ type updateReq struct {
 func (r updateReq) validate() error {
 	if r.Status != "" {
 		switch model.CampaignStatus(r.Status) {
-		case model.CampaignStatusActive, model.CampaignStatusInactive, model.CampaignStatusArchived:
+		case model.CampaignStatusPending, model.CampaignStatusActive, model.CampaignStatusPaused, model.CampaignStatusArchived:
 			// valid
 		default:
 			return errInvalidStatus
@@ -125,7 +125,7 @@ type campaignResp struct {
 	ID          string  `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`               // Campaign UUID
 	Name        string  `json:"name" example:"Q1 2026 VinFast Campaign"`                         // Campaign name
 	Description string  `json:"description,omitempty" example:"Monitor VinFast brand sentiment"` // Campaign description
-	Status      string  `json:"status" example:"ACTIVE" enums:"ACTIVE,INACTIVE,ARCHIVED"`        // Campaign status
+	Status      string  `json:"status" example:"PENDING" enums:"PENDING,ACTIVE,PAUSED,ARCHIVED"` // Campaign status
 	StartDate   *string `json:"start_date,omitempty" example:"2026-01-01T00:00:00Z"`             // Campaign start date
 	EndDate     *string `json:"end_date,omitempty" example:"2026-03-31T23:59:59Z"`               // Campaign end date
 	CreatedBy   string  `json:"created_by" example:"550e8400-e29b-41d4-a716-446655440001"`       // Creator user UUID

@@ -10,8 +10,9 @@ import (
 type CampaignStatus string
 
 const (
+	CampaignStatusPending  CampaignStatus = "PENDING"
 	CampaignStatusActive   CampaignStatus = "ACTIVE"
-	CampaignStatusInactive CampaignStatus = "INACTIVE"
+	CampaignStatusPaused   CampaignStatus = "PAUSED"
 	CampaignStatusArchived CampaignStatus = "ARCHIVED"
 )
 

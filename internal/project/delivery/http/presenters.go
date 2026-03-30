@@ -186,7 +186,7 @@ type projectResp struct {
 	Brand       string `json:"brand,omitempty" example:"VinFast"`                                               // Brand name for UI grouping
 	EntityType  string `json:"entity_type" example:"product" enums:"product,campaign,service,competitor,topic"` // Entity type
 	EntityName  string `json:"entity_name" example:"VF8"`                                                       // Specific entity name
-	Status      string `json:"status" example:"DRAFT" enums:"DRAFT,ACTIVE,PAUSED,ARCHIVED"`                     // Project status
+	Status      string `json:"status" example:"PENDING" enums:"PENDING,ACTIVE,PAUSED,ARCHIVED"`                 // Project status
 	CreatedBy   string `json:"created_by" example:"550e8400-e29b-41d4-a716-446655440001"`                       // Creator user UUID
 	CreatedAt   string `json:"created_at" example:"2026-02-18T00:00:00Z"`                                       // Creation timestamp
 	UpdatedAt   string `json:"updated_at" example:"2026-02-18T00:00:00Z"`                                       // Last update timestamp
@@ -229,7 +229,7 @@ type activationReadinessErrorResp struct {
 // activationReadinessResp wraps readiness output from project lifecycle manager + local status.
 type activationReadinessResp struct {
 	ProjectID                string                         `json:"project_id" example:"550e8400-e29b-41d4-a716-446655440002"`
-	ProjectStatus            string                         `json:"project_status" example:"DRAFT" enums:"DRAFT,ACTIVE,PAUSED,ARCHIVED"`
+	ProjectStatus            string                         `json:"project_status" example:"PENDING" enums:"PENDING,ACTIVE,PAUSED,ARCHIVED"`
 	DataSourceCount          int                            `json:"data_source_count" example:"2"`
 	HasDatasource            bool                           `json:"has_datasource" example:"true"`
 	PassiveUnconfirmedCount  int                            `json:"passive_unconfirmed_count" example:"0"`

@@ -26,10 +26,10 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- This ensures we have clean Enum definitions.
 
 DROP TYPE IF EXISTS schema_project.campaign_status CASCADE;
-CREATE TYPE schema_project.campaign_status AS ENUM ('ACTIVE', 'INACTIVE', 'ARCHIVED');
+CREATE TYPE schema_project.campaign_status AS ENUM ('PENDING', 'ACTIVE', 'PAUSED', 'ARCHIVED');
 
 DROP TYPE IF EXISTS schema_project.project_status CASCADE;
-CREATE TYPE schema_project.project_status AS ENUM ('ACTIVE', 'PAUSED', 'ARCHIVED');
+CREATE TYPE schema_project.project_status AS ENUM ('PENDING', 'ACTIVE', 'PAUSED', 'ARCHIVED');
 
 DROP TYPE IF EXISTS schema_project.project_config_status CASCADE;
 CREATE TYPE schema_project.project_config_status AS ENUM (
@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS schema_project.campaigns (
     description TEXT,
     
     -- Enum Status
-    status schema_project.campaign_status NOT NULL DEFAULT 'ACTIVE'::schema_project.campaign_status,
+    status schema_project.campaign_status NOT NULL DEFAULT 'PENDING'::schema_project.campaign_status,
     
     start_date TIMESTAMPTZ,
     end_date TIMESTAMPTZ,
@@ -93,7 +93,7 @@ CREATE TABLE IF NOT EXISTS schema_project.projects (
     entity_name VARCHAR(200) NOT NULL, -- Specific name (e.g. "VF8")
     
     -- Status Fields
-    status schema_project.project_status NOT NULL DEFAULT 'ACTIVE'::schema_project.project_status,
+    status schema_project.project_status NOT NULL DEFAULT 'PENDING'::schema_project.project_status,
     config_status schema_project.project_config_status DEFAULT 'DRAFT'::schema_project.project_config_status,
     
     created_by UUID NOT NULL,

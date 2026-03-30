@@ -10,7 +10,7 @@ import (
 type ProjectStatus string
 
 const (
-	ProjectStatusDraft    ProjectStatus = "DRAFT"
+	ProjectStatusPending  ProjectStatus = "PENDING"
 	ProjectStatusActive   ProjectStatus = "ACTIVE"
 	ProjectStatusPaused   ProjectStatus = "PAUSED"
 	ProjectStatusArchived ProjectStatus = "ARCHIVED"
@@ -63,7 +63,7 @@ type Project struct {
 
 func IsValidProjectStatus(status string) bool {
 	switch ProjectStatus(status) {
-	case ProjectStatusDraft, ProjectStatusActive, ProjectStatusPaused, ProjectStatusArchived:
+	case ProjectStatusPending, ProjectStatusActive, ProjectStatusPaused, ProjectStatusArchived:
 		return true
 	default:
 		return false
@@ -80,7 +80,7 @@ func IsValidEntityType(entityType string) bool {
 }
 
 func CanActivateProjectStatus(status ProjectStatus) bool {
-	return status == ProjectStatusDraft
+	return status == ProjectStatusPending
 }
 
 func CanPauseProjectStatus(status ProjectStatus) bool {
@@ -92,7 +92,7 @@ func CanResumeProjectStatus(status ProjectStatus) bool {
 }
 
 func CanArchiveProjectStatus(status ProjectStatus) bool {
-	return status == ProjectStatusDraft || status == ProjectStatusActive || status == ProjectStatusPaused
+	return status == ProjectStatusPending || status == ProjectStatusActive || status == ProjectStatusPaused
 }
 
 func CanUnarchiveProjectStatus(status ProjectStatus) bool {

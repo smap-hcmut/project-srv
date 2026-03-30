@@ -8,7 +8,7 @@ import (
 // validateStatus checks if the given status is a valid CampaignStatus.
 func validateStatus(status string) error {
 	switch model.CampaignStatus(status) {
-	case model.CampaignStatusActive, model.CampaignStatusInactive, model.CampaignStatusArchived:
+	case model.CampaignStatusPending, model.CampaignStatusActive, model.CampaignStatusPaused, model.CampaignStatusArchived:
 		return nil
 	default:
 		return campaign.ErrInvalidStatus

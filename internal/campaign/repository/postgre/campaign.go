@@ -21,7 +21,7 @@ func (r *implRepository) Create(ctx context.Context, opt repository.CreateOption
 	row := &sqlboiler.Campaign{
 		Name:      opt.Name,
 		CreatedBy: opt.CreatedBy,
-		Status:    sqlboiler.CampaignStatusACTIVE,
+		Status:    sqlboiler.CampaignStatusPENDING,
 	}
 
 	if opt.Description != "" {

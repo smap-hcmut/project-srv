@@ -62,7 +62,7 @@ func (h *handler) Detail(c *gin.Context) {
 // @Description Paginate campaigns with optional status filter
 // @Tags Campaign
 // @Produce json
-// @Param status query string false "Filter by status (ACTIVE, INACTIVE, ARCHIVED)"
+// @Param status query string false "Filter by status (PENDING, ACTIVE, PAUSED, ARCHIVED)"
 // @Param page query int false "Page number (default 1)"
 // @Param limit query int false "Number of records per page (default 15)"
 // @Success 200 {object} listResp

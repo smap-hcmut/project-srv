@@ -23,7 +23,7 @@ func (r *implRepository) Create(ctx context.Context, opt repository.CreateOption
 		Name:       opt.Name,
 		EntityType: sqlboiler.EntityType(opt.EntityType),
 		EntityName: opt.EntityName,
-		Status:     sqlboiler.ProjectStatusDRAFT,
+		Status:     sqlboiler.ProjectStatusPENDING,
 		CreatedBy:  opt.CreatedBy,
 	}
 
