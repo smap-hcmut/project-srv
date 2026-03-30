@@ -149,16 +149,23 @@ func (r activationReadinessReq) toInput() project.ActivationReadinessInput {
 
 type listReq struct {
 	paginator.PaginateQuery
-	CampaignID string `form:"-"`
-	Status     string `form:"status"`
-	Name       string `form:"name"`
-	Brand      string `form:"brand"`
-	EntityType string `form:"entity_type"`
+	CampaignID   string `form:"-"`
+	Status       string `form:"status"`
+	Name         string `form:"name"`
+	Brand        string `form:"brand"`
+	EntityType   string `form:"entity_type"`
+	FavoriteOnly bool   `form:"favorite_only"`
+	Sort         string `form:"sort"`
 }
 
 func (r listReq) validate() error {
 	if !isValidUUID(r.CampaignID) {
 		return errWrongBody
+	}
+	switch r.Sort {
+	case "", "created_at_desc", "favorite_desc":
+	default:
+		return errWrongQuery
 	}
 	return nil
 }
@@ -166,12 +173,51 @@ func (r listReq) validate() error {
 func (r listReq) toInput() project.ListInput {
 	r.PaginateQuery.Adjust()
 	return project.ListInput{
-		CampaignID: r.CampaignID,
-		Status:     r.Status,
-		Name:       r.Name,
-		Brand:      r.Brand,
-		EntityType: r.EntityType,
-		Paginator:  r.PaginateQuery,
+		CampaignID:   r.CampaignID,
+		Status:       r.Status,
+		Name:         r.Name,
+		Brand:        r.Brand,
+		EntityType:   r.EntityType,
+		FavoriteOnly: r.FavoriteOnly,
+		Sort:         r.Sort,
+		Paginator:    r.PaginateQuery,
+	}
+}
+
+type favoriteListReq struct {
+	paginator.PaginateQuery
+	CampaignID   string `form:"campaign_id"`
+	Status       string `form:"status"`
+	Name         string `form:"name"`
+	Brand        string `form:"brand"`
+	EntityType   string `form:"entity_type"`
+	FavoriteOnly bool   `form:"favorite_only"`
+	Sort         string `form:"sort"`
+}
+
+func (r favoriteListReq) validate() error {
+	if r.CampaignID != "" && !isValidUUID(r.CampaignID) {
+		return errWrongQuery
+	}
+	switch r.Sort {
+	case "", "created_at_desc", "favorite_desc":
+	default:
+		return errWrongQuery
+	}
+	return nil
+}
+
+func (r favoriteListReq) toInput() project.ListInput {
+	r.PaginateQuery.Adjust()
+	return project.ListInput{
+		CampaignID:   r.CampaignID,
+		Status:       r.Status,
+		Name:         r.Name,
+		Brand:        r.Brand,
+		EntityType:   r.EntityType,
+		FavoriteOnly: true,
+		Sort:         r.Sort,
+		Paginator:    r.PaginateQuery,
 	}
 }
 
@@ -187,6 +233,7 @@ type projectResp struct {
 	EntityType  string `json:"entity_type" example:"product" enums:"product,campaign,service,competitor,topic"` // Entity type
 	EntityName  string `json:"entity_name" example:"VF8"`                                                       // Specific entity name
 	Status      string `json:"status" example:"PENDING" enums:"PENDING,ACTIVE,PAUSED,ARCHIVED"`                 // Project status
+	IsFavorite  bool   `json:"is_favorite" example:"false"`                                                     // Whether current user favorited this project
 	CreatedBy   string `json:"created_by" example:"550e8400-e29b-41d4-a716-446655440001"`                       // Creator user UUID
 	CreatedAt   string `json:"created_at" example:"2026-02-18T00:00:00Z"`                                       // Creation timestamp
 	UpdatedAt   string `json:"updated_at" example:"2026-02-18T00:00:00Z"`                                       // Last update timestamp
@@ -302,6 +349,7 @@ func (h *handler) toProjectResp(p model.Project) projectResp {
 		EntityType: string(p.EntityType),
 		EntityName: p.EntityName,
 		Status:     string(p.Status),
+		IsFavorite: p.IsFavorite,
 		CreatedBy:  p.CreatedBy,
 		CreatedAt:  p.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt:  p.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),

@@ -1,35 +1,60 @@
 package postgre
 
 import (
-	"project-srv/internal/project/repository"
-	"project-srv/internal/sqlboiler"
+	"fmt"
+	"strings"
 
-	"github.com/aarondl/sqlboiler/v4/queries/qm"
+	"project-srv/internal/project/repository"
+
+	"github.com/lib/pq"
 )
 
-// buildGetQuery builds query mods for listing projects.
-func (r *implRepository) buildGetQuery(opt repository.GetOptions) []qm.QueryMod {
-	var mods []qm.QueryMod
+func (r *implRepository) buildProjectFilters(opt repository.GetOptions) (string, []any) {
+	clauses := []string{"deleted_at IS NULL"}
+	args := make([]any, 0, 8)
 
 	if opt.CampaignID != "" {
-		mods = append(mods, sqlboiler.ProjectWhere.CampaignID.EQ(opt.CampaignID))
+		args = append(args, opt.CampaignID)
+		clauses = append(clauses, fmt.Sprintf("campaign_id = $%d", len(args)))
 	}
 
 	if opt.Status != "" {
-		mods = append(mods, sqlboiler.ProjectWhere.Status.EQ(sqlboiler.ProjectStatus(opt.Status)))
+		args = append(args, opt.Status)
+		clauses = append(clauses, fmt.Sprintf("status = $%d", len(args)))
 	}
 
 	if opt.Name != "" {
-		mods = append(mods, qm.Where(sqlboiler.ProjectColumns.Name+" ILIKE ?", "%"+opt.Name+"%"))
+		args = append(args, "%"+opt.Name+"%")
+		clauses = append(clauses, fmt.Sprintf("name ILIKE $%d", len(args)))
 	}
 
 	if opt.Brand != "" {
-		mods = append(mods, qm.Where(sqlboiler.ProjectColumns.Brand+" ILIKE ?", "%"+opt.Brand+"%"))
+		args = append(args, "%"+opt.Brand+"%")
+		clauses = append(clauses, fmt.Sprintf("brand ILIKE $%d", len(args)))
 	}
 
 	if opt.EntityType != "" {
-		mods = append(mods, sqlboiler.ProjectWhere.EntityType.EQ(sqlboiler.EntityType(opt.EntityType)))
+		args = append(args, opt.EntityType)
+		clauses = append(clauses, fmt.Sprintf("entity_type = $%d", len(args)))
 	}
 
-	return mods
+	if opt.FavoriteOnly {
+		if opt.CurrentUserID == "" {
+			clauses = append(clauses, "1 = 0")
+		} else {
+			args = append(args, pq.Array([]string{opt.CurrentUserID}))
+			clauses = append(clauses, fmt.Sprintf("favorite_user_ids @> $%d::uuid[]", len(args)))
+		}
+	}
+
+	return strings.Join(clauses, " AND "), args
+}
+
+func (r *implRepository) buildProjectOrderBy(opt repository.GetOptions, args *[]any) string {
+	if opt.Sort == "favorite_desc" && opt.CurrentUserID != "" {
+		*args = append(*args, pq.Array([]string{opt.CurrentUserID}))
+		return fmt.Sprintf("CASE WHEN favorite_user_ids @> $%d::uuid[] THEN 0 ELSE 1 END, created_at DESC", len(*args))
+	}
+
+	return "created_at DESC"
 }

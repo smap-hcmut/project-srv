@@ -17,12 +17,15 @@ type CreateOptions struct {
 
 // GetOptions contains filters for listing projects.
 type GetOptions struct {
-	CampaignID string
-	Status     string
-	Name       string
-	Brand      string
-	EntityType string
-	Paginator  paginator.PaginateQuery
+	CampaignID    string
+	Status        string
+	Name          string
+	Brand         string
+	EntityType    string
+	FavoriteOnly  bool
+	Sort          string
+	CurrentUserID string
+	Paginator     paginator.PaginateQuery
 }
 
 // UpdateOptions contains the data for updating a project.

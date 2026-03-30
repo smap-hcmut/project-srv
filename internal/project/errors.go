@@ -14,6 +14,7 @@ var (
 	ErrCampaignNotFound             = errors.New("campaign not found")
 	ErrInvalidStatus                = errors.New("invalid project status")
 	ErrInvalidEntity                = errors.New("invalid entity type")
+	ErrInvalidSort                  = errors.New("invalid project sort")
 	ErrInvalidTransition            = errors.New("invalid project lifecycle transition")
 	ErrActivateNotAllowed           = errors.New("project cannot be activated in its current state")
 	ErrPauseNotAllowed              = errors.New("project cannot be paused in its current state")

@@ -4,17 +4,101 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
+	"time"
+
 	"project-srv/internal/model"
 	"project-srv/internal/project/repository"
 	"project-srv/internal/sqlboiler"
-	"strings"
-	"time"
 
 	"github.com/aarondl/null/v8"
 	"github.com/aarondl/sqlboiler/v4/boil"
 	"github.com/aarondl/sqlboiler/v4/queries/qm"
+	"github.com/lib/pq"
 	"github.com/smap-hcmut/shared-libs/go/paginator"
 )
+
+type projectRow struct {
+	ID              string
+	CampaignID      string
+	Name            string
+	Description     sql.NullString
+	Brand           sql.NullString
+	EntityType      string
+	EntityName      string
+	Status          string
+	ConfigStatus    sql.NullString
+	FavoriteUserIDs pq.StringArray
+	CreatedBy       string
+	CreatedAt       sql.NullTime
+	UpdatedAt       sql.NullTime
+}
+
+func toProjectModel(row projectRow) model.Project {
+	result := model.Project{
+		ID:              row.ID,
+		CampaignID:      row.CampaignID,
+		Name:            row.Name,
+		EntityType:      model.EntityType(row.EntityType),
+		EntityName:      row.EntityName,
+		Status:          model.ProjectStatus(row.Status),
+		FavoriteUserIDs: append([]string(nil), row.FavoriteUserIDs...),
+		CreatedBy:       row.CreatedBy,
+	}
+
+	if row.Description.Valid {
+		result.Description = row.Description.String
+	}
+	if row.Brand.Valid {
+		result.Brand = row.Brand.String
+	}
+	if row.ConfigStatus.Valid {
+		result.ConfigStatus = model.ProjectConfigStatus(row.ConfigStatus.String)
+	}
+	if row.CreatedAt.Valid {
+		result.CreatedAt = row.CreatedAt.Time
+	}
+	if row.UpdatedAt.Valid {
+		result.UpdatedAt = row.UpdatedAt.Time
+	}
+
+	return result
+}
+
+func (r *implRepository) fetchProjectByID(ctx context.Context, id string) (model.Project, error) {
+	query := `
+		SELECT id, campaign_id, name, description, brand, entity_type, entity_name, status, config_status, favorite_user_ids, created_by, created_at, updated_at
+		FROM schema_project.projects
+		WHERE id = $1 AND deleted_at IS NULL
+	`
+
+	var row projectRow
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&row.ID,
+		&row.CampaignID,
+		&row.Name,
+		&row.Description,
+		&row.Brand,
+		&row.EntityType,
+		&row.EntityName,
+		&row.Status,
+		&row.ConfigStatus,
+		&row.FavoriteUserIDs,
+		&row.CreatedBy,
+		&row.CreatedAt,
+		&row.UpdatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			r.l.Warnf(ctx, "project.repository.fetchProjectByID.QueryRowContext: not found id=%s", id)
+			return model.Project{}, repository.ErrNotFound
+		}
+		r.l.Errorf(ctx, "project.repository.fetchProjectByID.QueryRowContext: %v", err)
+		return model.Project{}, repository.ErrFailedToGet
+	}
+
+	return toProjectModel(row), nil
+}
 
 // Create inserts a new project into the database.
 func (r *implRepository) Create(ctx context.Context, opt repository.CreateOptions) (model.Project, error) {
@@ -49,55 +133,72 @@ func (r *implRepository) Create(ctx context.Context, opt repository.CreateOption
 
 // Detail fetches a single project by ID.
 func (r *implRepository) Detail(ctx context.Context, id string) (model.Project, error) {
-	row, err := sqlboiler.FindProject(ctx, r.db, id)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			r.l.Warnf(ctx, "project.repository.Detail.FindProject: not found id=%s", id)
-			return model.Project{}, repository.ErrNotFound
-		}
-		r.l.Errorf(ctx, "project.repository.Detail.FindProject: %v", err)
-		return model.Project{}, repository.ErrFailedToGet
-	}
-
-	result := model.NewProjectFromDB(row)
-	return *result, nil
+	return r.fetchProjectByID(ctx, id)
 }
 
 // Get fetches projects with pagination and filters.
 func (r *implRepository) Get(ctx context.Context, opt repository.GetOptions) ([]model.Project, paginator.Paginator, error) {
-	mods := r.buildGetQuery(opt)
+	whereClause, args := r.buildProjectFilters(opt)
 
-	// Count total
-	total, err := sqlboiler.Projects(mods...).Count(ctx, r.db)
-	if err != nil {
-		r.l.Errorf(ctx, "project.repository.Get.Count: %v", err)
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM schema_project.projects WHERE %s", whereClause)
+	var total int64
+	if err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
+		r.l.Errorf(ctx, "project.repository.Get.QueryRowContext.count: %v", err)
 		return nil, paginator.Paginator{}, repository.ErrFailedToList
 	}
 
-	// Apply pagination
-	pq := opt.Paginator
-	mods = append(mods,
-		qm.Limit(int(pq.Limit)),
-		qm.Offset(int(pq.Offset())),
-		qm.OrderBy(fmt.Sprintf("%s DESC", sqlboiler.ProjectColumns.CreatedAt)),
-	)
+	pqg := opt.Paginator
+	orderBy := r.buildProjectOrderBy(opt, &args)
+	args = append(args, pqg.Limit, pqg.Offset())
 
-	rows, err := sqlboiler.Projects(mods...).All(ctx, r.db)
+	query := fmt.Sprintf(`
+		SELECT id, campaign_id, name, description, brand, entity_type, entity_name, status, config_status, favorite_user_ids, created_by, created_at, updated_at
+		FROM schema_project.projects
+		WHERE %s
+		ORDER BY %s
+		LIMIT $%d OFFSET $%d
+	`, whereClause, orderBy, len(args)-1, len(args))
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		r.l.Errorf(ctx, "project.repository.Get.All: %v", err)
+		r.l.Errorf(ctx, "project.repository.Get.QueryContext.list: %v", err)
 		return nil, paginator.Paginator{}, repository.ErrFailedToList
 	}
+	defer rows.Close()
 
-	projects := make([]model.Project, 0, len(rows))
-	for _, row := range rows {
-		projects = append(projects, *model.NewProjectFromDB(row))
+	projects := make([]model.Project, 0)
+	for rows.Next() {
+		var row projectRow
+		if err := rows.Scan(
+			&row.ID,
+			&row.CampaignID,
+			&row.Name,
+			&row.Description,
+			&row.Brand,
+			&row.EntityType,
+			&row.EntityName,
+			&row.Status,
+			&row.ConfigStatus,
+			&row.FavoriteUserIDs,
+			&row.CreatedBy,
+			&row.CreatedAt,
+			&row.UpdatedAt,
+		); err != nil {
+			r.l.Errorf(ctx, "project.repository.Get.rows.Scan: %v", err)
+			return nil, paginator.Paginator{}, repository.ErrFailedToList
+		}
+		projects = append(projects, toProjectModel(row))
+	}
+	if err := rows.Err(); err != nil {
+		r.l.Errorf(ctx, "project.repository.Get.rows.Err: %v", err)
+		return nil, paginator.Paginator{}, repository.ErrFailedToList
 	}
 
 	pag := paginator.Paginator{
 		Total:       total,
 		Count:       int64(len(projects)),
-		PerPage:     pq.Limit,
-		CurrentPage: pq.Page,
+		PerPage:     pqg.Limit,
+		CurrentPage: pqg.Page,
 	}
 
 	return projects, pag, nil
@@ -138,8 +239,11 @@ func (r *implRepository) Update(ctx context.Context, opt repository.UpdateOption
 		return model.Project{}, repository.ErrFailedToUpdate
 	}
 
-	result := model.NewProjectFromDB(row)
-	return *result, nil
+	result, err := r.fetchProjectByID(ctx, opt.ID)
+	if err != nil {
+		return model.Project{}, err
+	}
+	return result, nil
 }
 
 // UpdateStatus updates only the lifecycle status of a project.
@@ -184,18 +288,7 @@ func (r *implRepository) UpdateStatus(ctx context.Context, opt repository.Update
 			return model.Project{}, repository.ErrStatusConflict
 		}
 
-		row, err := sqlboiler.FindProject(ctx, r.db, opt.ID)
-		if err != nil {
-			if err == sql.ErrNoRows {
-				r.l.Warnf(ctx, "project.repository.UpdateStatus.FindProjectAfterUpdate: not found id=%s", opt.ID)
-				return model.Project{}, repository.ErrNotFound
-			}
-			r.l.Errorf(ctx, "project.repository.UpdateStatus.FindProjectAfterUpdate: %v", err)
-			return model.Project{}, repository.ErrFailedToUpdate
-		}
-
-		result := model.NewProjectFromDB(row)
-		return *result, nil
+		return r.fetchProjectByID(ctx, opt.ID)
 	}
 
 	row, err := sqlboiler.FindProject(ctx, r.db, opt.ID)
@@ -220,8 +313,64 @@ func (r *implRepository) UpdateStatus(ctx context.Context, opt repository.Update
 		return model.Project{}, repository.ErrFailedToUpdate
 	}
 
-	result := model.NewProjectFromDB(row)
-	return *result, nil
+	return r.fetchProjectByID(ctx, opt.ID)
+}
+
+// Favorite adds a user to the favorite array idempotently.
+func (r *implRepository) Favorite(ctx context.Context, id, userID string) error {
+	query := `
+		UPDATE schema_project.projects
+		SET favorite_user_ids = CASE
+			WHEN NOT favorite_user_ids @> $2::uuid[] THEN array_append(favorite_user_ids, $3::uuid)
+			ELSE favorite_user_ids
+		END,
+		    updated_at = NOW()
+		WHERE id = $1 AND deleted_at IS NULL
+	`
+	result, err := r.db.ExecContext(ctx, query, id, pq.Array([]string{userID}), userID)
+	if err != nil {
+		r.l.Errorf(ctx, "project.repository.Favorite.ExecContext: id=%s user_id=%s err=%v", id, userID, err)
+		return repository.ErrFailedToUpdate
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		r.l.Errorf(ctx, "project.repository.Favorite.RowsAffected: id=%s user_id=%s err=%v", id, userID, err)
+		return repository.ErrFailedToUpdate
+	}
+	if affected == 0 {
+		r.l.Warnf(ctx, "project.repository.Favorite: not found id=%s", id)
+		return repository.ErrNotFound
+	}
+
+	return nil
+}
+
+// Unfavorite removes a user from the favorite array idempotently.
+func (r *implRepository) Unfavorite(ctx context.Context, id, userID string) error {
+	query := `
+		UPDATE schema_project.projects
+		SET favorite_user_ids = array_remove(favorite_user_ids, $2::uuid),
+		    updated_at = NOW()
+		WHERE id = $1 AND deleted_at IS NULL
+	`
+	result, err := r.db.ExecContext(ctx, query, id, userID)
+	if err != nil {
+		r.l.Errorf(ctx, "project.repository.Unfavorite.ExecContext: id=%s user_id=%s err=%v", id, userID, err)
+		return repository.ErrFailedToUpdate
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		r.l.Errorf(ctx, "project.repository.Unfavorite.RowsAffected: id=%s user_id=%s err=%v", id, userID, err)
+		return repository.ErrFailedToUpdate
+	}
+	if affected == 0 {
+		r.l.Warnf(ctx, "project.repository.Unfavorite: not found id=%s", id)
+		return repository.ErrNotFound
+	}
+
+	return nil
 }
 
 // Archive soft-deletes a project by setting deleted_at.

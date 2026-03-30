@@ -29,12 +29,15 @@ type DetailOutput struct {
 
 // ListInput is the input for listing projects.
 type ListInput struct {
-	CampaignID string
-	Status     string
-	Name       string
-	Brand      string
-	EntityType string
-	Paginator  paginator.PaginateQuery
+	CampaignID    string
+	Status        string
+	Name          string
+	Brand         string
+	EntityType    string
+	FavoriteOnly  bool
+	Sort          string
+	CurrentUserID string
+	Paginator     paginator.PaginateQuery
 }
 
 // ListOutput is the output for listing projects.

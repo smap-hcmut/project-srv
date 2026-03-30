@@ -26,9 +26,12 @@ type DetailOutput struct {
 
 // ListInput is the input for listing campaigns.
 type ListInput struct {
-	Status    string
-	Name      string
-	Paginator paginator.PaginateQuery
+	Status        string
+	Name          string
+	FavoriteOnly  bool
+	Sort          string
+	CurrentUserID string
+	Paginator     paginator.PaginateQuery
 }
 
 // ListOutput is the output for listing campaigns.

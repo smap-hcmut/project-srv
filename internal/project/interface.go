@@ -10,6 +10,8 @@ type UseCase interface {
 	Detail(ctx context.Context, id string) (DetailOutput, error)
 	List(ctx context.Context, input ListInput) (ListOutput, error)
 	Update(ctx context.Context, input UpdateInput) (UpdateOutput, error)
+	Favorite(ctx context.Context, id string) error
+	Unfavorite(ctx context.Context, id string) error
 	Delete(ctx context.Context, id string) error
 
 	LifecycleManager

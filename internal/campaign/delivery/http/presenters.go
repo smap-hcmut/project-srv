@@ -105,16 +105,29 @@ func (r updateReq) toInput(id string) campaign.UpdateInput {
 
 type listReq struct {
 	paginator.PaginateQuery
-	Status string `form:"status"`
-	Name   string `form:"name"`
+	Status       string `form:"status"`
+	Name         string `form:"name"`
+	FavoriteOnly bool   `form:"favorite_only"`
+	Sort         string `form:"sort"`
+}
+
+func (r listReq) validate() error {
+	switch r.Sort {
+	case "", "created_at_desc", "favorite_desc":
+		return nil
+	default:
+		return errWrongQuery
+	}
 }
 
 func (r listReq) toInput() campaign.ListInput {
 	r.PaginateQuery.Adjust()
 	return campaign.ListInput{
-		Status:    r.Status,
-		Name:      r.Name,
-		Paginator: r.PaginateQuery,
+		Status:       r.Status,
+		Name:         r.Name,
+		FavoriteOnly: r.FavoriteOnly,
+		Sort:         r.Sort,
+		Paginator:    r.PaginateQuery,
 	}
 }
 
@@ -126,6 +139,7 @@ type campaignResp struct {
 	Name        string  `json:"name" example:"Q1 2026 VinFast Campaign"`                         // Campaign name
 	Description string  `json:"description,omitempty" example:"Monitor VinFast brand sentiment"` // Campaign description
 	Status      string  `json:"status" example:"PENDING" enums:"PENDING,ACTIVE,PAUSED,ARCHIVED"` // Campaign status
+	IsFavorite  bool    `json:"is_favorite" example:"false"`                                     // Whether current user favorited this campaign
 	StartDate   *string `json:"start_date,omitempty" example:"2026-01-01T00:00:00Z"`             // Campaign start date
 	EndDate     *string `json:"end_date,omitempty" example:"2026-03-31T23:59:59Z"`               // Campaign end date
 	CreatedBy   string  `json:"created_by" example:"550e8400-e29b-41d4-a716-446655440001"`       // Creator user UUID
@@ -189,12 +203,13 @@ func (h *handler) newUpdateResp(o campaign.UpdateOutput) updateResp {
 
 func toCampaignResp(c model.Campaign) campaignResp {
 	resp := campaignResp{
-		ID:        c.ID,
-		Name:      c.Name,
-		Status:    string(c.Status),
-		CreatedBy: c.CreatedBy,
-		CreatedAt: c.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt: c.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		ID:         c.ID,
+		Name:       c.Name,
+		Status:     string(c.Status),
+		IsFavorite: c.IsFavorite,
+		CreatedBy:  c.CreatedBy,
+		CreatedAt:  c.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:  c.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
 
 	if c.Description != "" {

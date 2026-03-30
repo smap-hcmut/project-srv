@@ -54,6 +54,7 @@ func (uc *implUseCase) Create(ctx context.Context, input project.CreateInput) (p
 		uc.l.Errorf(ctx, "project.usecase.Create.repo.Create: %v", err)
 		return project.CreateOutput{}, project.ErrCreateFailed
 	}
+	result = uc.favoriteProjectForUser(result, userID)
 
 	return project.CreateOutput{Project: result}, nil
 }
@@ -75,6 +76,8 @@ func (uc *implUseCase) Detail(ctx context.Context, id string) (project.DetailOut
 		}
 		return project.DetailOutput{}, project.ErrDetailFailed
 	}
+	userID, _ := auth.GetUserIDFromContext(ctx)
+	result = uc.favoriteProjectForUser(result, userID)
 
 	return project.DetailOutput{Project: result}, nil
 }
@@ -93,21 +96,32 @@ func (uc *implUseCase) List(ctx context.Context, input project.ListInput) (proje
 			return project.ListOutput{}, project.ErrInvalidEntity
 		}
 	}
+	if err := uc.validateProjectSort(input.Sort); err != nil {
+		uc.l.Warnf(ctx, "project.usecase.List.validateProjectSort: invalid sort=%s", input.Sort)
+		return project.ListOutput{}, err
+	}
+	userID, _ := auth.GetUserIDFromContext(ctx)
 
 	// Convert Input → Options
 	opt := repo.GetOptions{
-		CampaignID: input.CampaignID,
-		Status:     input.Status,
-		Name:       input.Name,
-		Brand:      input.Brand,
-		EntityType: input.EntityType,
-		Paginator:  input.Paginator,
+		CampaignID:    input.CampaignID,
+		Status:        input.Status,
+		Name:          input.Name,
+		Brand:         input.Brand,
+		EntityType:    input.EntityType,
+		FavoriteOnly:  input.FavoriteOnly,
+		Sort:          input.Sort,
+		CurrentUserID: userID,
+		Paginator:     input.Paginator,
 	}
 
 	projects, pag, err := uc.repo.Get(ctx, opt)
 	if err != nil {
 		uc.l.Errorf(ctx, "project.usecase.List.repo.Get: %v", err)
 		return project.ListOutput{}, project.ErrListFailed
+	}
+	for i := range projects {
+		projects[i] = uc.favoriteProjectForUser(projects[i], userID)
 	}
 
 	return project.ListOutput{
@@ -148,8 +162,58 @@ func (uc *implUseCase) Update(ctx context.Context, input project.UpdateInput) (p
 		}
 		return project.UpdateOutput{}, project.ErrUpdateFailed
 	}
+	userID, _ := auth.GetUserIDFromContext(ctx)
+	result = uc.favoriteProjectForUser(result, userID)
 
 	return project.UpdateOutput{Project: result}, nil
+}
+
+// Favorite marks a project as favorite for the current user.
+func (uc *implUseCase) Favorite(ctx context.Context, id string) error {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		uc.l.Warnf(ctx, "project.usecase.Favorite: empty id")
+		return project.ErrNotFound
+	}
+
+	userID, _ := auth.GetUserIDFromContext(ctx)
+	if userID == "" {
+		uc.l.Warnf(ctx, "project.usecase.Favorite: missing user id for id=%s", id)
+		return project.ErrUpdateFailed
+	}
+	if err := uc.repo.Favorite(ctx, id, userID); err != nil {
+		uc.l.Errorf(ctx, "project.usecase.Favorite.repo.Favorite: id=%s user_id=%s err=%v", id, userID, err)
+		if err == repo.ErrNotFound {
+			return project.ErrNotFound
+		}
+		return project.ErrUpdateFailed
+	}
+
+	return nil
+}
+
+// Unfavorite removes a project favorite for the current user.
+func (uc *implUseCase) Unfavorite(ctx context.Context, id string) error {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		uc.l.Warnf(ctx, "project.usecase.Unfavorite: empty id")
+		return project.ErrNotFound
+	}
+
+	userID, _ := auth.GetUserIDFromContext(ctx)
+	if userID == "" {
+		uc.l.Warnf(ctx, "project.usecase.Unfavorite: missing user id for id=%s", id)
+		return project.ErrUpdateFailed
+	}
+	if err := uc.repo.Unfavorite(ctx, id, userID); err != nil {
+		uc.l.Errorf(ctx, "project.usecase.Unfavorite.repo.Unfavorite: id=%s user_id=%s err=%v", id, userID, err)
+		if err == repo.ErrNotFound {
+			return project.ErrNotFound
+		}
+		return project.ErrUpdateFailed
+	}
+
+	return nil
 }
 
 // Delete soft-deletes a project by ID after it has been archived.

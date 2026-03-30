@@ -18,15 +18,17 @@ const (
 
 // Campaign represents a high-level marketing campaign
 type Campaign struct {
-	ID          string         `json:"id"`
-	Name        string         `json:"name"`
-	Description string         `json:"description,omitempty"`
-	Status      CampaignStatus `json:"status"`
-	StartDate   *time.Time     `json:"start_date,omitempty"`
-	EndDate     *time.Time     `json:"end_date,omitempty"`
-	CreatedBy   string         `json:"created_by"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
+	ID              string         `json:"id"`
+	Name            string         `json:"name"`
+	Description     string         `json:"description,omitempty"`
+	Status          CampaignStatus `json:"status"`
+	StartDate       *time.Time     `json:"start_date,omitempty"`
+	EndDate         *time.Time     `json:"end_date,omitempty"`
+	FavoriteUserIDs []string       `json:"-"`
+	IsFavorite      bool           `json:"is_favorite"`
+	CreatedBy       string         `json:"created_by"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
 }
 
 // NewCampaignFromDB converts a sqlboiler Campaign to a domain Campaign.

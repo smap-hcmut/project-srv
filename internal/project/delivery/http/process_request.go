@@ -33,12 +33,26 @@ func (h *handler) processListReq(c *gin.Context) (listReq, error) {
 	var req listReq
 	if err := c.ShouldBindQuery(&req); err != nil {
 		h.l.Warnf(c.Request.Context(), "project.delivery.processListReq.ShouldBindQuery: %v", err)
-		return req, errWrongBody
+		return req, errWrongQuery
 	}
 	req.CampaignID = c.Param("id")
 	if err := req.validate(); err != nil {
 		h.l.Warnf(c.Request.Context(), "project.delivery.processListReq.validate: %v", err)
 		return req, errWrongBody
+	}
+	return req, nil
+}
+
+// processFavoriteListReq binds query params for global favorite project listing.
+func (h *handler) processFavoriteListReq(c *gin.Context) (favoriteListReq, error) {
+	var req favoriteListReq
+	if err := c.ShouldBindQuery(&req); err != nil {
+		h.l.Warnf(c.Request.Context(), "project.delivery.processFavoriteListReq.ShouldBindQuery: %v", err)
+		return req, errWrongQuery
+	}
+	if err := req.validate(); err != nil {
+		h.l.Warnf(c.Request.Context(), "project.delivery.processFavoriteListReq.validate: %v", err)
+		return req, err
 	}
 	return req, nil
 }
@@ -80,7 +94,7 @@ func (h *handler) processActivationReadinessReq(c *gin.Context) (activationReadi
 	var req activationReadinessReq
 	if err := c.ShouldBindQuery(&req); err != nil {
 		h.l.Warnf(c.Request.Context(), "project.delivery.processActivationReadinessReq.ShouldBindQuery: %v", err)
-		return req, errWrongBody
+		return req, errWrongQuery
 	}
 	req.ID = c.Param("project_id")
 	if err := req.validate(); err != nil {

@@ -13,6 +13,7 @@ var (
 	errNotFound          = &pkgErrors.HTTPError{Code: 150001, Message: "Campaign not found", StatusCode: http.StatusBadRequest}
 	errNameRequired      = &pkgErrors.HTTPError{Code: 150002, Message: "Campaign name is required", StatusCode: http.StatusBadRequest}
 	errInvalidStatus     = &pkgErrors.HTTPError{Code: 150003, Message: "Invalid campaign status", StatusCode: http.StatusBadRequest}
+	errInvalidSort       = &pkgErrors.HTTPError{Code: 150012, Message: "Invalid campaign sort", StatusCode: http.StatusBadRequest}
 	errInvalidDateRange  = &pkgErrors.HTTPError{Code: 150004, Message: "Invalid date range: start_date must be before end_date", StatusCode: http.StatusBadRequest}
 	errCreateFailed      = &pkgErrors.HTTPError{Code: 150005, Message: "Failed to create campaign", StatusCode: http.StatusInternalServerError}
 	errUpdateFailed      = &pkgErrors.HTTPError{Code: 150006, Message: "Failed to update campaign", StatusCode: http.StatusInternalServerError}
@@ -32,6 +33,8 @@ func (h *handler) mapError(err error) error {
 		return errNameRequired
 	case campaign.ErrInvalidStatus:
 		return errInvalidStatus
+	case campaign.ErrInvalidSort:
+		return errInvalidSort
 	case campaign.ErrInvalidDateRange:
 		return errInvalidDateRange
 	case campaign.ErrCreateFailed:

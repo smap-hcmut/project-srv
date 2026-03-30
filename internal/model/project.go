@@ -44,18 +44,20 @@ const (
 
 // Project represents a specific entity monitoring unit
 type Project struct {
-	ID           string              `json:"id"`
-	CampaignID   string              `json:"campaign_id"`
-	Name         string              `json:"name"`
-	Description  string              `json:"description,omitempty"`
-	Brand        string              `json:"brand,omitempty"`
-	EntityType   EntityType          `json:"entity_type"`
-	EntityName   string              `json:"entity_name"`
-	Status       ProjectStatus       `json:"status"`
-	ConfigStatus ProjectConfigStatus `json:"config_status"`
-	CreatedBy    string              `json:"created_by"`
-	CreatedAt    time.Time           `json:"created_at"`
-	UpdatedAt    time.Time           `json:"updated_at"`
+	ID              string              `json:"id"`
+	CampaignID      string              `json:"campaign_id"`
+	Name            string              `json:"name"`
+	Description     string              `json:"description,omitempty"`
+	Brand           string              `json:"brand,omitempty"`
+	EntityType      EntityType          `json:"entity_type"`
+	EntityName      string              `json:"entity_name"`
+	Status          ProjectStatus       `json:"status"`
+	ConfigStatus    ProjectConfigStatus `json:"config_status"`
+	FavoriteUserIDs []string            `json:"-"`
+	IsFavorite      bool                `json:"is_favorite"`
+	CreatedBy       string              `json:"created_by"`
+	CreatedAt       time.Time           `json:"created_at"`
+	UpdatedAt       time.Time           `json:"updated_at"`
 
 	// Relations
 	Campaign *Campaign `json:"campaign,omitempty"`
