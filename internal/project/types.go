@@ -9,12 +9,13 @@ import (
 
 // CreateInput is the input for creating a project.
 type CreateInput struct {
-	CampaignID  string
-	Name        string
-	Description string
-	Brand       string
-	EntityType  string
-	EntityName  string
+	CampaignID     string
+	Name           string
+	Description    string
+	Brand          string
+	EntityType     string
+	EntityName     string
+	DomainTypeCode string
 }
 
 // CreateOutput is the output after creating a project.
@@ -48,12 +49,13 @@ type ListOutput struct {
 
 // UpdateInput is the input for updating a project.
 type UpdateInput struct {
-	ID          string
-	Name        string
-	Description string
-	Brand       string
-	EntityType  string
-	EntityName  string
+	ID             string
+	Name           string
+	Description    string
+	Brand          string
+	EntityType     string
+	EntityName     string
+	DomainTypeCode string
 }
 
 // UpdateOutput is the output after updating a project.

@@ -51,6 +51,7 @@ type Project struct {
 	Brand           string              `json:"brand,omitempty"`
 	EntityType      EntityType          `json:"entity_type"`
 	EntityName      string              `json:"entity_name"`
+	DomainTypeCode  string              `json:"domain_type_code"`
 	Status          ProjectStatus       `json:"status"`
 	ConfigStatus    ProjectConfigStatus `json:"config_status"`
 	FavoriteUserIDs []string            `json:"-"`
@@ -109,13 +110,14 @@ func NewProjectFromDB(db *sqlboiler.Project) *Project {
 	}
 
 	p := &Project{
-		ID:         db.ID,
-		CampaignID: db.CampaignID,
-		Name:       db.Name,
-		EntityType: EntityType(db.EntityType),
-		EntityName: db.EntityName,
-		Status:     ProjectStatus(db.Status),
-		CreatedBy:  db.CreatedBy,
+		ID:             db.ID,
+		CampaignID:     db.CampaignID,
+		Name:           db.Name,
+		EntityType:     EntityType(db.EntityType),
+		EntityName:     db.EntityName,
+		DomainTypeCode: db.DomainTypeCode,
+		Status:         ProjectStatus(db.Status),
+		CreatedBy:      db.CreatedBy,
 	}
 
 	if db.Description.Valid {

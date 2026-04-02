@@ -13,12 +13,13 @@ import (
 
 // createReq represents project creation request
 type createReq struct {
-	CampaignID  string `json:"-"`                                                                                                  // Parent campaign ID (from path param)
-	Name        string `json:"name" binding:"required" example:"VinFast VF8 Monitoring"`                                           // Project name (required)
-	Description string `json:"description" example:"Monitor discussions about VF8 electric SUV"`                                   // Project description
-	Brand       string `json:"brand" example:"VinFast"`                                                                            // Brand name for UI grouping
-	EntityType  string `json:"entity_type" binding:"required" example:"product" enums:"product,campaign,service,competitor,topic"` // Entity type (required)
-	EntityName  string `json:"entity_name" binding:"required" example:"VF8"`                                                       // Specific entity name (required)
+	CampaignID     string `json:"-"`                                                                                                  // Parent campaign ID (from path param)
+	Name           string `json:"name" binding:"required" example:"VinFast VF8 Monitoring"`                                           // Project name (required)
+	Description    string `json:"description" example:"Monitor discussions about VF8 electric SUV"`                                   // Project description
+	Brand          string `json:"brand" example:"VinFast"`                                                                            // Brand name for UI grouping
+	EntityType     string `json:"entity_type" binding:"required" example:"product" enums:"product,campaign,service,competitor,topic"` // Entity type (required)
+	EntityName     string `json:"entity_name" binding:"required" example:"VF8"`                                                       // Specific entity name (required)
+	DomainTypeCode string `json:"domain_type_code" binding:"required" example:"ev"`                                                   // Analysis/business domain code
 }
 
 func (r createReq) validate() error {
@@ -43,17 +44,21 @@ func (r createReq) validate() error {
 	if r.EntityName == "" {
 		return errEntityNameRequired
 	}
+	if strings.TrimSpace(r.DomainTypeCode) == "" {
+		return errDomainTypeRequired
+	}
 	return nil
 }
 
 func (r createReq) toInput() project.CreateInput {
 	return project.CreateInput{
-		CampaignID:  r.CampaignID,
-		Name:        r.Name,
-		Description: r.Description,
-		Brand:       r.Brand,
-		EntityType:  r.EntityType,
-		EntityName:  r.EntityName,
+		CampaignID:     r.CampaignID,
+		Name:           r.Name,
+		Description:    r.Description,
+		Brand:          r.Brand,
+		EntityType:     r.EntityType,
+		EntityName:     r.EntityName,
+		DomainTypeCode: strings.TrimSpace(r.DomainTypeCode),
 	}
 }
 
@@ -74,12 +79,13 @@ func (r detailReq) toInput() string {
 
 // updateReq represents project update request
 type updateReq struct {
-	ID          string `json:"-"`                                                                               // Project ID (from path param)
-	Name        string `json:"name" example:"VinFast VF8 Monitoring - Updated"`                                 // Project name
-	Description string `json:"description" example:"Monitor discussions about VF8 electric SUV - Updated"`      // Project description
-	Brand       string `json:"brand" example:"VinFast"`                                                         // Brand name
-	EntityType  string `json:"entity_type" example:"product" enums:"product,campaign,service,competitor,topic"` // Entity type
-	EntityName  string `json:"entity_name" example:"VF8"`                                                       // Specific entity name
+	ID             string `json:"-"`                                                                               // Project ID (from path param)
+	Name           string `json:"name" example:"VinFast VF8 Monitoring - Updated"`                                 // Project name
+	Description    string `json:"description" example:"Monitor discussions about VF8 electric SUV - Updated"`      // Project description
+	Brand          string `json:"brand" example:"VinFast"`                                                         // Brand name
+	EntityType     string `json:"entity_type" example:"product" enums:"product,campaign,service,competitor,topic"` // Entity type
+	EntityName     string `json:"entity_name" example:"VF8"`                                                       // Specific entity name
+	DomainTypeCode string `json:"domain_type_code,omitempty" example:"ev"`                                         // Analysis/business domain code
 }
 
 func (r updateReq) validate() error {
@@ -99,12 +105,13 @@ func (r updateReq) validate() error {
 
 func (r updateReq) toInput() project.UpdateInput {
 	return project.UpdateInput{
-		ID:          r.ID,
-		Name:        r.Name,
-		Description: r.Description,
-		Brand:       r.Brand,
-		EntityType:  r.EntityType,
-		EntityName:  r.EntityName,
+		ID:             r.ID,
+		Name:           r.Name,
+		Description:    r.Description,
+		Brand:          r.Brand,
+		EntityType:     r.EntityType,
+		EntityName:     r.EntityName,
+		DomainTypeCode: strings.TrimSpace(r.DomainTypeCode),
 	}
 }
 
@@ -225,18 +232,19 @@ func (r favoriteListReq) toInput() project.ListInput {
 
 // projectResp represents project data in API responses
 type projectResp struct {
-	ID          string `json:"id" example:"550e8400-e29b-41d4-a716-446655440002"`                               // Project UUID
-	CampaignID  string `json:"campaign_id" example:"550e8400-e29b-41d4-a716-446655440000"`                      // Parent campaign UUID
-	Name        string `json:"name" example:"VinFast VF8 Monitoring"`                                           // Project name
-	Description string `json:"description,omitempty" example:"Monitor discussions about VF8 electric SUV"`      // Project description
-	Brand       string `json:"brand,omitempty" example:"VinFast"`                                               // Brand name for UI grouping
-	EntityType  string `json:"entity_type" example:"product" enums:"product,campaign,service,competitor,topic"` // Entity type
-	EntityName  string `json:"entity_name" example:"VF8"`                                                       // Specific entity name
-	Status      string `json:"status" example:"PENDING" enums:"PENDING,ACTIVE,PAUSED,ARCHIVED"`                 // Project status
-	IsFavorite  bool   `json:"is_favorite" example:"false"`                                                     // Whether current user favorited this project
-	CreatedBy   string `json:"created_by" example:"550e8400-e29b-41d4-a716-446655440001"`                       // Creator user UUID
-	CreatedAt   string `json:"created_at" example:"2026-02-18T00:00:00Z"`                                       // Creation timestamp
-	UpdatedAt   string `json:"updated_at" example:"2026-02-18T00:00:00Z"`                                       // Last update timestamp
+	ID             string `json:"id" example:"550e8400-e29b-41d4-a716-446655440002"`                               // Project UUID
+	CampaignID     string `json:"campaign_id" example:"550e8400-e29b-41d4-a716-446655440000"`                      // Parent campaign UUID
+	Name           string `json:"name" example:"VinFast VF8 Monitoring"`                                           // Project name
+	Description    string `json:"description,omitempty" example:"Monitor discussions about VF8 electric SUV"`      // Project description
+	Brand          string `json:"brand,omitempty" example:"VinFast"`                                               // Brand name for UI grouping
+	EntityType     string `json:"entity_type" example:"product" enums:"product,campaign,service,competitor,topic"` // Entity type
+	EntityName     string `json:"entity_name" example:"VF8"`                                                       // Specific entity name
+	DomainTypeCode string `json:"domain_type_code" example:"ev"`                                                   // Analysis/business domain code
+	Status         string `json:"status" example:"PENDING" enums:"PENDING,ACTIVE,PAUSED,ARCHIVED"`                 // Project status
+	IsFavorite     bool   `json:"is_favorite" example:"false"`                                                     // Whether current user favorited this project
+	CreatedBy      string `json:"created_by" example:"550e8400-e29b-41d4-a716-446655440001"`                       // Creator user UUID
+	CreatedAt      string `json:"created_at" example:"2026-02-18T00:00:00Z"`                                       // Creation timestamp
+	UpdatedAt      string `json:"updated_at" example:"2026-02-18T00:00:00Z"`                                       // Last update timestamp
 }
 
 // createResp wraps project creation response
@@ -343,16 +351,17 @@ func (h *handler) newActivationReadinessResp(o project.ActivationReadiness) acti
 
 func (h *handler) toProjectResp(p model.Project) projectResp {
 	resp := projectResp{
-		ID:         p.ID,
-		CampaignID: p.CampaignID,
-		Name:       p.Name,
-		EntityType: string(p.EntityType),
-		EntityName: p.EntityName,
-		Status:     string(p.Status),
-		IsFavorite: p.IsFavorite,
-		CreatedBy:  p.CreatedBy,
-		CreatedAt:  p.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:  p.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		ID:             p.ID,
+		CampaignID:     p.CampaignID,
+		Name:           p.Name,
+		EntityType:     string(p.EntityType),
+		EntityName:     p.EntityName,
+		DomainTypeCode: p.DomainTypeCode,
+		Status:         string(p.Status),
+		IsFavorite:     p.IsFavorite,
+		CreatedBy:      p.CreatedBy,
+		CreatedAt:      p.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:      p.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
 
 	if p.Description != "" {

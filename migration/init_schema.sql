@@ -54,7 +54,27 @@ CREATE TYPE schema_project.entity_type AS ENUM (
 );
 
 -- =====================================================
--- 1. CAMPAIGNS TABLE
+-- 1. DOMAIN TYPES REGISTRY
+-- =====================================================
+CREATE TABLE IF NOT EXISTS schema_project.domain_types (
+    code VARCHAR(50) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO schema_project.domain_types (code, name, description)
+VALUES
+    ('generic', 'Generic', 'Fallback domain used for legacy or uncategorized projects'),
+    ('ev', 'Electric Vehicles', 'Electric vehicle products, brands, charging, policy, and ecosystem'),
+    ('fnb', 'Food & Beverage', 'Food, beverage, restaurant, cafe, and hospitality conversations'),
+    ('crypto', 'Crypto & Blockchain', 'Crypto, blockchain, DeFi, wallets, exchanges, and web3 topics')
+ON CONFLICT (code) DO NOTHING;
+
+-- =====================================================
+-- 2. CAMPAIGNS TABLE
 -- =====================================================
 CREATE TABLE IF NOT EXISTS schema_project.campaigns (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -79,7 +99,7 @@ CREATE INDEX IF NOT EXISTS idx_campaigns_created_by ON schema_project.campaigns(
 CREATE INDEX IF NOT EXISTS idx_campaigns_date_range ON schema_project.campaigns(start_date, end_date);
 
 -- =====================================================
--- 2. PROJECTS TABLE
+-- 3. PROJECTS TABLE
 -- =====================================================
 CREATE TABLE IF NOT EXISTS schema_project.projects (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -91,6 +111,7 @@ CREATE TABLE IF NOT EXISTS schema_project.projects (
     brand VARCHAR(100), -- Text field for grouping/filtering in UI
     entity_type schema_project.entity_type NOT NULL DEFAULT 'product'::schema_project.entity_type,
     entity_name VARCHAR(200) NOT NULL, -- Specific name (e.g. "VF8")
+    domain_type_code VARCHAR(50) NOT NULL DEFAULT 'generic' REFERENCES schema_project.domain_types(code),
     
     -- Status Fields
     status schema_project.project_status NOT NULL DEFAULT 'PENDING'::schema_project.project_status,
@@ -109,6 +130,7 @@ CREATE INDEX IF NOT EXISTS idx_projects_config_status ON schema_project.projects
 CREATE INDEX IF NOT EXISTS idx_projects_created_by ON schema_project.projects(created_by);
 CREATE INDEX IF NOT EXISTS idx_projects_brand ON schema_project.projects(brand);
 CREATE INDEX IF NOT EXISTS idx_projects_entity ON schema_project.projects(entity_type, entity_name);
+CREATE INDEX IF NOT EXISTS idx_projects_domain_type_code ON schema_project.projects(domain_type_code);
 
 -- =====================================================
 -- Triggers

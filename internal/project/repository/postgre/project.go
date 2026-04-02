@@ -26,6 +26,7 @@ type projectRow struct {
 	Brand           sql.NullString
 	EntityType      string
 	EntityName      string
+	DomainTypeCode  string
 	Status          string
 	ConfigStatus    sql.NullString
 	FavoriteUserIDs pq.StringArray
@@ -41,6 +42,7 @@ func toProjectModel(row projectRow) model.Project {
 		Name:            row.Name,
 		EntityType:      model.EntityType(row.EntityType),
 		EntityName:      row.EntityName,
+		DomainTypeCode:  row.DomainTypeCode,
 		Status:          model.ProjectStatus(row.Status),
 		FavoriteUserIDs: append([]string(nil), row.FavoriteUserIDs...),
 		CreatedBy:       row.CreatedBy,
@@ -67,7 +69,7 @@ func toProjectModel(row projectRow) model.Project {
 
 func (r *implRepository) fetchProjectByID(ctx context.Context, id string) (model.Project, error) {
 	query := `
-		SELECT id, campaign_id, name, description, brand, entity_type, entity_name, status, config_status, favorite_user_ids, created_by, created_at, updated_at
+		SELECT id, campaign_id, name, description, brand, entity_type, entity_name, domain_type_code, status, config_status, favorite_user_ids, created_by, created_at, updated_at
 		FROM schema_project.projects
 		WHERE id = $1 AND deleted_at IS NULL
 	`
@@ -81,6 +83,7 @@ func (r *implRepository) fetchProjectByID(ctx context.Context, id string) (model
 		&row.Brand,
 		&row.EntityType,
 		&row.EntityName,
+		&row.DomainTypeCode,
 		&row.Status,
 		&row.ConfigStatus,
 		&row.FavoriteUserIDs,
@@ -102,33 +105,51 @@ func (r *implRepository) fetchProjectByID(ctx context.Context, id string) (model
 
 // Create inserts a new project into the database.
 func (r *implRepository) Create(ctx context.Context, opt repository.CreateOptions) (model.Project, error) {
-	row := &sqlboiler.Project{
-		CampaignID: opt.CampaignID,
-		Name:       opt.Name,
-		EntityType: sqlboiler.EntityType(opt.EntityType),
-		EntityName: opt.EntityName,
-		Status:     sqlboiler.ProjectStatusPENDING,
-		CreatedBy:  opt.CreatedBy,
-	}
+	now := time.Now().UTC()
+	query := `
+		INSERT INTO schema_project.projects (
+			campaign_id,
+			name,
+			description,
+			brand,
+			entity_type,
+			entity_name,
+			domain_type_code,
+			status,
+			config_status,
+			created_by,
+			created_at,
+			updated_at
+		) VALUES ($1, $2, NULLIF($3, ''), NULLIF($4, ''), $5, $6, $7, $8, $9, $10, $11, $12)
+		RETURNING id
+	`
 
-	if opt.Description != "" {
-		row.Description = null.StringFrom(opt.Description)
-	}
-	if opt.Brand != "" {
-		row.Brand = null.StringFrom(opt.Brand)
-	}
-
-	row.ConfigStatus = sqlboiler.NullProjectConfigStatusFrom(sqlboiler.ProjectConfigStatusDRAFT)
-	row.CreatedAt = null.TimeFrom(time.Now())
-	row.UpdatedAt = null.TimeFrom(time.Now())
-
-	if err := row.Insert(ctx, r.db, boil.Infer()); err != nil {
-		r.l.Errorf(ctx, "project.repository.Create.Insert: %v", err)
+	var id string
+	if err := r.db.QueryRowContext(
+		ctx,
+		query,
+		opt.CampaignID,
+		opt.Name,
+		opt.Description,
+		opt.Brand,
+		opt.EntityType,
+		opt.EntityName,
+		opt.DomainTypeCode,
+		string(model.ProjectStatusPending),
+		string(model.ConfigStatusDraft),
+		opt.CreatedBy,
+		now,
+		now,
+	).Scan(&id); err != nil {
+		r.l.Errorf(ctx, "project.repository.Create.QueryRowContext: %v", err)
 		return model.Project{}, repository.ErrFailedToInsert
 	}
 
-	result := model.NewProjectFromDB(row)
-	return *result, nil
+	result, err := r.fetchProjectByID(ctx, id)
+	if err != nil {
+		return model.Project{}, err
+	}
+	return result, nil
 }
 
 // Detail fetches a single project by ID.
@@ -152,7 +173,7 @@ func (r *implRepository) Get(ctx context.Context, opt repository.GetOptions) ([]
 	args = append(args, pqg.Limit, pqg.Offset())
 
 	query := fmt.Sprintf(`
-		SELECT id, campaign_id, name, description, brand, entity_type, entity_name, status, config_status, favorite_user_ids, created_by, created_at, updated_at
+		SELECT id, campaign_id, name, description, brand, entity_type, entity_name, domain_type_code, status, config_status, favorite_user_ids, created_by, created_at, updated_at
 		FROM schema_project.projects
 		WHERE %s
 		ORDER BY %s
@@ -177,6 +198,7 @@ func (r *implRepository) Get(ctx context.Context, opt repository.GetOptions) ([]
 			&row.Brand,
 			&row.EntityType,
 			&row.EntityName,
+			&row.DomainTypeCode,
 			&row.Status,
 			&row.ConfigStatus,
 			&row.FavoriteUserIDs,
@@ -206,37 +228,61 @@ func (r *implRepository) Get(ctx context.Context, opt repository.GetOptions) ([]
 
 // Update updates a project by ID.
 func (r *implRepository) Update(ctx context.Context, opt repository.UpdateOptions) (model.Project, error) {
-	row, err := sqlboiler.FindProject(ctx, r.db, opt.ID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			r.l.Warnf(ctx, "project.repository.Update.FindProject: not found id=%s", opt.ID)
-			return model.Project{}, repository.ErrNotFound
-		}
-		r.l.Errorf(ctx, "project.repository.Update.FindProject: %v", err)
-		return model.Project{}, repository.ErrFailedToUpdate
-	}
+	assignments := []string{"updated_at = $1"}
+	args := []interface{}{time.Now().UTC()}
+	argPos := 2
 
 	if opt.Name != "" {
-		row.Name = opt.Name
+		assignments = append(assignments, fmt.Sprintf("name = $%d", argPos))
+		args = append(args, opt.Name)
+		argPos++
 	}
 	if opt.Description != "" {
-		row.Description = null.StringFrom(opt.Description)
+		assignments = append(assignments, fmt.Sprintf("description = $%d", argPos))
+		args = append(args, opt.Description)
+		argPos++
 	}
 	if opt.Brand != "" {
-		row.Brand = null.StringFrom(opt.Brand)
+		assignments = append(assignments, fmt.Sprintf("brand = $%d", argPos))
+		args = append(args, opt.Brand)
+		argPos++
 	}
 	if opt.EntityType != "" {
-		row.EntityType = sqlboiler.EntityType(opt.EntityType)
+		assignments = append(assignments, fmt.Sprintf("entity_type = $%d", argPos))
+		args = append(args, opt.EntityType)
+		argPos++
 	}
 	if opt.EntityName != "" {
-		row.EntityName = opt.EntityName
+		assignments = append(assignments, fmt.Sprintf("entity_name = $%d", argPos))
+		args = append(args, opt.EntityName)
+		argPos++
 	}
-	row.UpdatedAt = null.TimeFrom(time.Now())
+	if opt.DomainTypeCode != "" {
+		assignments = append(assignments, fmt.Sprintf("domain_type_code = $%d", argPos))
+		args = append(args, opt.DomainTypeCode)
+		argPos++
+	}
 
-	_, err = row.Update(ctx, r.db, boil.Infer())
+	args = append(args, opt.ID)
+	query := fmt.Sprintf(`
+		UPDATE schema_project.projects
+		SET %s
+		WHERE id = $%d AND deleted_at IS NULL
+	`, strings.Join(assignments, ", "), argPos)
+
+	resultExec, err := r.db.ExecContext(ctx, query, args...)
 	if err != nil {
-		r.l.Errorf(ctx, "project.repository.Update.Update: %v", err)
+		r.l.Errorf(ctx, "project.repository.Update.ExecContext: %v", err)
 		return model.Project{}, repository.ErrFailedToUpdate
+	}
+	rowsAffected, err := resultExec.RowsAffected()
+	if err != nil {
+		r.l.Errorf(ctx, "project.repository.Update.RowsAffected: %v", err)
+		return model.Project{}, repository.ErrFailedToUpdate
+	}
+	if rowsAffected == 0 {
+		r.l.Warnf(ctx, "project.repository.Update: not found id=%s", opt.ID)
+		return model.Project{}, repository.ErrNotFound
 	}
 
 	result, err := r.fetchProjectByID(ctx, opt.ID)
@@ -244,6 +290,24 @@ func (r *implRepository) Update(ctx context.Context, opt repository.UpdateOption
 		return model.Project{}, err
 	}
 	return result, nil
+}
+
+func (r *implRepository) DomainTypeExists(ctx context.Context, code string) (bool, error) {
+	query := `
+		SELECT EXISTS (
+			SELECT 1
+			FROM schema_project.domain_types
+			WHERE code = $1 AND is_active = TRUE
+		)
+	`
+
+	var exists bool
+	if err := r.db.QueryRowContext(ctx, query, strings.TrimSpace(code)).Scan(&exists); err != nil {
+		r.l.Errorf(ctx, "project.repository.DomainTypeExists.QueryRowContext: %v", err)
+		return false, repository.ErrFailedToGet
+	}
+
+	return exists, nil
 }
 
 // UpdateStatus updates only the lifecycle status of a project.

@@ -27,9 +27,22 @@ func (uc *implUseCase) Create(ctx context.Context, input project.CreateInput) (p
 			return project.CreateOutput{}, project.ErrInvalidEntity
 		}
 	}
+	if strings.TrimSpace(input.DomainTypeCode) == "" {
+		uc.l.Warnf(ctx, "project.usecase.Create: domain_type_code is required")
+		return project.CreateOutput{}, project.ErrDomainTypeRequired
+	}
+	exists, err := uc.repo.DomainTypeExists(ctx, input.DomainTypeCode)
+	if err != nil {
+		uc.l.Errorf(ctx, "project.usecase.Create.repo.DomainTypeExists: domain_type_code=%s err=%v", input.DomainTypeCode, err)
+		return project.CreateOutput{}, project.ErrCreateFailed
+	}
+	if !exists {
+		uc.l.Warnf(ctx, "project.usecase.Create: invalid domain_type_code=%s", input.DomainTypeCode)
+		return project.CreateOutput{}, project.ErrInvalidDomainType
+	}
 
 	// Validate campaign exists
-	_, err := uc.campaignUC.Detail(ctx, input.CampaignID)
+	_, err = uc.campaignUC.Detail(ctx, input.CampaignID)
 	if err != nil {
 		uc.l.Warnf(ctx, "project.usecase.Create.campaignUC.Detail: campaign_id=%s err=%v", input.CampaignID, err)
 		return project.CreateOutput{}, project.ErrCampaignNotFound
@@ -40,13 +53,14 @@ func (uc *implUseCase) Create(ctx context.Context, input project.CreateInput) (p
 
 	// Convert Input → Options
 	opt := repo.CreateOptions{
-		CampaignID:  input.CampaignID,
-		Name:        input.Name,
-		Description: input.Description,
-		Brand:       input.Brand,
-		EntityType:  input.EntityType,
-		EntityName:  input.EntityName,
-		CreatedBy:   userID,
+		CampaignID:     input.CampaignID,
+		Name:           input.Name,
+		Description:    input.Description,
+		Brand:          input.Brand,
+		EntityType:     input.EntityType,
+		EntityName:     input.EntityName,
+		DomainTypeCode: input.DomainTypeCode,
+		CreatedBy:      userID,
 	}
 
 	result, err := uc.repo.Create(ctx, opt)
@@ -143,15 +157,27 @@ func (uc *implUseCase) Update(ctx context.Context, input project.UpdateInput) (p
 			return project.UpdateOutput{}, project.ErrInvalidEntity
 		}
 	}
+	if strings.TrimSpace(input.DomainTypeCode) != "" {
+		exists, err := uc.repo.DomainTypeExists(ctx, input.DomainTypeCode)
+		if err != nil {
+			uc.l.Errorf(ctx, "project.usecase.Update.repo.DomainTypeExists: domain_type_code=%s err=%v", input.DomainTypeCode, err)
+			return project.UpdateOutput{}, project.ErrUpdateFailed
+		}
+		if !exists {
+			uc.l.Warnf(ctx, "project.usecase.Update: invalid domain_type_code=%s", input.DomainTypeCode)
+			return project.UpdateOutput{}, project.ErrInvalidDomainType
+		}
+	}
 
 	// Convert Input → Options
 	opt := repo.UpdateOptions{
-		ID:          input.ID,
-		Name:        input.Name,
-		Description: input.Description,
-		Brand:       input.Brand,
-		EntityType:  input.EntityType,
-		EntityName:  input.EntityName,
+		ID:             input.ID,
+		Name:           input.Name,
+		Description:    input.Description,
+		Brand:          input.Brand,
+		EntityType:     input.EntityType,
+		EntityName:     input.EntityName,
+		DomainTypeCode: input.DomainTypeCode,
 	}
 
 	result, err := uc.repo.Update(ctx, opt)

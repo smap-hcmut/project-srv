@@ -17,6 +17,8 @@ var (
 	errCampaignNotFound             = &pkgErrors.HTTPError{Code: 160004, Message: "Campaign not found", StatusCode: http.StatusBadRequest}
 	errInvalidStatus                = &pkgErrors.HTTPError{Code: 160005, Message: "Invalid project status", StatusCode: http.StatusBadRequest}
 	errInvalidEntity                = &pkgErrors.HTTPError{Code: 160006, Message: "Invalid entity type", StatusCode: http.StatusBadRequest}
+	errDomainTypeRequired           = &pkgErrors.HTTPError{Code: 160034, Message: "Domain type is required", StatusCode: http.StatusBadRequest}
+	errInvalidDomainType            = &pkgErrors.HTTPError{Code: 160035, Message: "Invalid domain type", StatusCode: http.StatusBadRequest}
 	errInvalidSort                  = &pkgErrors.HTTPError{Code: 160032, Message: "Invalid project sort", StatusCode: http.StatusBadRequest}
 	errCreateFailed                 = &pkgErrors.HTTPError{Code: 160007, Message: "Failed to create project", StatusCode: http.StatusInternalServerError}
 	errUpdateFailed                 = &pkgErrors.HTTPError{Code: 160008, Message: "Failed to update project", StatusCode: http.StatusInternalServerError}
@@ -61,6 +63,10 @@ func (h *handler) mapError(err error) error {
 		return errInvalidStatus
 	case errors.Is(err, project.ErrInvalidEntity):
 		return errInvalidEntity
+	case errors.Is(err, project.ErrDomainTypeRequired):
+		return errDomainTypeRequired
+	case errors.Is(err, project.ErrInvalidDomainType):
+		return errInvalidDomainType
 	case errors.Is(err, project.ErrInvalidSort):
 		return errInvalidSort
 	case errors.Is(err, project.ErrCreateFailed):
