@@ -7,8 +7,6 @@ import (
 	"project-srv/internal/project"
 	repo "project-srv/internal/project/repository"
 	"project-srv/pkg/microservice"
-
-	"github.com/smap-hcmut/shared-libs/go/auth"
 )
 
 func (uc *implUseCase) Activate(ctx context.Context, id string) (project.ActivateOutput, error) {
@@ -66,8 +64,6 @@ func (uc *implUseCase) Activate(ctx context.Context, id string) (project.Activat
 	if err := uc.publishLifecycleEvent(ctx, project.ProjectLifecycleEventActivated, updated); err != nil {
 		uc.l.Errorf(ctx, "project.usecase.Activate.publishLifecycleEvent: id=%s event=%s err=%v", updated.ID, project.ProjectLifecycleEventActivated, err)
 	}
-	userID, _ := auth.GetUserIDFromContext(ctx)
-	updated = uc.favoriteProjectForUser(updated, userID)
 
 	return project.ActivateOutput{Project: updated}, nil
 }
@@ -113,8 +109,6 @@ func (uc *implUseCase) Pause(ctx context.Context, id string) (project.PauseOutpu
 	if err := uc.publishLifecycleEvent(ctx, project.ProjectLifecycleEventPaused, updated); err != nil {
 		uc.l.Errorf(ctx, "project.usecase.Pause.publishLifecycleEvent: id=%s event=%s err=%v", updated.ID, project.ProjectLifecycleEventPaused, err)
 	}
-	userID, _ := auth.GetUserIDFromContext(ctx)
-	updated = uc.favoriteProjectForUser(updated, userID)
 
 	return project.PauseOutput{Project: updated}, nil
 }
@@ -173,8 +167,6 @@ func (uc *implUseCase) Resume(ctx context.Context, id string) (project.ResumeOut
 	if err := uc.publishLifecycleEvent(ctx, project.ProjectLifecycleEventResumed, updated); err != nil {
 		uc.l.Errorf(ctx, "project.usecase.Resume.publishLifecycleEvent: id=%s event=%s err=%v", updated.ID, project.ProjectLifecycleEventResumed, err)
 	}
-	userID, _ := auth.GetUserIDFromContext(ctx)
-	updated = uc.favoriteProjectForUser(updated, userID)
 
 	return project.ResumeOutput{Project: updated}, nil
 }
@@ -217,8 +209,6 @@ func (uc *implUseCase) Archive(ctx context.Context, id string) (project.ArchiveO
 	if err := uc.publishLifecycleEvent(ctx, project.ProjectLifecycleEventArchived, updated); err != nil {
 		uc.l.Errorf(ctx, "project.usecase.Archive.publishLifecycleEvent: id=%s event=%s err=%v", updated.ID, project.ProjectLifecycleEventArchived, err)
 	}
-	userID, _ := auth.GetUserIDFromContext(ctx)
-	updated = uc.favoriteProjectForUser(updated, userID)
 
 	return project.ArchiveOutput{Project: updated}, nil
 }
@@ -249,8 +239,6 @@ func (uc *implUseCase) Unarchive(ctx context.Context, id string) (project.Unarch
 	if err := uc.publishLifecycleEvent(ctx, project.ProjectLifecycleEventUnarchived, updated); err != nil {
 		uc.l.Errorf(ctx, "project.usecase.Unarchive.publishLifecycleEvent: id=%s event=%s err=%v", updated.ID, project.ProjectLifecycleEventUnarchived, err)
 	}
-	userID, _ := auth.GetUserIDFromContext(ctx)
-	updated = uc.favoriteProjectForUser(updated, userID)
 
 	return project.UnarchiveOutput{Project: updated}, nil
 }

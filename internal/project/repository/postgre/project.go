@@ -103,7 +103,6 @@ func (r *implRepository) fetchProjectByID(ctx context.Context, id string) (model
 	return toProjectModel(row), nil
 }
 
-// Create inserts a new project into the database.
 func (r *implRepository) Create(ctx context.Context, opt repository.CreateOptions) (model.Project, error) {
 	now := time.Now().UTC()
 	query := `
@@ -145,19 +144,13 @@ func (r *implRepository) Create(ctx context.Context, opt repository.CreateOption
 		return model.Project{}, repository.ErrFailedToInsert
 	}
 
-	result, err := r.fetchProjectByID(ctx, id)
-	if err != nil {
-		return model.Project{}, err
-	}
-	return result, nil
+	return r.fetchProjectByID(ctx, id)
 }
 
-// Detail fetches a single project by ID.
 func (r *implRepository) Detail(ctx context.Context, id string) (model.Project, error) {
 	return r.fetchProjectByID(ctx, id)
 }
 
-// Get fetches projects with pagination and filters.
 func (r *implRepository) Get(ctx context.Context, opt repository.GetOptions) ([]model.Project, paginator.Paginator, error) {
 	whereClause, args := r.buildProjectFilters(opt)
 
@@ -226,7 +219,6 @@ func (r *implRepository) Get(ctx context.Context, opt repository.GetOptions) ([]
 	return projects, pag, nil
 }
 
-// Update updates a project by ID.
 func (r *implRepository) Update(ctx context.Context, opt repository.UpdateOptions) (model.Project, error) {
 	assignments := []string{"updated_at = $1"}
 	args := []interface{}{time.Now().UTC()}
@@ -285,11 +277,7 @@ func (r *implRepository) Update(ctx context.Context, opt repository.UpdateOption
 		return model.Project{}, repository.ErrNotFound
 	}
 
-	result, err := r.fetchProjectByID(ctx, opt.ID)
-	if err != nil {
-		return model.Project{}, err
-	}
-	return result, nil
+	return r.fetchProjectByID(ctx, opt.ID)
 }
 
 func (r *implRepository) DomainTypeExists(ctx context.Context, code string) (bool, error) {
@@ -310,7 +298,6 @@ func (r *implRepository) DomainTypeExists(ctx context.Context, code string) (boo
 	return exists, nil
 }
 
-// UpdateStatus updates only the lifecycle status of a project.
 func (r *implRepository) UpdateStatus(ctx context.Context, opt repository.UpdateStatusOptions) (model.Project, error) {
 	if len(opt.ExpectedStatuses) > 0 {
 		now := time.Now()
@@ -380,7 +367,6 @@ func (r *implRepository) UpdateStatus(ctx context.Context, opt repository.Update
 	return r.fetchProjectByID(ctx, opt.ID)
 }
 
-// Favorite adds a user to the favorite array idempotently.
 func (r *implRepository) Favorite(ctx context.Context, id, userID string) error {
 	query := `
 		UPDATE schema_project.projects
@@ -410,7 +396,6 @@ func (r *implRepository) Favorite(ctx context.Context, id, userID string) error 
 	return nil
 }
 
-// Unfavorite removes a user from the favorite array idempotently.
 func (r *implRepository) Unfavorite(ctx context.Context, id, userID string) error {
 	query := `
 		UPDATE schema_project.projects
@@ -437,7 +422,6 @@ func (r *implRepository) Unfavorite(ctx context.Context, id, userID string) erro
 	return nil
 }
 
-// Archive soft-deletes a project by setting deleted_at.
 func (r *implRepository) Archive(ctx context.Context, id string) error {
 	row, err := sqlboiler.FindProject(ctx, r.db, id)
 	if err != nil {
@@ -449,8 +433,9 @@ func (r *implRepository) Archive(ctx context.Context, id string) error {
 		return repository.ErrFailedToDelete
 	}
 
-	row.DeletedAt = null.TimeFrom(time.Now())
-	row.UpdatedAt = null.TimeFrom(time.Now())
+	now := time.Now()
+	row.DeletedAt = null.TimeFrom(now)
+	row.UpdatedAt = null.TimeFrom(now)
 
 	_, err = row.Update(ctx, r.db, boil.Whitelist(
 		sqlboiler.ProjectColumns.DeletedAt,

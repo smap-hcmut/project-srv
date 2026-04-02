@@ -10,7 +10,6 @@ const (
 	projectSortCreatedAtDesc = "created_at_desc"
 	projectSortFavoriteDesc  = "favorite_desc"
 )
-
 func (uc *implUseCase) normalizeActivationReadinessCommand(command project.ActivationReadinessCommand) project.ActivationReadinessCommand {
 	switch command {
 	case project.ActivationReadinessCommandResume:

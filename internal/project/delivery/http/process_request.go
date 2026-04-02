@@ -4,7 +4,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// processCreateReq binds, validates, and extracts path params for create.
 func (h *handler) processCreateReq(c *gin.Context) (createReq, error) {
 	var req createReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -19,7 +18,6 @@ func (h *handler) processCreateReq(c *gin.Context) (createReq, error) {
 	return req, nil
 }
 
-// processDetailReq extracts path param for detail.
 func (h *handler) processDetailReq(c *gin.Context) (detailReq, error) {
 	req := detailReq{ID: c.Param("project_id")}
 	if err := req.validate(); err != nil {
@@ -28,7 +26,6 @@ func (h *handler) processDetailReq(c *gin.Context) (detailReq, error) {
 	return req, nil
 }
 
-// processListReq binds query params and extracts path param for listing.
 func (h *handler) processListReq(c *gin.Context) (listReq, error) {
 	var req listReq
 	if err := c.ShouldBindQuery(&req); err != nil {
@@ -43,7 +40,6 @@ func (h *handler) processListReq(c *gin.Context) (listReq, error) {
 	return req, nil
 }
 
-// processFavoriteListReq binds query params for global favorite project listing.
 func (h *handler) processFavoriteListReq(c *gin.Context) (favoriteListReq, error) {
 	var req favoriteListReq
 	if err := c.ShouldBindQuery(&req); err != nil {
@@ -57,7 +53,6 @@ func (h *handler) processFavoriteListReq(c *gin.Context) (favoriteListReq, error
 	return req, nil
 }
 
-// processUpdateReq binds, validates, and extracts path param for update.
 func (h *handler) processUpdateReq(c *gin.Context) (updateReq, error) {
 	var req updateReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -72,7 +67,6 @@ func (h *handler) processUpdateReq(c *gin.Context) (updateReq, error) {
 	return req, nil
 }
 
-// processArchiveReq extracts path param for archive.
 func (h *handler) processArchiveReq(c *gin.Context) (archiveReq, error) {
 	req := archiveReq{ID: c.Param("project_id")}
 	if err := req.validate(); err != nil {
@@ -81,7 +75,6 @@ func (h *handler) processArchiveReq(c *gin.Context) (archiveReq, error) {
 	return req, nil
 }
 
-// processLifecycleReq extracts path param for lifecycle actions.
 func (h *handler) processLifecycleReq(c *gin.Context) (archiveReq, error) {
 	req := archiveReq{ID: c.Param("project_id")}
 	if err := req.validate(); err != nil {

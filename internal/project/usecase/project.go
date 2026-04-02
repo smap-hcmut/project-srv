@@ -249,7 +249,6 @@ func (uc *implUseCase) Delete(ctx context.Context, id string) error {
 		uc.l.Warnf(ctx, "project.usecase.Delete: empty id")
 		return project.ErrNotFound
 	}
-
 	current, err := uc.repo.Detail(ctx, id)
 	if err != nil {
 		uc.l.Errorf(ctx, "project.usecase.Delete.repo.Detail: id=%s err=%v", id, err)
