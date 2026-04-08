@@ -60,22 +60,24 @@ type CampaignStatus string
 
 // Enum values for CampaignStatus
 const (
+	CampaignStatusPENDING  CampaignStatus = "PENDING"
 	CampaignStatusACTIVE   CampaignStatus = "ACTIVE"
-	CampaignStatusINACTIVE CampaignStatus = "INACTIVE"
+	CampaignStatusPAUSED   CampaignStatus = "PAUSED"
 	CampaignStatusARCHIVED CampaignStatus = "ARCHIVED"
 )
 
 func AllCampaignStatus() []CampaignStatus {
 	return []CampaignStatus{
+		CampaignStatusPENDING,
 		CampaignStatusACTIVE,
-		CampaignStatusINACTIVE,
+		CampaignStatusPAUSED,
 		CampaignStatusARCHIVED,
 	}
 }
 
 func (e CampaignStatus) IsValid() error {
 	switch e {
-	case CampaignStatusACTIVE, CampaignStatusINACTIVE, CampaignStatusARCHIVED:
+	case CampaignStatusPENDING, CampaignStatusACTIVE, CampaignStatusPAUSED, CampaignStatusARCHIVED:
 		return nil
 	default:
 		return errors.New("enum is not valid")
@@ -88,12 +90,14 @@ func (e CampaignStatus) String() string {
 
 func (e CampaignStatus) Ordinal() int {
 	switch e {
-	case CampaignStatusACTIVE:
+	case CampaignStatusPENDING:
 		return 0
-	case CampaignStatusINACTIVE:
+	case CampaignStatusACTIVE:
 		return 1
-	case CampaignStatusARCHIVED:
+	case CampaignStatusPAUSED:
 		return 2
+	case CampaignStatusARCHIVED:
+		return 3
 
 	default:
 		panic(errors.New("enum is not valid"))
@@ -156,24 +160,24 @@ type ProjectStatus string
 
 // Enum values for ProjectStatus
 const (
+	ProjectStatusPENDING  ProjectStatus = "PENDING"
 	ProjectStatusACTIVE   ProjectStatus = "ACTIVE"
 	ProjectStatusPAUSED   ProjectStatus = "PAUSED"
 	ProjectStatusARCHIVED ProjectStatus = "ARCHIVED"
-	ProjectStatusDRAFT    ProjectStatus = "DRAFT"
 )
 
 func AllProjectStatus() []ProjectStatus {
 	return []ProjectStatus{
+		ProjectStatusPENDING,
 		ProjectStatusACTIVE,
 		ProjectStatusPAUSED,
 		ProjectStatusARCHIVED,
-		ProjectStatusDRAFT,
 	}
 }
 
 func (e ProjectStatus) IsValid() error {
 	switch e {
-	case ProjectStatusACTIVE, ProjectStatusPAUSED, ProjectStatusARCHIVED, ProjectStatusDRAFT:
+	case ProjectStatusPENDING, ProjectStatusACTIVE, ProjectStatusPAUSED, ProjectStatusARCHIVED:
 		return nil
 	default:
 		return errors.New("enum is not valid")
@@ -186,13 +190,13 @@ func (e ProjectStatus) String() string {
 
 func (e ProjectStatus) Ordinal() int {
 	switch e {
-	case ProjectStatusACTIVE:
+	case ProjectStatusPENDING:
 		return 0
-	case ProjectStatusPAUSED:
+	case ProjectStatusACTIVE:
 		return 1
-	case ProjectStatusARCHIVED:
+	case ProjectStatusPAUSED:
 		return 2
-	case ProjectStatusDRAFT:
+	case ProjectStatusARCHIVED:
 		return 3
 
 	default:

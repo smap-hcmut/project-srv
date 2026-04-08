@@ -57,7 +57,7 @@ func (r createReq) toInput() campaign.CreateInput {
 type updateReq struct {
 	Name        string `json:"name" example:"Q1 2026 VinFast Campaign - Updated"`               // Campaign name
 	Description string `json:"description" example:"Monitor VinFast brand sentiment - Updated"` // Campaign description
-	Status      string `json:"status" example:"ACTIVE" enums:"ACTIVE,INACTIVE,ARCHIVED"`        // Campaign status
+	Status      string `json:"status" example:"PENDING" enums:"PENDING,ACTIVE,PAUSED,ARCHIVED"` // Campaign status
 	StartDate   string `json:"start_date" example:"2026-01-01T00:00:00Z"`                       // Campaign start date (RFC3339 format)
 	EndDate     string `json:"end_date" example:"2026-03-31T23:59:59Z"`                         // Campaign end date (RFC3339 format)
 }
@@ -65,7 +65,7 @@ type updateReq struct {
 func (r updateReq) validate() error {
 	if r.Status != "" {
 		switch model.CampaignStatus(r.Status) {
-		case model.CampaignStatusActive, model.CampaignStatusInactive, model.CampaignStatusArchived:
+		case model.CampaignStatusPending, model.CampaignStatusActive, model.CampaignStatusPaused, model.CampaignStatusArchived:
 			// valid
 		default:
 			return errInvalidStatus
@@ -105,16 +105,29 @@ func (r updateReq) toInput(id string) campaign.UpdateInput {
 
 type listReq struct {
 	paginator.PaginateQuery
-	Status string `form:"status"`
-	Name   string `form:"name"`
+	Status       string `form:"status"`
+	Name         string `form:"name"`
+	FavoriteOnly bool   `form:"favorite_only"`
+	Sort         string `form:"sort"`
+}
+
+func (r listReq) validate() error {
+	switch r.Sort {
+	case "", "created_at_desc", "favorite_desc":
+		return nil
+	default:
+		return errWrongQuery
+	}
 }
 
 func (r listReq) toInput() campaign.ListInput {
 	r.PaginateQuery.Adjust()
 	return campaign.ListInput{
-		Status:    r.Status,
-		Name:      r.Name,
-		Paginator: r.PaginateQuery,
+		Status:       r.Status,
+		Name:         r.Name,
+		FavoriteOnly: r.FavoriteOnly,
+		Sort:         r.Sort,
+		Paginator:    r.PaginateQuery,
 	}
 }
 
@@ -125,7 +138,8 @@ type campaignResp struct {
 	ID          string  `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`               // Campaign UUID
 	Name        string  `json:"name" example:"Q1 2026 VinFast Campaign"`                         // Campaign name
 	Description string  `json:"description,omitempty" example:"Monitor VinFast brand sentiment"` // Campaign description
-	Status      string  `json:"status" example:"ACTIVE" enums:"ACTIVE,INACTIVE,ARCHIVED"`        // Campaign status
+	Status      string  `json:"status" example:"PENDING" enums:"PENDING,ACTIVE,PAUSED,ARCHIVED"` // Campaign status
+	IsFavorite  bool    `json:"is_favorite" example:"false"`                                     // Whether current user favorited this campaign
 	StartDate   *string `json:"start_date,omitempty" example:"2026-01-01T00:00:00Z"`             // Campaign start date
 	EndDate     *string `json:"end_date,omitempty" example:"2026-03-31T23:59:59Z"`               // Campaign end date
 	CreatedBy   string  `json:"created_by" example:"550e8400-e29b-41d4-a716-446655440001"`       // Creator user UUID
@@ -189,12 +203,13 @@ func (h *handler) newUpdateResp(o campaign.UpdateOutput) updateResp {
 
 func toCampaignResp(c model.Campaign) campaignResp {
 	resp := campaignResp{
-		ID:        c.ID,
-		Name:      c.Name,
-		Status:    string(c.Status),
-		CreatedBy: c.CreatedBy,
-		CreatedAt: c.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt: c.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		ID:         c.ID,
+		Name:       c.Name,
+		Status:     string(c.Status),
+		IsFavorite: c.IsFavorite,
+		CreatedBy:  c.CreatedBy,
+		CreatedAt:  c.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:  c.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
 
 	if c.Description != "" {

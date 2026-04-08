@@ -14,5 +14,7 @@ type Repository interface {
 	Detail(ctx context.Context, id string) (model.Campaign, error)
 	Get(ctx context.Context, opt GetOptions) ([]model.Campaign, paginator.Paginator, error)
 	Update(ctx context.Context, opt UpdateOptions) (model.Campaign, error)
+	Favorite(ctx context.Context, id, userID string) error
+	Unfavorite(ctx context.Context, id, userID string) error
 	Archive(ctx context.Context, id string) error
 }

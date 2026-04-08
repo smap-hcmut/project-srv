@@ -24,82 +24,87 @@ import (
 
 // Project is an object representing the database table.
 type Project struct {
-	ID           string                  `boil:"id" json:"id" toml:"id" yaml:"id"`
-	CampaignID   string                  `boil:"campaign_id" json:"campaign_id" toml:"campaign_id" yaml:"campaign_id"`
-	Name         string                  `boil:"name" json:"name" toml:"name" yaml:"name"`
-	Description  null.String             `boil:"description" json:"description,omitempty" toml:"description" yaml:"description,omitempty"`
-	Brand        null.String             `boil:"brand" json:"brand,omitempty" toml:"brand" yaml:"brand,omitempty"`
-	EntityType   EntityType              `boil:"entity_type" json:"entity_type" toml:"entity_type" yaml:"entity_type"`
-	EntityName   string                  `boil:"entity_name" json:"entity_name" toml:"entity_name" yaml:"entity_name"`
-	Status       ProjectStatus           `boil:"status" json:"status" toml:"status" yaml:"status"`
-	ConfigStatus NullProjectConfigStatus `boil:"config_status" json:"config_status,omitempty" toml:"config_status" yaml:"config_status,omitempty"`
-	CreatedBy    string                  `boil:"created_by" json:"created_by" toml:"created_by" yaml:"created_by"`
-	CreatedAt    null.Time               `boil:"created_at" json:"created_at,omitempty" toml:"created_at" yaml:"created_at,omitempty"`
-	UpdatedAt    null.Time               `boil:"updated_at" json:"updated_at,omitempty" toml:"updated_at" yaml:"updated_at,omitempty"`
-	DeletedAt    null.Time               `boil:"deleted_at" json:"deleted_at,omitempty" toml:"deleted_at" yaml:"deleted_at,omitempty"`
+	ID             string                  `boil:"id" json:"id" toml:"id" yaml:"id"`
+	CampaignID     string                  `boil:"campaign_id" json:"campaign_id" toml:"campaign_id" yaml:"campaign_id"`
+	Name           string                  `boil:"name" json:"name" toml:"name" yaml:"name"`
+	Description    null.String             `boil:"description" json:"description,omitempty" toml:"description" yaml:"description,omitempty"`
+	Brand          null.String             `boil:"brand" json:"brand,omitempty" toml:"brand" yaml:"brand,omitempty"`
+	EntityType     EntityType              `boil:"entity_type" json:"entity_type" toml:"entity_type" yaml:"entity_type"`
+	EntityName     string                  `boil:"entity_name" json:"entity_name" toml:"entity_name" yaml:"entity_name"`
+	DomainTypeCode string                  `boil:"domain_type_code" json:"domain_type_code" toml:"domain_type_code" yaml:"domain_type_code"`
+	Status         ProjectStatus           `boil:"status" json:"status" toml:"status" yaml:"status"`
+	ConfigStatus   NullProjectConfigStatus `boil:"config_status" json:"config_status,omitempty" toml:"config_status" yaml:"config_status,omitempty"`
+	CreatedBy      string                  `boil:"created_by" json:"created_by" toml:"created_by" yaml:"created_by"`
+	CreatedAt      null.Time               `boil:"created_at" json:"created_at,omitempty" toml:"created_at" yaml:"created_at,omitempty"`
+	UpdatedAt      null.Time               `boil:"updated_at" json:"updated_at,omitempty" toml:"updated_at" yaml:"updated_at,omitempty"`
+	DeletedAt      null.Time               `boil:"deleted_at" json:"deleted_at,omitempty" toml:"deleted_at" yaml:"deleted_at,omitempty"`
 
 	R *projectR `boil:"-" json:"-" toml:"-" yaml:"-"`
 	L projectL  `boil:"-" json:"-" toml:"-" yaml:"-"`
 }
 
 var ProjectColumns = struct {
-	ID           string
-	CampaignID   string
-	Name         string
-	Description  string
-	Brand        string
-	EntityType   string
-	EntityName   string
-	Status       string
-	ConfigStatus string
-	CreatedBy    string
-	CreatedAt    string
-	UpdatedAt    string
-	DeletedAt    string
+	ID             string
+	CampaignID     string
+	Name           string
+	Description    string
+	Brand          string
+	EntityType     string
+	EntityName     string
+	DomainTypeCode string
+	Status         string
+	ConfigStatus   string
+	CreatedBy      string
+	CreatedAt      string
+	UpdatedAt      string
+	DeletedAt      string
 }{
-	ID:           "id",
-	CampaignID:   "campaign_id",
-	Name:         "name",
-	Description:  "description",
-	Brand:        "brand",
-	EntityType:   "entity_type",
-	EntityName:   "entity_name",
-	Status:       "status",
-	ConfigStatus: "config_status",
-	CreatedBy:    "created_by",
-	CreatedAt:    "created_at",
-	UpdatedAt:    "updated_at",
-	DeletedAt:    "deleted_at",
+	ID:             "id",
+	CampaignID:     "campaign_id",
+	Name:           "name",
+	Description:    "description",
+	Brand:          "brand",
+	EntityType:     "entity_type",
+	EntityName:     "entity_name",
+	DomainTypeCode: "domain_type_code",
+	Status:         "status",
+	ConfigStatus:   "config_status",
+	CreatedBy:      "created_by",
+	CreatedAt:      "created_at",
+	UpdatedAt:      "updated_at",
+	DeletedAt:      "deleted_at",
 }
 
 var ProjectTableColumns = struct {
-	ID           string
-	CampaignID   string
-	Name         string
-	Description  string
-	Brand        string
-	EntityType   string
-	EntityName   string
-	Status       string
-	ConfigStatus string
-	CreatedBy    string
-	CreatedAt    string
-	UpdatedAt    string
-	DeletedAt    string
+	ID             string
+	CampaignID     string
+	Name           string
+	Description    string
+	Brand          string
+	EntityType     string
+	EntityName     string
+	DomainTypeCode string
+	Status         string
+	ConfigStatus   string
+	CreatedBy      string
+	CreatedAt      string
+	UpdatedAt      string
+	DeletedAt      string
 }{
-	ID:           "projects.id",
-	CampaignID:   "projects.campaign_id",
-	Name:         "projects.name",
-	Description:  "projects.description",
-	Brand:        "projects.brand",
-	EntityType:   "projects.entity_type",
-	EntityName:   "projects.entity_name",
-	Status:       "projects.status",
-	ConfigStatus: "projects.config_status",
-	CreatedBy:    "projects.created_by",
-	CreatedAt:    "projects.created_at",
-	UpdatedAt:    "projects.updated_at",
-	DeletedAt:    "projects.deleted_at",
+	ID:             "projects.id",
+	CampaignID:     "projects.campaign_id",
+	Name:           "projects.name",
+	Description:    "projects.description",
+	Brand:          "projects.brand",
+	EntityType:     "projects.entity_type",
+	EntityName:     "projects.entity_name",
+	DomainTypeCode: "projects.domain_type_code",
+	Status:         "projects.status",
+	ConfigStatus:   "projects.config_status",
+	CreatedBy:      "projects.created_by",
+	CreatedAt:      "projects.created_at",
+	UpdatedAt:      "projects.updated_at",
+	DeletedAt:      "projects.deleted_at",
 }
 
 // Generated where
@@ -217,33 +222,35 @@ func (w whereHelperNullProjectConfigStatus) IsNotNull() qm.QueryMod {
 }
 
 var ProjectWhere = struct {
-	ID           whereHelperstring
-	CampaignID   whereHelperstring
-	Name         whereHelperstring
-	Description  whereHelpernull_String
-	Brand        whereHelpernull_String
-	EntityType   whereHelperEntityType
-	EntityName   whereHelperstring
-	Status       whereHelperProjectStatus
-	ConfigStatus whereHelperNullProjectConfigStatus
-	CreatedBy    whereHelperstring
-	CreatedAt    whereHelpernull_Time
-	UpdatedAt    whereHelpernull_Time
-	DeletedAt    whereHelpernull_Time
+	ID             whereHelperstring
+	CampaignID     whereHelperstring
+	Name           whereHelperstring
+	Description    whereHelpernull_String
+	Brand          whereHelpernull_String
+	EntityType     whereHelperEntityType
+	EntityName     whereHelperstring
+	DomainTypeCode whereHelperstring
+	Status         whereHelperProjectStatus
+	ConfigStatus   whereHelperNullProjectConfigStatus
+	CreatedBy      whereHelperstring
+	CreatedAt      whereHelpernull_Time
+	UpdatedAt      whereHelpernull_Time
+	DeletedAt      whereHelpernull_Time
 }{
-	ID:           whereHelperstring{field: "\"schema_project\".\"projects\".\"id\""},
-	CampaignID:   whereHelperstring{field: "\"schema_project\".\"projects\".\"campaign_id\""},
-	Name:         whereHelperstring{field: "\"schema_project\".\"projects\".\"name\""},
-	Description:  whereHelpernull_String{field: "\"schema_project\".\"projects\".\"description\""},
-	Brand:        whereHelpernull_String{field: "\"schema_project\".\"projects\".\"brand\""},
-	EntityType:   whereHelperEntityType{field: "\"schema_project\".\"projects\".\"entity_type\""},
-	EntityName:   whereHelperstring{field: "\"schema_project\".\"projects\".\"entity_name\""},
-	Status:       whereHelperProjectStatus{field: "\"schema_project\".\"projects\".\"status\""},
-	ConfigStatus: whereHelperNullProjectConfigStatus{field: "\"schema_project\".\"projects\".\"config_status\""},
-	CreatedBy:    whereHelperstring{field: "\"schema_project\".\"projects\".\"created_by\""},
-	CreatedAt:    whereHelpernull_Time{field: "\"schema_project\".\"projects\".\"created_at\""},
-	UpdatedAt:    whereHelpernull_Time{field: "\"schema_project\".\"projects\".\"updated_at\""},
-	DeletedAt:    whereHelpernull_Time{field: "\"schema_project\".\"projects\".\"deleted_at\""},
+	ID:             whereHelperstring{field: "\"schema_project\".\"projects\".\"id\""},
+	CampaignID:     whereHelperstring{field: "\"schema_project\".\"projects\".\"campaign_id\""},
+	Name:           whereHelperstring{field: "\"schema_project\".\"projects\".\"name\""},
+	Description:    whereHelpernull_String{field: "\"schema_project\".\"projects\".\"description\""},
+	Brand:          whereHelpernull_String{field: "\"schema_project\".\"projects\".\"brand\""},
+	EntityType:     whereHelperEntityType{field: "\"schema_project\".\"projects\".\"entity_type\""},
+	EntityName:     whereHelperstring{field: "\"schema_project\".\"projects\".\"entity_name\""},
+	DomainTypeCode: whereHelperstring{field: "\"schema_project\".\"projects\".\"domain_type_code\""},
+	Status:         whereHelperProjectStatus{field: "\"schema_project\".\"projects\".\"status\""},
+	ConfigStatus:   whereHelperNullProjectConfigStatus{field: "\"schema_project\".\"projects\".\"config_status\""},
+	CreatedBy:      whereHelperstring{field: "\"schema_project\".\"projects\".\"created_by\""},
+	CreatedAt:      whereHelpernull_Time{field: "\"schema_project\".\"projects\".\"created_at\""},
+	UpdatedAt:      whereHelpernull_Time{field: "\"schema_project\".\"projects\".\"updated_at\""},
+	DeletedAt:      whereHelpernull_Time{field: "\"schema_project\".\"projects\".\"deleted_at\""},
 }
 
 // ProjectRels is where relationship names are stored.

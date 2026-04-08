@@ -37,7 +37,11 @@ func (h *handler) processListReq(c *gin.Context) (listReq, error) {
 	var req listReq
 	if err := c.ShouldBindQuery(&req); err != nil {
 		h.l.Warnf(c.Request.Context(), "campaign.delivery.processListReq.ShouldBindQuery: %v", err)
-		return req, errWrongBody
+		return req, errWrongQuery
+	}
+	if err := req.validate(); err != nil {
+		h.l.Warnf(c.Request.Context(), "campaign.delivery.processListReq.validate: %v", err)
+		return req, err
 	}
 	return req, nil
 }

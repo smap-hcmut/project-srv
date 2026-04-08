@@ -17,10 +17,13 @@ type CreateOptions struct {
 
 // GetOptions contains filters for listing campaigns.
 type GetOptions struct {
-	Status    string
-	Name      string
-	CreatedBy string
-	Paginator paginator.PaginateQuery
+	Status        string
+	Name          string
+	CreatedBy     string
+	FavoriteOnly  bool
+	Sort          string
+	CurrentUserID string
+	Paginator     paginator.PaginateQuery
 }
 
 // UpdateOptions contains the data for updating a campaign.

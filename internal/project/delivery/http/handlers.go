@@ -70,10 +70,12 @@ func (h *handler) Detail(c *gin.Context) {
 // @Tags Project
 // @Produce json
 // @Param id path string true "Campaign ID"
-// @Param status query string false "Filter by status (DRAFT, ACTIVE, PAUSED, ARCHIVED)"
+// @Param status query string false "Filter by status (PENDING, ACTIVE, PAUSED, ARCHIVED)"
 // @Param name query string false "Filter by name (ILIKE)"
 // @Param brand query string false "Filter by brand (ILIKE)"
 // @Param entity_type query string false "Filter by entity type"
+// @Param favorite_only query bool false "Return only projects favorited by current user"
+// @Param sort query string false "Sort by created_at_desc or favorite_desc"
 // @Param page query int false "Page number (default 1)"
 // @Param limit query int false "Number of records per page (default 15)"
 // @Success 200 {object} listResp
@@ -93,6 +95,42 @@ func (h *handler) List(c *gin.Context) {
 	o, err := h.uc.List(ctx, req.toInput())
 	if err != nil {
 		h.l.Errorf(ctx, "project.delivery.List.uc.List: %v", err)
+		response.Error(c, h.mapError(err), h.discord)
+		return
+	}
+
+	response.OK(c, h.newListResp(o))
+}
+
+// @Summary List favorite projects
+// @Description Paginate projects favorited by the current user
+// @Tags Project
+// @Produce json
+// @Param campaign_id query string false "Filter by campaign ID"
+// @Param status query string false "Filter by status (PENDING, ACTIVE, PAUSED, ARCHIVED)"
+// @Param name query string false "Filter by name (ILIKE)"
+// @Param brand query string false "Filter by brand (ILIKE)"
+// @Param entity_type query string false "Filter by entity type"
+// @Param sort query string false "Sort by created_at_desc or favorite_desc"
+// @Param page query int false "Page number (default 1)"
+// @Param limit query int false "Number of records per page (default 15)"
+// @Success 200 {object} listResp
+// @Failure 400 {object} response.Resp
+// @Failure 500 {object} response.Resp
+// @Router /projects/favorites [get]
+func (h *handler) ListFavorites(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	req, err := h.processFavoriteListReq(c)
+	if err != nil {
+		h.l.Warnf(ctx, "project.delivery.ListFavorites.processFavoriteListReq: %v", err)
+		response.Error(c, err, h.discord)
+		return
+	}
+
+	o, err := h.uc.List(ctx, req.toInput())
+	if err != nil {
+		h.l.Errorf(ctx, "project.delivery.ListFavorites.uc.List: %v", err)
 		response.Error(c, h.mapError(err), h.discord)
 		return
 	}
@@ -129,6 +167,62 @@ func (h *handler) Update(c *gin.Context) {
 	}
 
 	response.OK(c, h.newUpdateResp(o))
+}
+
+// @Summary Favorite a project
+// @Description Mark a project as favorite for the current user
+// @Tags Project
+// @Produce json
+// @Param project_id path string true "Project ID"
+// @Success 200 {object} response.Resp
+// @Failure 400 {object} response.Resp
+// @Failure 500 {object} response.Resp
+// @Router /projects/{project_id}/favorite [post]
+func (h *handler) Favorite(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	req, err := h.processDetailReq(c)
+	if err != nil {
+		h.l.Warnf(ctx, "project.delivery.Favorite.processDetailReq: %v", err)
+		response.Error(c, err, h.discord)
+		return
+	}
+
+	if err := h.uc.Favorite(ctx, req.toInput()); err != nil {
+		h.l.Errorf(ctx, "project.delivery.Favorite.uc.Favorite: id=%s err=%v", req.ID, err)
+		response.Error(c, h.mapError(err), h.discord)
+		return
+	}
+
+	response.OK(c, nil)
+}
+
+// @Summary Unfavorite a project
+// @Description Remove project favorite for the current user
+// @Tags Project
+// @Produce json
+// @Param project_id path string true "Project ID"
+// @Success 200 {object} response.Resp
+// @Failure 400 {object} response.Resp
+// @Failure 500 {object} response.Resp
+// @Router /projects/{project_id}/favorite [delete]
+func (h *handler) Unfavorite(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	req, err := h.processDetailReq(c)
+	if err != nil {
+		h.l.Warnf(ctx, "project.delivery.Unfavorite.processDetailReq: %v", err)
+		response.Error(c, err, h.discord)
+		return
+	}
+
+	if err := h.uc.Unfavorite(ctx, req.toInput()); err != nil {
+		h.l.Errorf(ctx, "project.delivery.Unfavorite.uc.Unfavorite: id=%s err=%v", req.ID, err)
+		response.Error(c, h.mapError(err), h.discord)
+		return
+	}
+
+	response.OK(c, nil)
 }
 
 // @Summary Archive a project

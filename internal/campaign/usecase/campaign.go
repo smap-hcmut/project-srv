@@ -58,6 +58,7 @@ func (uc *implUseCase) Create(ctx context.Context, input campaign.CreateInput) (
 		uc.l.Errorf(ctx, "campaign.usecase.Create.repo.Create: %v", err)
 		return campaign.CreateOutput{}, campaign.ErrCreateFailed
 	}
+	result = favoriteCampaignForUser(result, userID)
 
 	return campaign.CreateOutput{Campaign: result}, nil
 }
@@ -74,6 +75,8 @@ func (uc *implUseCase) Detail(ctx context.Context, id string) (campaign.DetailOu
 		uc.l.Errorf(ctx, "campaign.usecase.Detail.repo.Detail: id=%s err=%v", id, err)
 		return campaign.DetailOutput{}, campaign.ErrNotFound
 	}
+	userID, _ := auth.GetUserIDFromContext(ctx)
+	result = favoriteCampaignForUser(result, userID)
 
 	return campaign.DetailOutput{Campaign: result}, nil
 }
@@ -87,18 +90,29 @@ func (uc *implUseCase) List(ctx context.Context, input campaign.ListInput) (camp
 			return campaign.ListOutput{}, err
 		}
 	}
+	if err := validateSort(input.Sort); err != nil {
+		uc.l.Warnf(ctx, "campaign.usecase.List.validateSort: invalid sort=%s", input.Sort)
+		return campaign.ListOutput{}, err
+	}
+	userID, _ := auth.GetUserIDFromContext(ctx)
 
 	// Convert Input → Options
 	opt := repo.GetOptions{
-		Status:    input.Status,
-		Name:      input.Name,
-		Paginator: input.Paginator,
+		Status:        input.Status,
+		Name:          input.Name,
+		FavoriteOnly:  input.FavoriteOnly,
+		Sort:          input.Sort,
+		CurrentUserID: userID,
+		Paginator:     input.Paginator,
 	}
 
 	campaigns, pag, err := uc.repo.Get(ctx, opt)
 	if err != nil {
 		uc.l.Errorf(ctx, "campaign.usecase.List.repo.Get: %v", err)
 		return campaign.ListOutput{}, campaign.ErrListFailed
+	}
+	for i := range campaigns {
+		campaigns[i] = favoriteCampaignForUser(campaigns[i], userID)
 	}
 
 	return campaign.ListOutput{
@@ -164,8 +178,56 @@ func (uc *implUseCase) Update(ctx context.Context, input campaign.UpdateInput) (
 		}
 		return campaign.UpdateOutput{}, campaign.ErrUpdateFailed
 	}
+	userID, _ := auth.GetUserIDFromContext(ctx)
+	result = favoriteCampaignForUser(result, userID)
 
 	return campaign.UpdateOutput{Campaign: result}, nil
+}
+
+// Favorite marks a campaign as favorite for the current user.
+func (uc *implUseCase) Favorite(ctx context.Context, id string) error {
+	if id == "" {
+		uc.l.Warnf(ctx, "campaign.usecase.Favorite: empty id")
+		return campaign.ErrNotFound
+	}
+
+	userID, _ := auth.GetUserIDFromContext(ctx)
+	if userID == "" {
+		uc.l.Warnf(ctx, "campaign.usecase.Favorite: missing user id for id=%s", id)
+		return campaign.ErrUpdateFailed
+	}
+	if err := uc.repo.Favorite(ctx, id, userID); err != nil {
+		uc.l.Errorf(ctx, "campaign.usecase.Favorite.repo.Favorite: id=%s user_id=%s err=%v", id, userID, err)
+		if err == repo.ErrFailedToGet {
+			return campaign.ErrNotFound
+		}
+		return campaign.ErrUpdateFailed
+	}
+
+	return nil
+}
+
+// Unfavorite removes a campaign favorite for the current user.
+func (uc *implUseCase) Unfavorite(ctx context.Context, id string) error {
+	if id == "" {
+		uc.l.Warnf(ctx, "campaign.usecase.Unfavorite: empty id")
+		return campaign.ErrNotFound
+	}
+
+	userID, _ := auth.GetUserIDFromContext(ctx)
+	if userID == "" {
+		uc.l.Warnf(ctx, "campaign.usecase.Unfavorite: missing user id for id=%s", id)
+		return campaign.ErrUpdateFailed
+	}
+	if err := uc.repo.Unfavorite(ctx, id, userID); err != nil {
+		uc.l.Errorf(ctx, "campaign.usecase.Unfavorite.repo.Unfavorite: id=%s user_id=%s err=%v", id, userID, err)
+		if err == repo.ErrFailedToGet {
+			return campaign.ErrNotFound
+		}
+		return campaign.ErrUpdateFailed
+	}
+
+	return nil
 }
 
 // Archive soft-deletes a campaign by ID.

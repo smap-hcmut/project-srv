@@ -1,7 +1,15 @@
 package usecase
 
-import "project-srv/internal/project"
+import (
+	"project-srv/internal/model"
+	"project-srv/internal/project"
+	"slices"
+)
 
+const (
+	projectSortCreatedAtDesc = "created_at_desc"
+	projectSortFavoriteDesc  = "favorite_desc"
+)
 func (uc *implUseCase) normalizeActivationReadinessCommand(command project.ActivationReadinessCommand) project.ActivationReadinessCommand {
 	switch command {
 	case project.ActivationReadinessCommandResume:
@@ -32,4 +40,24 @@ func (uc *implUseCase) mapReadinessBlockedError(readiness project.ActivationRead
 	default:
 		return project.ErrReadinessFailed
 	}
+}
+
+func (uc *implUseCase) validateProjectSort(sort string) error {
+	switch sort {
+	case "", projectSortCreatedAtDesc, projectSortFavoriteDesc:
+		return nil
+	default:
+		return project.ErrInvalidSort
+	}
+}
+
+func (uc *implUseCase) favoriteProjectForUser(item model.Project, userID string) model.Project {
+	item.IsFavorite = false
+	if userID == "" {
+		return item
+	}
+	if slices.Contains(item.FavoriteUserIDs, userID) {
+		item.IsFavorite = true
+	}
+	return item
 }

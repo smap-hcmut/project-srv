@@ -10,7 +10,7 @@ import (
 type ProjectStatus string
 
 const (
-	ProjectStatusDraft    ProjectStatus = "DRAFT"
+	ProjectStatusPending  ProjectStatus = "PENDING"
 	ProjectStatusActive   ProjectStatus = "ACTIVE"
 	ProjectStatusPaused   ProjectStatus = "PAUSED"
 	ProjectStatusArchived ProjectStatus = "ARCHIVED"
@@ -44,18 +44,21 @@ const (
 
 // Project represents a specific entity monitoring unit
 type Project struct {
-	ID           string              `json:"id"`
-	CampaignID   string              `json:"campaign_id"`
-	Name         string              `json:"name"`
-	Description  string              `json:"description,omitempty"`
-	Brand        string              `json:"brand,omitempty"`
-	EntityType   EntityType          `json:"entity_type"`
-	EntityName   string              `json:"entity_name"`
-	Status       ProjectStatus       `json:"status"`
-	ConfigStatus ProjectConfigStatus `json:"config_status"`
-	CreatedBy    string              `json:"created_by"`
-	CreatedAt    time.Time           `json:"created_at"`
-	UpdatedAt    time.Time           `json:"updated_at"`
+	ID              string              `json:"id"`
+	CampaignID      string              `json:"campaign_id"`
+	Name            string              `json:"name"`
+	Description     string              `json:"description,omitempty"`
+	Brand           string              `json:"brand,omitempty"`
+	EntityType      EntityType          `json:"entity_type"`
+	EntityName      string              `json:"entity_name"`
+	DomainTypeCode  string              `json:"domain_type_code"`
+	Status          ProjectStatus       `json:"status"`
+	ConfigStatus    ProjectConfigStatus `json:"config_status"`
+	FavoriteUserIDs []string            `json:"-"`
+	IsFavorite      bool                `json:"is_favorite"`
+	CreatedBy       string              `json:"created_by"`
+	CreatedAt       time.Time           `json:"created_at"`
+	UpdatedAt       time.Time           `json:"updated_at"`
 
 	// Relations
 	Campaign *Campaign `json:"campaign,omitempty"`
@@ -63,7 +66,7 @@ type Project struct {
 
 func IsValidProjectStatus(status string) bool {
 	switch ProjectStatus(status) {
-	case ProjectStatusDraft, ProjectStatusActive, ProjectStatusPaused, ProjectStatusArchived:
+	case ProjectStatusPending, ProjectStatusActive, ProjectStatusPaused, ProjectStatusArchived:
 		return true
 	default:
 		return false
@@ -80,7 +83,7 @@ func IsValidEntityType(entityType string) bool {
 }
 
 func CanActivateProjectStatus(status ProjectStatus) bool {
-	return status == ProjectStatusDraft
+	return status == ProjectStatusPending
 }
 
 func CanPauseProjectStatus(status ProjectStatus) bool {
@@ -92,7 +95,7 @@ func CanResumeProjectStatus(status ProjectStatus) bool {
 }
 
 func CanArchiveProjectStatus(status ProjectStatus) bool {
-	return status == ProjectStatusDraft || status == ProjectStatusActive || status == ProjectStatusPaused
+	return status == ProjectStatusPending || status == ProjectStatusActive || status == ProjectStatusPaused
 }
 
 func CanUnarchiveProjectStatus(status ProjectStatus) bool {
@@ -107,13 +110,14 @@ func NewProjectFromDB(db *sqlboiler.Project) *Project {
 	}
 
 	p := &Project{
-		ID:         db.ID,
-		CampaignID: db.CampaignID,
-		Name:       db.Name,
-		EntityType: EntityType(db.EntityType),
-		EntityName: db.EntityName,
-		Status:     ProjectStatus(db.Status),
-		CreatedBy:  db.CreatedBy,
+		ID:             db.ID,
+		CampaignID:     db.CampaignID,
+		Name:           db.Name,
+		EntityType:     EntityType(db.EntityType),
+		EntityName:     db.EntityName,
+		DomainTypeCode: db.DomainTypeCode,
+		Status:         ProjectStatus(db.Status),
+		CreatedBy:      db.CreatedBy,
 	}
 
 	if db.Description.Valid {

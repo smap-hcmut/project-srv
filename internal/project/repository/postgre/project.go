@@ -4,145 +4,300 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
+	"time"
+
 	"project-srv/internal/model"
 	"project-srv/internal/project/repository"
 	"project-srv/internal/sqlboiler"
-	"strings"
-	"time"
 
 	"github.com/aarondl/null/v8"
 	"github.com/aarondl/sqlboiler/v4/boil"
 	"github.com/aarondl/sqlboiler/v4/queries/qm"
+	"github.com/lib/pq"
 	"github.com/smap-hcmut/shared-libs/go/paginator"
 )
 
-// Create inserts a new project into the database.
-func (r *implRepository) Create(ctx context.Context, opt repository.CreateOptions) (model.Project, error) {
-	row := &sqlboiler.Project{
-		CampaignID: opt.CampaignID,
-		Name:       opt.Name,
-		EntityType: sqlboiler.EntityType(opt.EntityType),
-		EntityName: opt.EntityName,
-		Status:     sqlboiler.ProjectStatusDRAFT,
-		CreatedBy:  opt.CreatedBy,
-	}
-
-	if opt.Description != "" {
-		row.Description = null.StringFrom(opt.Description)
-	}
-	if opt.Brand != "" {
-		row.Brand = null.StringFrom(opt.Brand)
-	}
-
-	row.ConfigStatus = sqlboiler.NullProjectConfigStatusFrom(sqlboiler.ProjectConfigStatusDRAFT)
-	row.CreatedAt = null.TimeFrom(time.Now())
-	row.UpdatedAt = null.TimeFrom(time.Now())
-
-	if err := row.Insert(ctx, r.db, boil.Infer()); err != nil {
-		r.l.Errorf(ctx, "project.repository.Create.Insert: %v", err)
-		return model.Project{}, repository.ErrFailedToInsert
-	}
-
-	result := model.NewProjectFromDB(row)
-	return *result, nil
+type projectRow struct {
+	ID              string
+	CampaignID      string
+	Name            string
+	Description     sql.NullString
+	Brand           sql.NullString
+	EntityType      string
+	EntityName      string
+	DomainTypeCode  string
+	Status          string
+	ConfigStatus    sql.NullString
+	FavoriteUserIDs pq.StringArray
+	CreatedBy       string
+	CreatedAt       sql.NullTime
+	UpdatedAt       sql.NullTime
 }
 
-// Detail fetches a single project by ID.
-func (r *implRepository) Detail(ctx context.Context, id string) (model.Project, error) {
-	row, err := sqlboiler.FindProject(ctx, r.db, id)
+func toProjectModel(row projectRow) model.Project {
+	result := model.Project{
+		ID:              row.ID,
+		CampaignID:      row.CampaignID,
+		Name:            row.Name,
+		EntityType:      model.EntityType(row.EntityType),
+		EntityName:      row.EntityName,
+		DomainTypeCode:  row.DomainTypeCode,
+		Status:          model.ProjectStatus(row.Status),
+		FavoriteUserIDs: append([]string(nil), row.FavoriteUserIDs...),
+		CreatedBy:       row.CreatedBy,
+	}
+
+	if row.Description.Valid {
+		result.Description = row.Description.String
+	}
+	if row.Brand.Valid {
+		result.Brand = row.Brand.String
+	}
+	if row.ConfigStatus.Valid {
+		result.ConfigStatus = model.ProjectConfigStatus(row.ConfigStatus.String)
+	}
+	if row.CreatedAt.Valid {
+		result.CreatedAt = row.CreatedAt.Time
+	}
+	if row.UpdatedAt.Valid {
+		result.UpdatedAt = row.UpdatedAt.Time
+	}
+
+	return result
+}
+
+func (r *implRepository) fetchProjectByID(ctx context.Context, id string) (model.Project, error) {
+	query := `
+		SELECT id, campaign_id, name, description, brand, entity_type, entity_name, domain_type_code, status, config_status, favorite_user_ids, created_by, created_at, updated_at
+		FROM schema_project.projects
+		WHERE id = $1 AND deleted_at IS NULL
+	`
+
+	var row projectRow
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&row.ID,
+		&row.CampaignID,
+		&row.Name,
+		&row.Description,
+		&row.Brand,
+		&row.EntityType,
+		&row.EntityName,
+		&row.DomainTypeCode,
+		&row.Status,
+		&row.ConfigStatus,
+		&row.FavoriteUserIDs,
+		&row.CreatedBy,
+		&row.CreatedAt,
+		&row.UpdatedAt,
+	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			r.l.Warnf(ctx, "project.repository.Detail.FindProject: not found id=%s", id)
+			r.l.Warnf(ctx, "project.repository.fetchProjectByID.QueryRowContext: not found id=%s", id)
 			return model.Project{}, repository.ErrNotFound
 		}
-		r.l.Errorf(ctx, "project.repository.Detail.FindProject: %v", err)
+		r.l.Errorf(ctx, "project.repository.fetchProjectByID.QueryRowContext: %v", err)
 		return model.Project{}, repository.ErrFailedToGet
 	}
 
-	result := model.NewProjectFromDB(row)
-	return *result, nil
+	return toProjectModel(row), nil
 }
 
-// Get fetches projects with pagination and filters.
+func (r *implRepository) Create(ctx context.Context, opt repository.CreateOptions) (model.Project, error) {
+	now := time.Now().UTC()
+	query := `
+		INSERT INTO schema_project.projects (
+			campaign_id,
+			name,
+			description,
+			brand,
+			entity_type,
+			entity_name,
+			domain_type_code,
+			status,
+			config_status,
+			created_by,
+			created_at,
+			updated_at
+		) VALUES ($1, $2, NULLIF($3, ''), NULLIF($4, ''), $5, $6, $7, $8, $9, $10, $11, $12)
+		RETURNING id
+	`
+
+	var id string
+	if err := r.db.QueryRowContext(
+		ctx,
+		query,
+		opt.CampaignID,
+		opt.Name,
+		opt.Description,
+		opt.Brand,
+		opt.EntityType,
+		opt.EntityName,
+		opt.DomainTypeCode,
+		string(model.ProjectStatusPending),
+		string(model.ConfigStatusDraft),
+		opt.CreatedBy,
+		now,
+		now,
+	).Scan(&id); err != nil {
+		r.l.Errorf(ctx, "project.repository.Create.QueryRowContext: %v", err)
+		return model.Project{}, repository.ErrFailedToInsert
+	}
+
+	return r.fetchProjectByID(ctx, id)
+}
+
+func (r *implRepository) Detail(ctx context.Context, id string) (model.Project, error) {
+	return r.fetchProjectByID(ctx, id)
+}
+
 func (r *implRepository) Get(ctx context.Context, opt repository.GetOptions) ([]model.Project, paginator.Paginator, error) {
-	mods := r.buildGetQuery(opt)
+	whereClause, args := r.buildProjectFilters(opt)
 
-	// Count total
-	total, err := sqlboiler.Projects(mods...).Count(ctx, r.db)
-	if err != nil {
-		r.l.Errorf(ctx, "project.repository.Get.Count: %v", err)
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM schema_project.projects WHERE %s", whereClause)
+	var total int64
+	if err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
+		r.l.Errorf(ctx, "project.repository.Get.QueryRowContext.count: %v", err)
 		return nil, paginator.Paginator{}, repository.ErrFailedToList
 	}
 
-	// Apply pagination
-	pq := opt.Paginator
-	mods = append(mods,
-		qm.Limit(int(pq.Limit)),
-		qm.Offset(int(pq.Offset())),
-		qm.OrderBy(fmt.Sprintf("%s DESC", sqlboiler.ProjectColumns.CreatedAt)),
-	)
+	pqg := opt.Paginator
+	orderBy := r.buildProjectOrderBy(opt, &args)
+	args = append(args, pqg.Limit, pqg.Offset())
 
-	rows, err := sqlboiler.Projects(mods...).All(ctx, r.db)
+	query := fmt.Sprintf(`
+		SELECT id, campaign_id, name, description, brand, entity_type, entity_name, domain_type_code, status, config_status, favorite_user_ids, created_by, created_at, updated_at
+		FROM schema_project.projects
+		WHERE %s
+		ORDER BY %s
+		LIMIT $%d OFFSET $%d
+	`, whereClause, orderBy, len(args)-1, len(args))
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		r.l.Errorf(ctx, "project.repository.Get.All: %v", err)
+		r.l.Errorf(ctx, "project.repository.Get.QueryContext.list: %v", err)
 		return nil, paginator.Paginator{}, repository.ErrFailedToList
 	}
+	defer rows.Close()
 
-	projects := make([]model.Project, 0, len(rows))
-	for _, row := range rows {
-		projects = append(projects, *model.NewProjectFromDB(row))
+	projects := make([]model.Project, 0)
+	for rows.Next() {
+		var row projectRow
+		if err := rows.Scan(
+			&row.ID,
+			&row.CampaignID,
+			&row.Name,
+			&row.Description,
+			&row.Brand,
+			&row.EntityType,
+			&row.EntityName,
+			&row.DomainTypeCode,
+			&row.Status,
+			&row.ConfigStatus,
+			&row.FavoriteUserIDs,
+			&row.CreatedBy,
+			&row.CreatedAt,
+			&row.UpdatedAt,
+		); err != nil {
+			r.l.Errorf(ctx, "project.repository.Get.rows.Scan: %v", err)
+			return nil, paginator.Paginator{}, repository.ErrFailedToList
+		}
+		projects = append(projects, toProjectModel(row))
+	}
+	if err := rows.Err(); err != nil {
+		r.l.Errorf(ctx, "project.repository.Get.rows.Err: %v", err)
+		return nil, paginator.Paginator{}, repository.ErrFailedToList
 	}
 
 	pag := paginator.Paginator{
 		Total:       total,
 		Count:       int64(len(projects)),
-		PerPage:     pq.Limit,
-		CurrentPage: pq.Page,
+		PerPage:     pqg.Limit,
+		CurrentPage: pqg.Page,
 	}
 
 	return projects, pag, nil
 }
 
-// Update updates a project by ID.
 func (r *implRepository) Update(ctx context.Context, opt repository.UpdateOptions) (model.Project, error) {
-	row, err := sqlboiler.FindProject(ctx, r.db, opt.ID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			r.l.Warnf(ctx, "project.repository.Update.FindProject: not found id=%s", opt.ID)
-			return model.Project{}, repository.ErrNotFound
-		}
-		r.l.Errorf(ctx, "project.repository.Update.FindProject: %v", err)
-		return model.Project{}, repository.ErrFailedToUpdate
-	}
+	assignments := []string{"updated_at = $1"}
+	args := []interface{}{time.Now().UTC()}
+	argPos := 2
 
 	if opt.Name != "" {
-		row.Name = opt.Name
+		assignments = append(assignments, fmt.Sprintf("name = $%d", argPos))
+		args = append(args, opt.Name)
+		argPos++
 	}
 	if opt.Description != "" {
-		row.Description = null.StringFrom(opt.Description)
+		assignments = append(assignments, fmt.Sprintf("description = $%d", argPos))
+		args = append(args, opt.Description)
+		argPos++
 	}
 	if opt.Brand != "" {
-		row.Brand = null.StringFrom(opt.Brand)
+		assignments = append(assignments, fmt.Sprintf("brand = $%d", argPos))
+		args = append(args, opt.Brand)
+		argPos++
 	}
 	if opt.EntityType != "" {
-		row.EntityType = sqlboiler.EntityType(opt.EntityType)
+		assignments = append(assignments, fmt.Sprintf("entity_type = $%d", argPos))
+		args = append(args, opt.EntityType)
+		argPos++
 	}
 	if opt.EntityName != "" {
-		row.EntityName = opt.EntityName
+		assignments = append(assignments, fmt.Sprintf("entity_name = $%d", argPos))
+		args = append(args, opt.EntityName)
+		argPos++
 	}
-	row.UpdatedAt = null.TimeFrom(time.Now())
+	if opt.DomainTypeCode != "" {
+		assignments = append(assignments, fmt.Sprintf("domain_type_code = $%d", argPos))
+		args = append(args, opt.DomainTypeCode)
+		argPos++
+	}
 
-	_, err = row.Update(ctx, r.db, boil.Infer())
+	args = append(args, opt.ID)
+	query := fmt.Sprintf(`
+		UPDATE schema_project.projects
+		SET %s
+		WHERE id = $%d AND deleted_at IS NULL
+	`, strings.Join(assignments, ", "), argPos)
+
+	resultExec, err := r.db.ExecContext(ctx, query, args...)
 	if err != nil {
-		r.l.Errorf(ctx, "project.repository.Update.Update: %v", err)
+		r.l.Errorf(ctx, "project.repository.Update.ExecContext: %v", err)
 		return model.Project{}, repository.ErrFailedToUpdate
 	}
+	rowsAffected, err := resultExec.RowsAffected()
+	if err != nil {
+		r.l.Errorf(ctx, "project.repository.Update.RowsAffected: %v", err)
+		return model.Project{}, repository.ErrFailedToUpdate
+	}
+	if rowsAffected == 0 {
+		r.l.Warnf(ctx, "project.repository.Update: not found id=%s", opt.ID)
+		return model.Project{}, repository.ErrNotFound
+	}
 
-	result := model.NewProjectFromDB(row)
-	return *result, nil
+	return r.fetchProjectByID(ctx, opt.ID)
 }
 
-// UpdateStatus updates only the lifecycle status of a project.
+func (r *implRepository) DomainTypeExists(ctx context.Context, code string) (bool, error) {
+	query := `
+		SELECT EXISTS (
+			SELECT 1
+			FROM schema_project.domain_types
+			WHERE code = $1 AND is_active = TRUE
+		)
+	`
+
+	var exists bool
+	if err := r.db.QueryRowContext(ctx, query, strings.TrimSpace(code)).Scan(&exists); err != nil {
+		r.l.Errorf(ctx, "project.repository.DomainTypeExists.QueryRowContext: %v", err)
+		return false, repository.ErrFailedToGet
+	}
+
+	return exists, nil
+}
+
 func (r *implRepository) UpdateStatus(ctx context.Context, opt repository.UpdateStatusOptions) (model.Project, error) {
 	if len(opt.ExpectedStatuses) > 0 {
 		now := time.Now()
@@ -184,18 +339,7 @@ func (r *implRepository) UpdateStatus(ctx context.Context, opt repository.Update
 			return model.Project{}, repository.ErrStatusConflict
 		}
 
-		row, err := sqlboiler.FindProject(ctx, r.db, opt.ID)
-		if err != nil {
-			if err == sql.ErrNoRows {
-				r.l.Warnf(ctx, "project.repository.UpdateStatus.FindProjectAfterUpdate: not found id=%s", opt.ID)
-				return model.Project{}, repository.ErrNotFound
-			}
-			r.l.Errorf(ctx, "project.repository.UpdateStatus.FindProjectAfterUpdate: %v", err)
-			return model.Project{}, repository.ErrFailedToUpdate
-		}
-
-		result := model.NewProjectFromDB(row)
-		return *result, nil
+		return r.fetchProjectByID(ctx, opt.ID)
 	}
 
 	row, err := sqlboiler.FindProject(ctx, r.db, opt.ID)
@@ -220,11 +364,64 @@ func (r *implRepository) UpdateStatus(ctx context.Context, opt repository.Update
 		return model.Project{}, repository.ErrFailedToUpdate
 	}
 
-	result := model.NewProjectFromDB(row)
-	return *result, nil
+	return r.fetchProjectByID(ctx, opt.ID)
 }
 
-// Archive soft-deletes a project by setting deleted_at.
+func (r *implRepository) Favorite(ctx context.Context, id, userID string) error {
+	query := `
+		UPDATE schema_project.projects
+		SET favorite_user_ids = CASE
+			WHEN NOT favorite_user_ids @> $2::uuid[] THEN array_append(favorite_user_ids, $3::uuid)
+			ELSE favorite_user_ids
+		END,
+		    updated_at = NOW()
+		WHERE id = $1 AND deleted_at IS NULL
+	`
+	result, err := r.db.ExecContext(ctx, query, id, pq.Array([]string{userID}), userID)
+	if err != nil {
+		r.l.Errorf(ctx, "project.repository.Favorite.ExecContext: id=%s user_id=%s err=%v", id, userID, err)
+		return repository.ErrFailedToUpdate
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		r.l.Errorf(ctx, "project.repository.Favorite.RowsAffected: id=%s user_id=%s err=%v", id, userID, err)
+		return repository.ErrFailedToUpdate
+	}
+	if affected == 0 {
+		r.l.Warnf(ctx, "project.repository.Favorite: not found id=%s", id)
+		return repository.ErrNotFound
+	}
+
+	return nil
+}
+
+func (r *implRepository) Unfavorite(ctx context.Context, id, userID string) error {
+	query := `
+		UPDATE schema_project.projects
+		SET favorite_user_ids = array_remove(favorite_user_ids, $2::uuid),
+		    updated_at = NOW()
+		WHERE id = $1 AND deleted_at IS NULL
+	`
+	result, err := r.db.ExecContext(ctx, query, id, userID)
+	if err != nil {
+		r.l.Errorf(ctx, "project.repository.Unfavorite.ExecContext: id=%s user_id=%s err=%v", id, userID, err)
+		return repository.ErrFailedToUpdate
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		r.l.Errorf(ctx, "project.repository.Unfavorite.RowsAffected: id=%s user_id=%s err=%v", id, userID, err)
+		return repository.ErrFailedToUpdate
+	}
+	if affected == 0 {
+		r.l.Warnf(ctx, "project.repository.Unfavorite: not found id=%s", id)
+		return repository.ErrNotFound
+	}
+
+	return nil
+}
+
 func (r *implRepository) Archive(ctx context.Context, id string) error {
 	row, err := sqlboiler.FindProject(ctx, r.db, id)
 	if err != nil {
@@ -236,8 +433,9 @@ func (r *implRepository) Archive(ctx context.Context, id string) error {
 		return repository.ErrFailedToDelete
 	}
 
-	row.DeletedAt = null.TimeFrom(time.Now())
-	row.UpdatedAt = null.TimeFrom(time.Now())
+	now := time.Now()
+	row.DeletedAt = null.TimeFrom(now)
+	row.UpdatedAt = null.TimeFrom(now)
 
 	_, err = row.Update(ctx, r.db, boil.Whitelist(
 		sqlboiler.ProjectColumns.DeletedAt,

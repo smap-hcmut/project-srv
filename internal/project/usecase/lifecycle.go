@@ -46,7 +46,7 @@ func (uc *implUseCase) Activate(ctx context.Context, id string) (project.Activat
 	updated, err := uc.repo.UpdateStatus(ctx, repo.UpdateStatusOptions{
 		ID:               current.ID,
 		Status:           string(model.ProjectStatusActive),
-		ExpectedStatuses: []string{string(model.ProjectStatusDraft)},
+		ExpectedStatuses: []string{string(model.ProjectStatusPending)},
 	})
 	if err != nil {
 		uc.l.Errorf(ctx, "project.usecase.Activate.repo.UpdateStatus: id=%s err=%v", current.ID, err)

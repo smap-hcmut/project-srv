@@ -1,9 +1,10 @@
 package http
 
 import (
+	"strings"
+
 	"project-srv/internal/model"
 	"project-srv/internal/project"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/smap-hcmut/shared-libs/go/paginator"
@@ -11,14 +12,14 @@ import (
 
 // --- Request DTOs ---
 
-// createReq represents project creation request
 type createReq struct {
-	CampaignID  string `json:"-"`                                                                                                  // Parent campaign ID (from path param)
-	Name        string `json:"name" binding:"required" example:"VinFast VF8 Monitoring"`                                           // Project name (required)
-	Description string `json:"description" example:"Monitor discussions about VF8 electric SUV"`                                   // Project description
-	Brand       string `json:"brand" example:"VinFast"`                                                                            // Brand name for UI grouping
-	EntityType  string `json:"entity_type" binding:"required" example:"product" enums:"product,campaign,service,competitor,topic"` // Entity type (required)
-	EntityName  string `json:"entity_name" binding:"required" example:"VF8"`                                                       // Specific entity name (required)
+	CampaignID     string `json:"-"`
+	Name           string `json:"name" binding:"required" example:"VinFast VF8 Monitoring"`
+	Description    string `json:"description" example:"Monitor discussions about VF8 electric SUV"`
+	Brand          string `json:"brand" example:"VinFast"`
+	EntityType     string `json:"entity_type" binding:"required" example:"product" enums:"product,campaign,service,competitor,topic"`
+	EntityName     string `json:"entity_name" binding:"required" example:"VF8"`
+	DomainTypeCode string `json:"domain_type_code" binding:"required" example:"ev"`
 }
 
 func (r createReq) validate() error {
@@ -36,24 +37,27 @@ func (r createReq) validate() error {
 	}
 	switch model.EntityType(r.EntityType) {
 	case model.EntityTypeProduct, model.EntityTypeCampaign, model.EntityTypeService, model.EntityTypeCompetitor, model.EntityTypeTopic:
-		// valid
 	default:
 		return errInvalidEntity
 	}
 	if r.EntityName == "" {
 		return errEntityNameRequired
 	}
+	if strings.TrimSpace(r.DomainTypeCode) == "" {
+		return errDomainTypeRequired
+	}
 	return nil
 }
 
 func (r createReq) toInput() project.CreateInput {
 	return project.CreateInput{
-		CampaignID:  r.CampaignID,
-		Name:        r.Name,
-		Description: r.Description,
-		Brand:       r.Brand,
-		EntityType:  r.EntityType,
-		EntityName:  r.EntityName,
+		CampaignID:     r.CampaignID,
+		Name:           r.Name,
+		Description:    r.Description,
+		Brand:          r.Brand,
+		EntityType:     r.EntityType,
+		EntityName:     r.EntityName,
+		DomainTypeCode: strings.TrimSpace(r.DomainTypeCode),
 	}
 }
 
@@ -72,14 +76,14 @@ func (r detailReq) toInput() string {
 	return r.ID
 }
 
-// updateReq represents project update request
 type updateReq struct {
-	ID          string `json:"-"`                                                                               // Project ID (from path param)
-	Name        string `json:"name" example:"VinFast VF8 Monitoring - Updated"`                                 // Project name
-	Description string `json:"description" example:"Monitor discussions about VF8 electric SUV - Updated"`      // Project description
-	Brand       string `json:"brand" example:"VinFast"`                                                         // Brand name
-	EntityType  string `json:"entity_type" example:"product" enums:"product,campaign,service,competitor,topic"` // Entity type
-	EntityName  string `json:"entity_name" example:"VF8"`                                                       // Specific entity name
+	ID             string `json:"-"`
+	Name           string `json:"name" example:"VinFast VF8 Monitoring - Updated"`
+	Description    string `json:"description" example:"Monitor discussions about VF8 electric SUV - Updated"`
+	Brand          string `json:"brand" example:"VinFast"`
+	EntityType     string `json:"entity_type" example:"product" enums:"product,campaign,service,competitor,topic"`
+	EntityName     string `json:"entity_name" example:"VF8"`
+	DomainTypeCode string `json:"domain_type_code,omitempty" example:"ev"`
 }
 
 func (r updateReq) validate() error {
@@ -89,7 +93,6 @@ func (r updateReq) validate() error {
 	if r.EntityType != "" {
 		switch model.EntityType(r.EntityType) {
 		case model.EntityTypeProduct, model.EntityTypeCampaign, model.EntityTypeService, model.EntityTypeCompetitor, model.EntityTypeTopic:
-			// valid
 		default:
 			return errInvalidEntity
 		}
@@ -99,12 +102,13 @@ func (r updateReq) validate() error {
 
 func (r updateReq) toInput() project.UpdateInput {
 	return project.UpdateInput{
-		ID:          r.ID,
-		Name:        r.Name,
-		Description: r.Description,
-		Brand:       r.Brand,
-		EntityType:  r.EntityType,
-		EntityName:  r.EntityName,
+		ID:             r.ID,
+		Name:           r.Name,
+		Description:    r.Description,
+		Brand:          r.Brand,
+		EntityType:     r.EntityType,
+		EntityName:     r.EntityName,
+		DomainTypeCode: strings.TrimSpace(r.DomainTypeCode),
 	}
 }
 
@@ -149,16 +153,23 @@ func (r activationReadinessReq) toInput() project.ActivationReadinessInput {
 
 type listReq struct {
 	paginator.PaginateQuery
-	CampaignID string `form:"-"`
-	Status     string `form:"status"`
-	Name       string `form:"name"`
-	Brand      string `form:"brand"`
-	EntityType string `form:"entity_type"`
+	CampaignID   string `form:"-"`
+	Status       string `form:"status"`
+	Name         string `form:"name"`
+	Brand        string `form:"brand"`
+	EntityType   string `form:"entity_type"`
+	FavoriteOnly bool   `form:"favorite_only"`
+	Sort         string `form:"sort"`
 }
 
 func (r listReq) validate() error {
 	if !isValidUUID(r.CampaignID) {
 		return errWrongBody
+	}
+	switch r.Sort {
+	case "", "created_at_desc", "favorite_desc":
+	default:
+		return errWrongQuery
 	}
 	return nil
 }
@@ -166,59 +177,92 @@ func (r listReq) validate() error {
 func (r listReq) toInput() project.ListInput {
 	r.PaginateQuery.Adjust()
 	return project.ListInput{
-		CampaignID: r.CampaignID,
-		Status:     r.Status,
-		Name:       r.Name,
-		Brand:      r.Brand,
-		EntityType: r.EntityType,
-		Paginator:  r.PaginateQuery,
+		CampaignID:   r.CampaignID,
+		Status:       r.Status,
+		Name:         r.Name,
+		Brand:        r.Brand,
+		EntityType:   r.EntityType,
+		FavoriteOnly: r.FavoriteOnly,
+		Sort:         r.Sort,
+		Paginator:    r.PaginateQuery,
+	}
+}
+
+type favoriteListReq struct {
+	paginator.PaginateQuery
+	CampaignID string `form:"campaign_id"`
+	Status     string `form:"status"`
+	Name       string `form:"name"`
+	Brand      string `form:"brand"`
+	EntityType string `form:"entity_type"`
+	Sort       string `form:"sort"`
+}
+
+func (r favoriteListReq) validate() error {
+	if r.CampaignID != "" && !isValidUUID(r.CampaignID) {
+		return errWrongQuery
+	}
+	switch r.Sort {
+	case "", "created_at_desc", "favorite_desc":
+	default:
+		return errWrongQuery
+	}
+	return nil
+}
+
+func (r favoriteListReq) toInput() project.ListInput {
+	r.PaginateQuery.Adjust()
+	return project.ListInput{
+		CampaignID:   r.CampaignID,
+		Status:       r.Status,
+		Name:         r.Name,
+		Brand:        r.Brand,
+		EntityType:   r.EntityType,
+		FavoriteOnly: true,
+		Sort:         r.Sort,
+		Paginator:    r.PaginateQuery,
 	}
 }
 
 // --- Response DTOs ---
 
-// projectResp represents project data in API responses
 type projectResp struct {
-	ID          string `json:"id" example:"550e8400-e29b-41d4-a716-446655440002"`                               // Project UUID
-	CampaignID  string `json:"campaign_id" example:"550e8400-e29b-41d4-a716-446655440000"`                      // Parent campaign UUID
-	Name        string `json:"name" example:"VinFast VF8 Monitoring"`                                           // Project name
-	Description string `json:"description,omitempty" example:"Monitor discussions about VF8 electric SUV"`      // Project description
-	Brand       string `json:"brand,omitempty" example:"VinFast"`                                               // Brand name for UI grouping
-	EntityType  string `json:"entity_type" example:"product" enums:"product,campaign,service,competitor,topic"` // Entity type
-	EntityName  string `json:"entity_name" example:"VF8"`                                                       // Specific entity name
-	Status      string `json:"status" example:"DRAFT" enums:"DRAFT,ACTIVE,PAUSED,ARCHIVED"`                     // Project status
-	CreatedBy   string `json:"created_by" example:"550e8400-e29b-41d4-a716-446655440001"`                       // Creator user UUID
-	CreatedAt   string `json:"created_at" example:"2026-02-18T00:00:00Z"`                                       // Creation timestamp
-	UpdatedAt   string `json:"updated_at" example:"2026-02-18T00:00:00Z"`                                       // Last update timestamp
+	ID             string `json:"id" example:"550e8400-e29b-41d4-a716-446655440002"`
+	CampaignID     string `json:"campaign_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Name           string `json:"name" example:"VinFast VF8 Monitoring"`
+	Description    string `json:"description,omitempty" example:"Monitor discussions about VF8 electric SUV"`
+	Brand          string `json:"brand,omitempty" example:"VinFast"`
+	EntityType     string `json:"entity_type" example:"product" enums:"product,campaign,service,competitor,topic"`
+	EntityName     string `json:"entity_name" example:"VF8"`
+	DomainTypeCode string `json:"domain_type_code" example:"ev"`
+	Status         string `json:"status" example:"PENDING" enums:"PENDING,ACTIVE,PAUSED,ARCHIVED"`
+	IsFavorite     bool   `json:"is_favorite" example:"false"`
+	CreatedBy      string `json:"created_by" example:"550e8400-e29b-41d4-a716-446655440001"`
+	CreatedAt      string `json:"created_at" example:"2026-02-18T00:00:00Z"`
+	UpdatedAt      string `json:"updated_at" example:"2026-02-18T00:00:00Z"`
 }
 
-// createResp wraps project creation response
 type createResp struct {
-	Project projectResp `json:"project"` // Created project data
+	Project projectResp `json:"project"`
 }
 
-// detailResp wraps project detail response
 type detailResp struct {
-	Project projectResp `json:"project"` // Project details
+	Project projectResp `json:"project"`
 }
 
-// listResp wraps paginated project list response
 type listResp struct {
-	Projects  []projectResp               `json:"projects"`  // List of projects
-	Paginator paginator.PaginatorResponse `json:"paginator"` // Pagination metadata
+	Projects  []projectResp               `json:"projects"`
+	Paginator paginator.PaginatorResponse `json:"paginator"`
 }
 
-// updateResp wraps project update response
 type updateResp struct {
-	Project projectResp `json:"project"` // Updated project data
+	Project projectResp `json:"project"`
 }
 
-// lifecycleResp wraps project lifecycle response.
 type lifecycleResp struct {
 	Project projectResp `json:"project"`
 }
 
-// activationReadinessErrorResp describes one readiness blocker.
 type activationReadinessErrorResp struct {
 	Code         string `json:"code" example:"TARGET_DRYRUN_MISSING"`
 	Message      string `json:"message" example:"crawl target has never been dry-run"`
@@ -226,10 +270,9 @@ type activationReadinessErrorResp struct {
 	TargetID     string `json:"target_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440012"`
 }
 
-// activationReadinessResp wraps readiness output from project lifecycle manager + local status.
 type activationReadinessResp struct {
 	ProjectID                string                         `json:"project_id" example:"550e8400-e29b-41d4-a716-446655440002"`
-	ProjectStatus            string                         `json:"project_status" example:"DRAFT" enums:"DRAFT,ACTIVE,PAUSED,ARCHIVED"`
+	ProjectStatus            string                         `json:"project_status" example:"PENDING" enums:"PENDING,ACTIVE,PAUSED,ARCHIVED"`
 	DataSourceCount          int                            `json:"data_source_count" example:"2"`
 	HasDatasource            bool                           `json:"has_datasource" example:"true"`
 	PassiveUnconfirmedCount  int                            `json:"passive_unconfirmed_count" example:"0"`
@@ -238,8 +281,6 @@ type activationReadinessResp struct {
 	CanProceed               bool                           `json:"can_proceed" example:"false"`
 	Errors                   []activationReadinessErrorResp `json:"errors"`
 }
-
-// --- Response Mappers ---
 
 func (h *handler) newCreateResp(o project.CreateOutput) createResp {
 	return createResp{Project: h.toProjectResp(o.Project)}
@@ -250,12 +291,12 @@ func (h *handler) newDetailResp(o project.DetailOutput) detailResp {
 }
 
 func (h *handler) newListResp(o project.ListOutput) listResp {
-	projects := make([]projectResp, len(o.Projects))
+	items := make([]projectResp, len(o.Projects))
 	for i, p := range o.Projects {
-		projects[i] = h.toProjectResp(p)
+		items[i] = h.toProjectResp(p)
 	}
 	return listResp{
-		Projects:  projects,
+		Projects:  items,
 		Paginator: o.Paginator.ToResponse(),
 	}
 }
@@ -292,19 +333,19 @@ func (h *handler) newActivationReadinessResp(o project.ActivationReadiness) acti
 	}
 }
 
-// --- Internal Mapper ---
-
 func (h *handler) toProjectResp(p model.Project) projectResp {
 	resp := projectResp{
-		ID:         p.ID,
-		CampaignID: p.CampaignID,
-		Name:       p.Name,
-		EntityType: string(p.EntityType),
-		EntityName: p.EntityName,
-		Status:     string(p.Status),
-		CreatedBy:  p.CreatedBy,
-		CreatedAt:  p.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:  p.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		ID:             p.ID,
+		CampaignID:     p.CampaignID,
+		Name:           p.Name,
+		EntityType:     string(p.EntityType),
+		EntityName:     p.EntityName,
+		DomainTypeCode: p.DomainTypeCode,
+		Status:         string(p.Status),
+		IsFavorite:     p.IsFavorite,
+		CreatedBy:      p.CreatedBy,
+		CreatedAt:      p.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:      p.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
 
 	if p.Description != "" {
@@ -318,6 +359,6 @@ func (h *handler) toProjectResp(p model.Project) projectResp {
 }
 
 func isValidUUID(value string) bool {
-	_, err := uuid.Parse(strings.TrimSpace(value))
+	_, err := uuid.Parse(value)
 	return err == nil
 }

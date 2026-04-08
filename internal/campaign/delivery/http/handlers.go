@@ -62,7 +62,9 @@ func (h *handler) Detail(c *gin.Context) {
 // @Description Paginate campaigns with optional status filter
 // @Tags Campaign
 // @Produce json
-// @Param status query string false "Filter by status (ACTIVE, INACTIVE, ARCHIVED)"
+// @Param status query string false "Filter by status (PENDING, ACTIVE, PAUSED, ARCHIVED)"
+// @Param favorite_only query bool false "Return only campaigns favorited by current user"
+// @Param sort query string false "Sort by created_at_desc or favorite_desc"
 // @Param page query int false "Page number (default 1)"
 // @Param limit query int false "Number of records per page (default 15)"
 // @Success 200 {object} listResp
@@ -82,6 +84,41 @@ func (h *handler) List(c *gin.Context) {
 	o, err := h.uc.List(ctx, req.toInput())
 	if err != nil {
 		h.l.Errorf(ctx, "campaign.delivery.List.uc.List: %v", err)
+		response.Error(c, h.mapError(err), h.discord)
+		return
+	}
+
+	response.OK(c, h.newListResp(o))
+}
+
+// @Summary List favorite campaigns
+// @Description Paginate campaigns favorited by the current user
+// @Tags Campaign
+// @Produce json
+// @Param status query string false "Filter by status (PENDING, ACTIVE, PAUSED, ARCHIVED)"
+// @Param sort query string false "Sort by created_at_desc or favorite_desc"
+// @Param page query int false "Page number (default 1)"
+// @Param limit query int false "Number of records per page (default 15)"
+// @Success 200 {object} listResp
+// @Failure 400 {object} response.Resp
+// @Failure 500 {object} response.Resp
+// @Router /campaigns/favorites [get]
+func (h *handler) ListFavorites(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	req, err := h.processListReq(c)
+	if err != nil {
+		h.l.Warnf(ctx, "campaign.delivery.ListFavorites.processListReq: %v", err)
+		response.Error(c, err, h.discord)
+		return
+	}
+
+	input := req.toInput()
+	input.FavoriteOnly = true
+
+	o, err := h.uc.List(ctx, input)
+	if err != nil {
+		h.l.Errorf(ctx, "campaign.delivery.ListFavorites.uc.List: %v", err)
 		response.Error(c, h.mapError(err), h.discord)
 		return
 	}
@@ -118,6 +155,50 @@ func (h *handler) Update(c *gin.Context) {
 	}
 
 	response.OK(c, h.newUpdateResp(o))
+}
+
+// @Summary Favorite a campaign
+// @Description Mark a campaign as favorite for the current user
+// @Tags Campaign
+// @Produce json
+// @Param id path string true "Campaign ID"
+// @Success 200 {object} response.Resp
+// @Failure 400 {object} response.Resp
+// @Failure 500 {object} response.Resp
+// @Router /campaigns/{id}/favorite [post]
+func (h *handler) Favorite(c *gin.Context) {
+	ctx := c.Request.Context()
+	id := c.Param("id")
+
+	if err := h.uc.Favorite(ctx, id); err != nil {
+		h.l.Errorf(ctx, "campaign.delivery.Favorite.uc.Favorite: id=%s err=%v", id, err)
+		response.Error(c, h.mapError(err), h.discord)
+		return
+	}
+
+	response.OK(c, nil)
+}
+
+// @Summary Unfavorite a campaign
+// @Description Remove campaign favorite for the current user
+// @Tags Campaign
+// @Produce json
+// @Param id path string true "Campaign ID"
+// @Success 200 {object} response.Resp
+// @Failure 400 {object} response.Resp
+// @Failure 500 {object} response.Resp
+// @Router /campaigns/{id}/favorite [delete]
+func (h *handler) Unfavorite(c *gin.Context) {
+	ctx := c.Request.Context()
+	id := c.Param("id")
+
+	if err := h.uc.Unfavorite(ctx, id); err != nil {
+		h.l.Errorf(ctx, "campaign.delivery.Unfavorite.uc.Unfavorite: id=%s err=%v", id, err)
+		response.Error(c, h.mapError(err), h.discord)
+		return
+	}
+
+	response.OK(c, nil)
 }
 
 // @Summary Archive a campaign
