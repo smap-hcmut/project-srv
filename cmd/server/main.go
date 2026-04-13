@@ -24,9 +24,8 @@ import (
 // @title       SMAP Project Service API
 // @description SMAP Project Service API documentation.
 // @version     1
-// @host        project-srv.tantai.dev
-// @schemes     https
-// @BasePath    /project
+// @schemes     https http
+// @BasePath    /project/api/v1
 //
 // @securityDefinitions.apikey CookieAuth
 // @in cookie
