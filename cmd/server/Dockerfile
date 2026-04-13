@@ -21,7 +21,7 @@ COPY . .
 
 # Install swag tool and generate Swagger docs
 RUN go install github.com/swaggo/swag/cmd/swag@v1.8.12
-RUN swag init -g cmd/api/main.go --parseVendor
+RUN swag init -g cmd/server/main.go --parseVendor
 
 # Build static binary — trimpath for reproducible & smaller output
 RUN --mount=type=cache,target=/root/.cache/go-build \
@@ -33,7 +33,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     -mod=vendor \
     -trimpath \
     -ldflags="-s -w" \
-    -o api ./cmd/api
+    -o project-srv ./cmd/server
 
 # =============================================================================
 # STAGE 2: RUNTIME (Distroless Static — ~2 MB base, no shell, non-root)
@@ -41,7 +41,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 FROM gcr.io/distroless/static-debian12:nonroot AS runtime
 
 LABEL org.opencontainers.image.source="https://github.com/smap-hcmut/project-srv" \
-      org.opencontainers.image.title="smap-project-api"
+      org.opencontainers.image.title="smap-project-srv"
 
 WORKDIR /app
 
@@ -50,10 +50,10 @@ COPY --link --from=builder /usr/share/zoneinfo/Asia/Ho_Chi_Minh /usr/share/zonei
 COPY --link --from=builder /usr/share/zoneinfo/UTC /usr/share/zoneinfo/UTC
 ENV TZ=Asia/Ho_Chi_Minh
 
-COPY --link --from=builder --chown=nonroot:nonroot /app/api .
+COPY --link --from=builder --chown=nonroot:nonroot /app/project-srv .
 
 USER nonroot:nonroot
 
 EXPOSE 8080
 
-ENTRYPOINT ["./api"]
+ENTRYPOINT ["./project-srv"]

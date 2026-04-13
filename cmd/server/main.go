@@ -11,6 +11,7 @@ import (
 	configKafka "project-srv/config/kafka"
 
 	_ "project-srv/docs" // Import swagger docs
+	"project-srv/internal/consumer"
 	"project-srv/internal/httpserver"
 
 	"github.com/smap-hcmut/shared-libs/go/discord"
@@ -56,7 +57,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	logger.Info(ctx, "Starting Project API Service...")
+	logger.Info(ctx, "Starting Project Service...")
 
 	// Initialize encrypter
 	encrypterInstance := encrypter.New(cfg.Encrypter.Key)
@@ -114,6 +115,29 @@ func main() {
 		}
 	}
 
+	// ── Consumer (Kafka) ────────────────────────────────────────────────────
+	consumerSrv, err := consumer.New(consumer.Config{
+		Logger:        logger,
+		KafkaConfig:   cfg.Kafka,
+		RedisClient:   redisClient,
+		PostgresDB:    postgresDB.GetDB(),
+		Discord:       discordClient,
+		KafkaProducer: kafkaProducer,
+	})
+	if err != nil {
+		logger.Errorf(ctx, "Failed to create consumer server: %v", err)
+		return
+	}
+
+	// Run consumer in background goroutine
+	go func() {
+		logger.Info(ctx, "Consumer server starting...")
+		if err := consumerSrv.Run(ctx); err != nil {
+			logger.Errorf(ctx, "Consumer server error: %v", err)
+		}
+	}()
+
+	// ── HTTP Server ─────────────────────────────────────────────────────────
 	// Initialize HTTP server
 	httpServer, err := httpserver.New(logger, httpserver.Config{
 		// Server Configuration

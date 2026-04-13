@@ -1,10 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: project-api
+  name: project-srv
   namespace: smap
   labels:
-    app: project-api
+    app: project-srv
     service: project-srv
     version: v1
 spec:
@@ -12,7 +12,7 @@ spec:
   revisionHistoryLimit: 10
   selector:
     matchLabels:
-      app: project-api
+      app: project-srv
   strategy:
     rollingUpdate:
       maxSurge: 1
@@ -21,15 +21,15 @@ spec:
   template:
     metadata:
       labels:
-        app: project-api
+        app: project-srv
         service: project-srv
         version: v1
     spec:
       imagePullSecrets:
         - name: harbor-registry
       containers:
-        - name: project-api
-          image: registry.tantai.dev/smap/project-api:260316-234935
+        - name: project-srv
+          image: registry.tantai.dev/smap/project-srv:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
@@ -49,7 +49,7 @@ spec:
                 name: project-secrets
           env:
             - name: CONTAINER_NAME
-              value: "project-api"
+              value: "project-srv"
             - name: KUBERNETES_NAMESPACE
               valueFrom:
                 fieldRef:
@@ -98,14 +98,14 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: project-api
+  name: project-srv
   namespace: smap
   labels:
-    app: project-api
+    app: project-srv
     service: project-srv
 spec:
   selector:
-    app: project-api
+    app: project-srv
   ports:
     - port: 80
       targetPort: 8080
