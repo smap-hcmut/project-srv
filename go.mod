@@ -30,6 +30,7 @@ require (
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/eapache/go-resiliency v1.7.0 // indirect
 	github.com/eapache/queue v1.1.0 // indirect
+	github.com/ericlagergren/decimal v0.0.0-20190420051523-6335edbaa640 // indirect
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.8 // indirect
 	github.com/gin-contrib/sse v1.1.0 // indirect

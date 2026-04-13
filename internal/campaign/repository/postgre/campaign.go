@@ -62,7 +62,7 @@ func toCampaignModel(row campaignRow) model.Campaign {
 func (r *implRepository) fetchCampaignByID(ctx context.Context, id string) (model.Campaign, error) {
 	query := `
 		SELECT id, name, description, status, start_date, end_date, favorite_user_ids, created_by, created_at, updated_at
-		FROM schema_project.campaigns
+		FROM project.campaigns
 		WHERE id = $1 AND deleted_at IS NULL
 	`
 
@@ -130,7 +130,7 @@ func (r *implRepository) Detail(ctx context.Context, id string) (model.Campaign,
 func (r *implRepository) Get(ctx context.Context, opt repository.GetOptions) ([]model.Campaign, paginator.Paginator, error) {
 	whereClause, args := r.buildCampaignFilters(opt)
 
-	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM schema_project.campaigns WHERE %s", whereClause)
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM project.campaigns WHERE %s", whereClause)
 	var total int64
 	if err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
 		r.l.Errorf(ctx, "campaign.repository.Get.QueryRowContext.count: %v", err)
@@ -143,7 +143,7 @@ func (r *implRepository) Get(ctx context.Context, opt repository.GetOptions) ([]
 
 	query := fmt.Sprintf(`
 		SELECT id, name, description, status, start_date, end_date, favorite_user_ids, created_by, created_at, updated_at
-		FROM schema_project.campaigns
+		FROM project.campaigns
 		WHERE %s
 		ORDER BY %s
 		LIMIT $%d OFFSET $%d
@@ -237,7 +237,7 @@ func (r *implRepository) Update(ctx context.Context, opt repository.UpdateOption
 // Favorite adds a user to the favorite array idempotently.
 func (r *implRepository) Favorite(ctx context.Context, id, userID string) error {
 	query := `
-		UPDATE schema_project.campaigns
+		UPDATE project.campaigns
 		SET favorite_user_ids = CASE
 			WHEN NOT favorite_user_ids @> $2::uuid[] THEN array_append(favorite_user_ids, $3::uuid)
 			ELSE favorite_user_ids
@@ -267,7 +267,7 @@ func (r *implRepository) Favorite(ctx context.Context, id, userID string) error 
 // Unfavorite removes a user from the favorite array idempotently.
 func (r *implRepository) Unfavorite(ctx context.Context, id, userID string) error {
 	query := `
-		UPDATE schema_project.campaigns
+		UPDATE project.campaigns
 		SET favorite_user_ids = array_remove(favorite_user_ids, $2::uuid),
 		    updated_at = NOW()
 		WHERE id = $1 AND deleted_at IS NULL

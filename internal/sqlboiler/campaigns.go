@@ -18,73 +18,79 @@ import (
 	"github.com/aarondl/sqlboiler/v4/queries"
 	"github.com/aarondl/sqlboiler/v4/queries/qm"
 	"github.com/aarondl/sqlboiler/v4/queries/qmhelper"
+	"github.com/aarondl/sqlboiler/v4/types"
 	"github.com/aarondl/strmangle"
 	"github.com/friendsofgo/errors"
 )
 
 // Campaign is an object representing the database table.
 type Campaign struct {
-	ID          string         `boil:"id" json:"id" toml:"id" yaml:"id"`
-	Name        string         `boil:"name" json:"name" toml:"name" yaml:"name"`
-	Description null.String    `boil:"description" json:"description,omitempty" toml:"description" yaml:"description,omitempty"`
-	Status      CampaignStatus `boil:"status" json:"status" toml:"status" yaml:"status"`
-	StartDate   null.Time      `boil:"start_date" json:"start_date,omitempty" toml:"start_date" yaml:"start_date,omitempty"`
-	EndDate     null.Time      `boil:"end_date" json:"end_date,omitempty" toml:"end_date" yaml:"end_date,omitempty"`
-	CreatedBy   string         `boil:"created_by" json:"created_by" toml:"created_by" yaml:"created_by"`
-	CreatedAt   null.Time      `boil:"created_at" json:"created_at,omitempty" toml:"created_at" yaml:"created_at,omitempty"`
-	UpdatedAt   null.Time      `boil:"updated_at" json:"updated_at,omitempty" toml:"updated_at" yaml:"updated_at,omitempty"`
-	DeletedAt   null.Time      `boil:"deleted_at" json:"deleted_at,omitempty" toml:"deleted_at" yaml:"deleted_at,omitempty"`
+	ID              string            `boil:"id" json:"id" toml:"id" yaml:"id"`
+	Name            string            `boil:"name" json:"name" toml:"name" yaml:"name"`
+	Description     null.String       `boil:"description" json:"description,omitempty" toml:"description" yaml:"description,omitempty"`
+	Status          CampaignStatus    `boil:"status" json:"status" toml:"status" yaml:"status"`
+	StartDate       null.Time         `boil:"start_date" json:"start_date,omitempty" toml:"start_date" yaml:"start_date,omitempty"`
+	EndDate         null.Time         `boil:"end_date" json:"end_date,omitempty" toml:"end_date" yaml:"end_date,omitempty"`
+	CreatedBy       string            `boil:"created_by" json:"created_by" toml:"created_by" yaml:"created_by"`
+	FavoriteUserIds types.StringArray `boil:"favorite_user_ids" json:"favorite_user_ids" toml:"favorite_user_ids" yaml:"favorite_user_ids"`
+	CreatedAt       null.Time         `boil:"created_at" json:"created_at,omitempty" toml:"created_at" yaml:"created_at,omitempty"`
+	UpdatedAt       null.Time         `boil:"updated_at" json:"updated_at,omitempty" toml:"updated_at" yaml:"updated_at,omitempty"`
+	DeletedAt       null.Time         `boil:"deleted_at" json:"deleted_at,omitempty" toml:"deleted_at" yaml:"deleted_at,omitempty"`
 
 	R *campaignR `boil:"-" json:"-" toml:"-" yaml:"-"`
 	L campaignL  `boil:"-" json:"-" toml:"-" yaml:"-"`
 }
 
 var CampaignColumns = struct {
-	ID          string
-	Name        string
-	Description string
-	Status      string
-	StartDate   string
-	EndDate     string
-	CreatedBy   string
-	CreatedAt   string
-	UpdatedAt   string
-	DeletedAt   string
+	ID              string
+	Name            string
+	Description     string
+	Status          string
+	StartDate       string
+	EndDate         string
+	CreatedBy       string
+	FavoriteUserIds string
+	CreatedAt       string
+	UpdatedAt       string
+	DeletedAt       string
 }{
-	ID:          "id",
-	Name:        "name",
-	Description: "description",
-	Status:      "status",
-	StartDate:   "start_date",
-	EndDate:     "end_date",
-	CreatedBy:   "created_by",
-	CreatedAt:   "created_at",
-	UpdatedAt:   "updated_at",
-	DeletedAt:   "deleted_at",
+	ID:              "id",
+	Name:            "name",
+	Description:     "description",
+	Status:          "status",
+	StartDate:       "start_date",
+	EndDate:         "end_date",
+	CreatedBy:       "created_by",
+	FavoriteUserIds: "favorite_user_ids",
+	CreatedAt:       "created_at",
+	UpdatedAt:       "updated_at",
+	DeletedAt:       "deleted_at",
 }
 
 var CampaignTableColumns = struct {
-	ID          string
-	Name        string
-	Description string
-	Status      string
-	StartDate   string
-	EndDate     string
-	CreatedBy   string
-	CreatedAt   string
-	UpdatedAt   string
-	DeletedAt   string
+	ID              string
+	Name            string
+	Description     string
+	Status          string
+	StartDate       string
+	EndDate         string
+	CreatedBy       string
+	FavoriteUserIds string
+	CreatedAt       string
+	UpdatedAt       string
+	DeletedAt       string
 }{
-	ID:          "campaigns.id",
-	Name:        "campaigns.name",
-	Description: "campaigns.description",
-	Status:      "campaigns.status",
-	StartDate:   "campaigns.start_date",
-	EndDate:     "campaigns.end_date",
-	CreatedBy:   "campaigns.created_by",
-	CreatedAt:   "campaigns.created_at",
-	UpdatedAt:   "campaigns.updated_at",
-	DeletedAt:   "campaigns.deleted_at",
+	ID:              "campaigns.id",
+	Name:            "campaigns.name",
+	Description:     "campaigns.description",
+	Status:          "campaigns.status",
+	StartDate:       "campaigns.start_date",
+	EndDate:         "campaigns.end_date",
+	CreatedBy:       "campaigns.created_by",
+	FavoriteUserIds: "campaigns.favorite_user_ids",
+	CreatedAt:       "campaigns.created_at",
+	UpdatedAt:       "campaigns.updated_at",
+	DeletedAt:       "campaigns.deleted_at",
 }
 
 // Generated where
@@ -235,28 +241,51 @@ func (w whereHelpernull_Time) GTE(x null.Time) qm.QueryMod {
 func (w whereHelpernull_Time) IsNull() qm.QueryMod    { return qmhelper.WhereIsNull(w.field) }
 func (w whereHelpernull_Time) IsNotNull() qm.QueryMod { return qmhelper.WhereIsNotNull(w.field) }
 
+type whereHelpertypes_StringArray struct{ field string }
+
+func (w whereHelpertypes_StringArray) EQ(x types.StringArray) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.EQ, x)
+}
+func (w whereHelpertypes_StringArray) NEQ(x types.StringArray) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.NEQ, x)
+}
+func (w whereHelpertypes_StringArray) LT(x types.StringArray) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.LT, x)
+}
+func (w whereHelpertypes_StringArray) LTE(x types.StringArray) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.LTE, x)
+}
+func (w whereHelpertypes_StringArray) GT(x types.StringArray) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.GT, x)
+}
+func (w whereHelpertypes_StringArray) GTE(x types.StringArray) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.GTE, x)
+}
+
 var CampaignWhere = struct {
-	ID          whereHelperstring
-	Name        whereHelperstring
-	Description whereHelpernull_String
-	Status      whereHelperCampaignStatus
-	StartDate   whereHelpernull_Time
-	EndDate     whereHelpernull_Time
-	CreatedBy   whereHelperstring
-	CreatedAt   whereHelpernull_Time
-	UpdatedAt   whereHelpernull_Time
-	DeletedAt   whereHelpernull_Time
+	ID              whereHelperstring
+	Name            whereHelperstring
+	Description     whereHelpernull_String
+	Status          whereHelperCampaignStatus
+	StartDate       whereHelpernull_Time
+	EndDate         whereHelpernull_Time
+	CreatedBy       whereHelperstring
+	FavoriteUserIds whereHelpertypes_StringArray
+	CreatedAt       whereHelpernull_Time
+	UpdatedAt       whereHelpernull_Time
+	DeletedAt       whereHelpernull_Time
 }{
-	ID:          whereHelperstring{field: "\"schema_project\".\"campaigns\".\"id\""},
-	Name:        whereHelperstring{field: "\"schema_project\".\"campaigns\".\"name\""},
-	Description: whereHelpernull_String{field: "\"schema_project\".\"campaigns\".\"description\""},
-	Status:      whereHelperCampaignStatus{field: "\"schema_project\".\"campaigns\".\"status\""},
-	StartDate:   whereHelpernull_Time{field: "\"schema_project\".\"campaigns\".\"start_date\""},
-	EndDate:     whereHelpernull_Time{field: "\"schema_project\".\"campaigns\".\"end_date\""},
-	CreatedBy:   whereHelperstring{field: "\"schema_project\".\"campaigns\".\"created_by\""},
-	CreatedAt:   whereHelpernull_Time{field: "\"schema_project\".\"campaigns\".\"created_at\""},
-	UpdatedAt:   whereHelpernull_Time{field: "\"schema_project\".\"campaigns\".\"updated_at\""},
-	DeletedAt:   whereHelpernull_Time{field: "\"schema_project\".\"campaigns\".\"deleted_at\""},
+	ID:              whereHelperstring{field: "\"project\".\"campaigns\".\"id\""},
+	Name:            whereHelperstring{field: "\"project\".\"campaigns\".\"name\""},
+	Description:     whereHelpernull_String{field: "\"project\".\"campaigns\".\"description\""},
+	Status:          whereHelperCampaignStatus{field: "\"project\".\"campaigns\".\"status\""},
+	StartDate:       whereHelpernull_Time{field: "\"project\".\"campaigns\".\"start_date\""},
+	EndDate:         whereHelpernull_Time{field: "\"project\".\"campaigns\".\"end_date\""},
+	CreatedBy:       whereHelperstring{field: "\"project\".\"campaigns\".\"created_by\""},
+	FavoriteUserIds: whereHelpertypes_StringArray{field: "\"project\".\"campaigns\".\"favorite_user_ids\""},
+	CreatedAt:       whereHelpernull_Time{field: "\"project\".\"campaigns\".\"created_at\""},
+	UpdatedAt:       whereHelpernull_Time{field: "\"project\".\"campaigns\".\"updated_at\""},
+	DeletedAt:       whereHelpernull_Time{field: "\"project\".\"campaigns\".\"deleted_at\""},
 }
 
 // CampaignRels is where relationship names are stored.
@@ -296,9 +325,9 @@ func (r *campaignR) GetProjects() ProjectSlice {
 type campaignL struct{}
 
 var (
-	campaignAllColumns            = []string{"id", "name", "description", "status", "start_date", "end_date", "created_by", "created_at", "updated_at", "deleted_at"}
+	campaignAllColumns            = []string{"id", "name", "description", "status", "start_date", "end_date", "created_by", "favorite_user_ids", "created_at", "updated_at", "deleted_at"}
 	campaignColumnsWithoutDefault = []string{"name", "created_by"}
-	campaignColumnsWithDefault    = []string{"id", "description", "status", "start_date", "end_date", "created_at", "updated_at", "deleted_at"}
+	campaignColumnsWithDefault    = []string{"id", "description", "status", "start_date", "end_date", "favorite_user_ids", "created_at", "updated_at", "deleted_at"}
 	campaignPrimaryKeyColumns     = []string{"id"}
 	campaignGeneratedColumns      = []string{}
 )
@@ -616,7 +645,7 @@ func (o *Campaign) Projects(mods ...qm.QueryMod) projectQuery {
 	}
 
 	queryMods = append(queryMods,
-		qm.Where("\"schema_project\".\"projects\".\"campaign_id\"=?", o.ID),
+		qm.Where("\"project\".\"projects\".\"campaign_id\"=?", o.ID),
 	)
 
 	return Projects(queryMods...)
@@ -677,9 +706,9 @@ func (campaignL) LoadProjects(ctx context.Context, e boil.ContextExecutor, singu
 	}
 
 	query := NewQuery(
-		qm.From(`schema_project.projects`),
-		qm.WhereIn(`schema_project.projects.campaign_id in ?`, argsSlice...),
-		qmhelper.WhereIsNull(`schema_project.projects.deleted_at`),
+		qm.From(`project.projects`),
+		qm.WhereIn(`project.projects.campaign_id in ?`, argsSlice...),
+		qmhelper.WhereIsNull(`project.projects.deleted_at`),
 	)
 	if mods != nil {
 		mods.Apply(query)
@@ -750,7 +779,7 @@ func (o *Campaign) AddProjects(ctx context.Context, exec boil.ContextExecutor, i
 			}
 		} else {
 			updateQuery := fmt.Sprintf(
-				"UPDATE \"schema_project\".\"projects\" SET %s WHERE %s",
+				"UPDATE \"project\".\"projects\" SET %s WHERE %s",
 				strmangle.SetParamNames("\"", "\"", 1, []string{"campaign_id"}),
 				strmangle.WhereClause("\"", "\"", 2, projectPrimaryKeyColumns),
 			)
@@ -791,10 +820,10 @@ func (o *Campaign) AddProjects(ctx context.Context, exec boil.ContextExecutor, i
 
 // Campaigns retrieves all the records using an executor.
 func Campaigns(mods ...qm.QueryMod) campaignQuery {
-	mods = append(mods, qm.From("\"schema_project\".\"campaigns\""), qmhelper.WhereIsNull("\"schema_project\".\"campaigns\".\"deleted_at\""))
+	mods = append(mods, qm.From("\"project\".\"campaigns\""), qmhelper.WhereIsNull("\"project\".\"campaigns\".\"deleted_at\""))
 	q := NewQuery(mods...)
 	if len(queries.GetSelect(q)) == 0 {
-		queries.SetSelect(q, []string{"\"schema_project\".\"campaigns\".*"})
+		queries.SetSelect(q, []string{"\"project\".\"campaigns\".*"})
 	}
 
 	return campaignQuery{q}
@@ -810,7 +839,7 @@ func FindCampaign(ctx context.Context, exec boil.ContextExecutor, iD string, sel
 		sel = strings.Join(strmangle.IdentQuoteSlice(dialect.LQ, dialect.RQ, selectCols), ",")
 	}
 	query := fmt.Sprintf(
-		"select %s from \"schema_project\".\"campaigns\" where \"id\"=$1 and \"deleted_at\" is null", sel,
+		"select %s from \"project\".\"campaigns\" where \"id\"=$1 and \"deleted_at\" is null", sel,
 	)
 
 	q := queries.Raw(query, iD)
@@ -877,9 +906,9 @@ func (o *Campaign) Insert(ctx context.Context, exec boil.ContextExecutor, column
 			return err
 		}
 		if len(wl) != 0 {
-			cache.query = fmt.Sprintf("INSERT INTO \"schema_project\".\"campaigns\" (\"%s\") %%sVALUES (%s)%%s", strings.Join(wl, "\",\""), strmangle.Placeholders(dialect.UseIndexPlaceholders, len(wl), 1, 1))
+			cache.query = fmt.Sprintf("INSERT INTO \"project\".\"campaigns\" (\"%s\") %%sVALUES (%s)%%s", strings.Join(wl, "\",\""), strmangle.Placeholders(dialect.UseIndexPlaceholders, len(wl), 1, 1))
 		} else {
-			cache.query = "INSERT INTO \"schema_project\".\"campaigns\" %sDEFAULT VALUES%s"
+			cache.query = "INSERT INTO \"project\".\"campaigns\" %sDEFAULT VALUES%s"
 		}
 
 		var queryOutput, queryReturning string
@@ -951,7 +980,7 @@ func (o *Campaign) Update(ctx context.Context, exec boil.ContextExecutor, column
 			return 0, errors.New("sqlboiler: unable to update campaigns, could not build whitelist")
 		}
 
-		cache.query = fmt.Sprintf("UPDATE \"schema_project\".\"campaigns\" SET %s WHERE %s",
+		cache.query = fmt.Sprintf("UPDATE \"project\".\"campaigns\" SET %s WHERE %s",
 			strmangle.SetParamNames("\"", "\"", 1, wl),
 			strmangle.WhereClause("\"", "\"", len(wl)+1, campaignPrimaryKeyColumns),
 		)
@@ -1032,7 +1061,7 @@ func (o CampaignSlice) UpdateAll(ctx context.Context, exec boil.ContextExecutor,
 		args = append(args, pkeyArgs...)
 	}
 
-	sql := fmt.Sprintf("UPDATE \"schema_project\".\"campaigns\" SET %s WHERE %s",
+	sql := fmt.Sprintf("UPDATE \"project\".\"campaigns\" SET %s WHERE %s",
 		strmangle.SetParamNames("\"", "\"", 1, colNames),
 		strmangle.WhereClauseRepeated(string(dialect.LQ), string(dialect.RQ), len(colNames)+1, campaignPrimaryKeyColumns, len(o)))
 
@@ -1136,7 +1165,7 @@ func (o *Campaign) Upsert(ctx context.Context, exec boil.ContextExecutor, update
 			conflict = make([]string, len(campaignPrimaryKeyColumns))
 			copy(conflict, campaignPrimaryKeyColumns)
 		}
-		cache.query = buildUpsertQueryPostgres(dialect, "\"schema_project\".\"campaigns\"", updateOnConflict, ret, update, conflict, insert, opts...)
+		cache.query = buildUpsertQueryPostgres(dialect, "\"project\".\"campaigns\"", updateOnConflict, ret, update, conflict, insert, opts...)
 
 		cache.valueMapping, err = queries.BindMapping(campaignType, campaignMapping, insert)
 		if err != nil {
@@ -1200,12 +1229,12 @@ func (o *Campaign) Delete(ctx context.Context, exec boil.ContextExecutor, hardDe
 	)
 	if hardDelete {
 		args = queries.ValuesFromMapping(reflect.Indirect(reflect.ValueOf(o)), campaignPrimaryKeyMapping)
-		sql = "DELETE FROM \"schema_project\".\"campaigns\" WHERE \"id\"=$1"
+		sql = "DELETE FROM \"project\".\"campaigns\" WHERE \"id\"=$1"
 	} else {
 		currTime := time.Now().In(boil.GetLocation())
 		o.DeletedAt = null.TimeFrom(currTime)
 		wl := []string{"deleted_at"}
-		sql = fmt.Sprintf("UPDATE \"schema_project\".\"campaigns\" SET %s WHERE \"id\"=$2",
+		sql = fmt.Sprintf("UPDATE \"project\".\"campaigns\" SET %s WHERE \"id\"=$2",
 			strmangle.SetParamNames("\"", "\"", 1, wl),
 		)
 		valueMapping, err := queries.BindMapping(campaignType, campaignMapping, append(wl, campaignPrimaryKeyColumns...))
@@ -1286,7 +1315,7 @@ func (o CampaignSlice) DeleteAll(ctx context.Context, exec boil.ContextExecutor,
 			pkeyArgs := queries.ValuesFromMapping(reflect.Indirect(reflect.ValueOf(obj)), campaignPrimaryKeyMapping)
 			args = append(args, pkeyArgs...)
 		}
-		sql = "DELETE FROM \"schema_project\".\"campaigns\" WHERE " +
+		sql = "DELETE FROM \"project\".\"campaigns\" WHERE " +
 			strmangle.WhereClauseRepeated(string(dialect.LQ), string(dialect.RQ), 1, campaignPrimaryKeyColumns, len(o))
 	} else {
 		currTime := time.Now().In(boil.GetLocation())
@@ -1296,7 +1325,7 @@ func (o CampaignSlice) DeleteAll(ctx context.Context, exec boil.ContextExecutor,
 			obj.DeletedAt = null.TimeFrom(currTime)
 		}
 		wl := []string{"deleted_at"}
-		sql = fmt.Sprintf("UPDATE \"schema_project\".\"campaigns\" SET %s WHERE "+
+		sql = fmt.Sprintf("UPDATE \"project\".\"campaigns\" SET %s WHERE "+
 			strmangle.WhereClauseRepeated(string(dialect.LQ), string(dialect.RQ), 2, campaignPrimaryKeyColumns, len(o)),
 			strmangle.SetParamNames("\"", "\"", 1, wl),
 		)
@@ -1355,7 +1384,7 @@ func (o *CampaignSlice) ReloadAll(ctx context.Context, exec boil.ContextExecutor
 		args = append(args, pkeyArgs...)
 	}
 
-	sql := "SELECT \"schema_project\".\"campaigns\".* FROM \"schema_project\".\"campaigns\" WHERE " +
+	sql := "SELECT \"project\".\"campaigns\".* FROM \"project\".\"campaigns\" WHERE " +
 		strmangle.WhereClauseRepeated(string(dialect.LQ), string(dialect.RQ), 1, campaignPrimaryKeyColumns, len(*o)) +
 		"and \"deleted_at\" is null"
 
@@ -1374,7 +1403,7 @@ func (o *CampaignSlice) ReloadAll(ctx context.Context, exec boil.ContextExecutor
 // CampaignExists checks if the Campaign row exists.
 func CampaignExists(ctx context.Context, exec boil.ContextExecutor, iD string) (bool, error) {
 	var exists bool
-	sql := "select exists(select 1 from \"schema_project\".\"campaigns\" where \"id\"=$1 and \"deleted_at\" is null limit 1)"
+	sql := "select exists(select 1 from \"project\".\"campaigns\" where \"id\"=$1 and \"deleted_at\" is null limit 1)"
 
 	if boil.IsDebug(ctx) {
 		writer := boil.DebugWriterFrom(ctx)

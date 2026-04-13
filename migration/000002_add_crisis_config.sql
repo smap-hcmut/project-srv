@@ -1,13 +1,13 @@
 -- Create ENUM for Crisis Status
-CREATE TYPE crisis_status AS ENUM ('NORMAL', 'WARNING', 'CRITICAL');
+CREATE TYPE project.crisis_status AS ENUM ('NORMAL', 'WARNING', 'CRITICAL');
 
 -- project_crisis_config table
 -- Stores crisis detection rules for each project
-CREATE TABLE IF NOT EXISTS projects_crisis_config (
-    project_id UUID PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS project.projects_crisis_config (
+    project_id UUID PRIMARY KEY REFERENCES project.projects(id) ON DELETE CASCADE,
     
     -- Crisis Status: NORMAL, WARNING, CRITICAL
-    status crisis_status DEFAULT 'NORMAL',
+    status project.crisis_status DEFAULT 'NORMAL',
     
     -- Keyword Rules (JSONB)
     -- { "critical": ["scam", "fake"], "legal": ["police", "court"], "slang": ["phot", "boc phot"] }
@@ -30,4 +30,4 @@ CREATE TABLE IF NOT EXISTS projects_crisis_config (
 );
 
 -- Index for fast lookup by status (to find projects in crisis)
-CREATE INDEX idx_projects_crisis_config_status ON projects_crisis_config(status);
+CREATE INDEX idx_projects_crisis_config_status ON project.projects_crisis_config(status);

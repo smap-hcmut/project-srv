@@ -70,7 +70,7 @@ func toProjectModel(row projectRow) model.Project {
 func (r *implRepository) fetchProjectByID(ctx context.Context, id string) (model.Project, error) {
 	query := `
 		SELECT id, campaign_id, name, description, brand, entity_type, entity_name, domain_type_code, status, config_status, favorite_user_ids, created_by, created_at, updated_at
-		FROM schema_project.projects
+		FROM project.projects
 		WHERE id = $1 AND deleted_at IS NULL
 	`
 
@@ -106,7 +106,7 @@ func (r *implRepository) fetchProjectByID(ctx context.Context, id string) (model
 func (r *implRepository) Create(ctx context.Context, opt repository.CreateOptions) (model.Project, error) {
 	now := time.Now().UTC()
 	query := `
-		INSERT INTO schema_project.projects (
+		INSERT INTO project.projects (
 			campaign_id,
 			name,
 			description,
@@ -154,7 +154,7 @@ func (r *implRepository) Detail(ctx context.Context, id string) (model.Project, 
 func (r *implRepository) Get(ctx context.Context, opt repository.GetOptions) ([]model.Project, paginator.Paginator, error) {
 	whereClause, args := r.buildProjectFilters(opt)
 
-	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM schema_project.projects WHERE %s", whereClause)
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM project.projects WHERE %s", whereClause)
 	var total int64
 	if err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
 		r.l.Errorf(ctx, "project.repository.Get.QueryRowContext.count: %v", err)
@@ -167,7 +167,7 @@ func (r *implRepository) Get(ctx context.Context, opt repository.GetOptions) ([]
 
 	query := fmt.Sprintf(`
 		SELECT id, campaign_id, name, description, brand, entity_type, entity_name, domain_type_code, status, config_status, favorite_user_ids, created_by, created_at, updated_at
-		FROM schema_project.projects
+		FROM project.projects
 		WHERE %s
 		ORDER BY %s
 		LIMIT $%d OFFSET $%d
@@ -257,7 +257,7 @@ func (r *implRepository) Update(ctx context.Context, opt repository.UpdateOption
 
 	args = append(args, opt.ID)
 	query := fmt.Sprintf(`
-		UPDATE schema_project.projects
+		UPDATE project.projects
 		SET %s
 		WHERE id = $%d AND deleted_at IS NULL
 	`, strings.Join(assignments, ", "), argPos)
@@ -351,7 +351,7 @@ func (r *implRepository) UpdateStatus(ctx context.Context, opt repository.Update
 
 func (r *implRepository) Favorite(ctx context.Context, id, userID string) error {
 	query := `
-		UPDATE schema_project.projects
+		UPDATE project.projects
 		SET favorite_user_ids = CASE
 			WHEN NOT favorite_user_ids @> $2::uuid[] THEN array_append(favorite_user_ids, $3::uuid)
 			ELSE favorite_user_ids
@@ -380,7 +380,7 @@ func (r *implRepository) Favorite(ctx context.Context, id, userID string) error 
 
 func (r *implRepository) Unfavorite(ctx context.Context, id, userID string) error {
 	query := `
-		UPDATE schema_project.projects
+		UPDATE project.projects
 		SET favorite_user_ids = array_remove(favorite_user_ids, $2::uuid),
 		    updated_at = NOW()
 		WHERE id = $1 AND deleted_at IS NULL

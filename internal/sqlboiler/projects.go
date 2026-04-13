@@ -18,93 +18,99 @@ import (
 	"github.com/aarondl/sqlboiler/v4/queries"
 	"github.com/aarondl/sqlboiler/v4/queries/qm"
 	"github.com/aarondl/sqlboiler/v4/queries/qmhelper"
+	"github.com/aarondl/sqlboiler/v4/types"
 	"github.com/aarondl/strmangle"
 	"github.com/friendsofgo/errors"
 )
 
 // Project is an object representing the database table.
 type Project struct {
-	ID             string                  `boil:"id" json:"id" toml:"id" yaml:"id"`
-	CampaignID     string                  `boil:"campaign_id" json:"campaign_id" toml:"campaign_id" yaml:"campaign_id"`
-	Name           string                  `boil:"name" json:"name" toml:"name" yaml:"name"`
-	Description    null.String             `boil:"description" json:"description,omitempty" toml:"description" yaml:"description,omitempty"`
-	Brand          null.String             `boil:"brand" json:"brand,omitempty" toml:"brand" yaml:"brand,omitempty"`
-	EntityType     EntityType              `boil:"entity_type" json:"entity_type" toml:"entity_type" yaml:"entity_type"`
-	EntityName     string                  `boil:"entity_name" json:"entity_name" toml:"entity_name" yaml:"entity_name"`
-	DomainTypeCode string                  `boil:"domain_type_code" json:"domain_type_code" toml:"domain_type_code" yaml:"domain_type_code"`
-	Status         ProjectStatus           `boil:"status" json:"status" toml:"status" yaml:"status"`
-	ConfigStatus   NullProjectConfigStatus `boil:"config_status" json:"config_status,omitempty" toml:"config_status" yaml:"config_status,omitempty"`
-	CreatedBy      string                  `boil:"created_by" json:"created_by" toml:"created_by" yaml:"created_by"`
-	CreatedAt      null.Time               `boil:"created_at" json:"created_at,omitempty" toml:"created_at" yaml:"created_at,omitempty"`
-	UpdatedAt      null.Time               `boil:"updated_at" json:"updated_at,omitempty" toml:"updated_at" yaml:"updated_at,omitempty"`
-	DeletedAt      null.Time               `boil:"deleted_at" json:"deleted_at,omitempty" toml:"deleted_at" yaml:"deleted_at,omitempty"`
+	ID              string                  `boil:"id" json:"id" toml:"id" yaml:"id"`
+	CampaignID      string                  `boil:"campaign_id" json:"campaign_id" toml:"campaign_id" yaml:"campaign_id"`
+	Name            string                  `boil:"name" json:"name" toml:"name" yaml:"name"`
+	Description     null.String             `boil:"description" json:"description,omitempty" toml:"description" yaml:"description,omitempty"`
+	Brand           null.String             `boil:"brand" json:"brand,omitempty" toml:"brand" yaml:"brand,omitempty"`
+	EntityType      EntityType              `boil:"entity_type" json:"entity_type" toml:"entity_type" yaml:"entity_type"`
+	EntityName      string                  `boil:"entity_name" json:"entity_name" toml:"entity_name" yaml:"entity_name"`
+	DomainTypeCode  string                  `boil:"domain_type_code" json:"domain_type_code" toml:"domain_type_code" yaml:"domain_type_code"`
+	Status          ProjectStatus           `boil:"status" json:"status" toml:"status" yaml:"status"`
+	ConfigStatus    NullProjectConfigStatus `boil:"config_status" json:"config_status,omitempty" toml:"config_status" yaml:"config_status,omitempty"`
+	CreatedBy       string                  `boil:"created_by" json:"created_by" toml:"created_by" yaml:"created_by"`
+	FavoriteUserIds types.StringArray       `boil:"favorite_user_ids" json:"favorite_user_ids" toml:"favorite_user_ids" yaml:"favorite_user_ids"`
+	CreatedAt       null.Time               `boil:"created_at" json:"created_at,omitempty" toml:"created_at" yaml:"created_at,omitempty"`
+	UpdatedAt       null.Time               `boil:"updated_at" json:"updated_at,omitempty" toml:"updated_at" yaml:"updated_at,omitempty"`
+	DeletedAt       null.Time               `boil:"deleted_at" json:"deleted_at,omitempty" toml:"deleted_at" yaml:"deleted_at,omitempty"`
 
 	R *projectR `boil:"-" json:"-" toml:"-" yaml:"-"`
 	L projectL  `boil:"-" json:"-" toml:"-" yaml:"-"`
 }
 
 var ProjectColumns = struct {
-	ID             string
-	CampaignID     string
-	Name           string
-	Description    string
-	Brand          string
-	EntityType     string
-	EntityName     string
-	DomainTypeCode string
-	Status         string
-	ConfigStatus   string
-	CreatedBy      string
-	CreatedAt      string
-	UpdatedAt      string
-	DeletedAt      string
+	ID              string
+	CampaignID      string
+	Name            string
+	Description     string
+	Brand           string
+	EntityType      string
+	EntityName      string
+	DomainTypeCode  string
+	Status          string
+	ConfigStatus    string
+	CreatedBy       string
+	FavoriteUserIds string
+	CreatedAt       string
+	UpdatedAt       string
+	DeletedAt       string
 }{
-	ID:             "id",
-	CampaignID:     "campaign_id",
-	Name:           "name",
-	Description:    "description",
-	Brand:          "brand",
-	EntityType:     "entity_type",
-	EntityName:     "entity_name",
-	DomainTypeCode: "domain_type_code",
-	Status:         "status",
-	ConfigStatus:   "config_status",
-	CreatedBy:      "created_by",
-	CreatedAt:      "created_at",
-	UpdatedAt:      "updated_at",
-	DeletedAt:      "deleted_at",
+	ID:              "id",
+	CampaignID:      "campaign_id",
+	Name:            "name",
+	Description:     "description",
+	Brand:           "brand",
+	EntityType:      "entity_type",
+	EntityName:      "entity_name",
+	DomainTypeCode:  "domain_type_code",
+	Status:          "status",
+	ConfigStatus:    "config_status",
+	CreatedBy:       "created_by",
+	FavoriteUserIds: "favorite_user_ids",
+	CreatedAt:       "created_at",
+	UpdatedAt:       "updated_at",
+	DeletedAt:       "deleted_at",
 }
 
 var ProjectTableColumns = struct {
-	ID             string
-	CampaignID     string
-	Name           string
-	Description    string
-	Brand          string
-	EntityType     string
-	EntityName     string
-	DomainTypeCode string
-	Status         string
-	ConfigStatus   string
-	CreatedBy      string
-	CreatedAt      string
-	UpdatedAt      string
-	DeletedAt      string
+	ID              string
+	CampaignID      string
+	Name            string
+	Description     string
+	Brand           string
+	EntityType      string
+	EntityName      string
+	DomainTypeCode  string
+	Status          string
+	ConfigStatus    string
+	CreatedBy       string
+	FavoriteUserIds string
+	CreatedAt       string
+	UpdatedAt       string
+	DeletedAt       string
 }{
-	ID:             "projects.id",
-	CampaignID:     "projects.campaign_id",
-	Name:           "projects.name",
-	Description:    "projects.description",
-	Brand:          "projects.brand",
-	EntityType:     "projects.entity_type",
-	EntityName:     "projects.entity_name",
-	DomainTypeCode: "projects.domain_type_code",
-	Status:         "projects.status",
-	ConfigStatus:   "projects.config_status",
-	CreatedBy:      "projects.created_by",
-	CreatedAt:      "projects.created_at",
-	UpdatedAt:      "projects.updated_at",
-	DeletedAt:      "projects.deleted_at",
+	ID:              "projects.id",
+	CampaignID:      "projects.campaign_id",
+	Name:            "projects.name",
+	Description:     "projects.description",
+	Brand:           "projects.brand",
+	EntityType:      "projects.entity_type",
+	EntityName:      "projects.entity_name",
+	DomainTypeCode:  "projects.domain_type_code",
+	Status:          "projects.status",
+	ConfigStatus:    "projects.config_status",
+	CreatedBy:       "projects.created_by",
+	FavoriteUserIds: "projects.favorite_user_ids",
+	CreatedAt:       "projects.created_at",
+	UpdatedAt:       "projects.updated_at",
+	DeletedAt:       "projects.deleted_at",
 }
 
 // Generated where
@@ -222,35 +228,37 @@ func (w whereHelperNullProjectConfigStatus) IsNotNull() qm.QueryMod {
 }
 
 var ProjectWhere = struct {
-	ID             whereHelperstring
-	CampaignID     whereHelperstring
-	Name           whereHelperstring
-	Description    whereHelpernull_String
-	Brand          whereHelpernull_String
-	EntityType     whereHelperEntityType
-	EntityName     whereHelperstring
-	DomainTypeCode whereHelperstring
-	Status         whereHelperProjectStatus
-	ConfigStatus   whereHelperNullProjectConfigStatus
-	CreatedBy      whereHelperstring
-	CreatedAt      whereHelpernull_Time
-	UpdatedAt      whereHelpernull_Time
-	DeletedAt      whereHelpernull_Time
+	ID              whereHelperstring
+	CampaignID      whereHelperstring
+	Name            whereHelperstring
+	Description     whereHelpernull_String
+	Brand           whereHelpernull_String
+	EntityType      whereHelperEntityType
+	EntityName      whereHelperstring
+	DomainTypeCode  whereHelperstring
+	Status          whereHelperProjectStatus
+	ConfigStatus    whereHelperNullProjectConfigStatus
+	CreatedBy       whereHelperstring
+	FavoriteUserIds whereHelpertypes_StringArray
+	CreatedAt       whereHelpernull_Time
+	UpdatedAt       whereHelpernull_Time
+	DeletedAt       whereHelpernull_Time
 }{
-	ID:             whereHelperstring{field: "\"schema_project\".\"projects\".\"id\""},
-	CampaignID:     whereHelperstring{field: "\"schema_project\".\"projects\".\"campaign_id\""},
-	Name:           whereHelperstring{field: "\"schema_project\".\"projects\".\"name\""},
-	Description:    whereHelpernull_String{field: "\"schema_project\".\"projects\".\"description\""},
-	Brand:          whereHelpernull_String{field: "\"schema_project\".\"projects\".\"brand\""},
-	EntityType:     whereHelperEntityType{field: "\"schema_project\".\"projects\".\"entity_type\""},
-	EntityName:     whereHelperstring{field: "\"schema_project\".\"projects\".\"entity_name\""},
-	DomainTypeCode: whereHelperstring{field: "\"schema_project\".\"projects\".\"domain_type_code\""},
-	Status:         whereHelperProjectStatus{field: "\"schema_project\".\"projects\".\"status\""},
-	ConfigStatus:   whereHelperNullProjectConfigStatus{field: "\"schema_project\".\"projects\".\"config_status\""},
-	CreatedBy:      whereHelperstring{field: "\"schema_project\".\"projects\".\"created_by\""},
-	CreatedAt:      whereHelpernull_Time{field: "\"schema_project\".\"projects\".\"created_at\""},
-	UpdatedAt:      whereHelpernull_Time{field: "\"schema_project\".\"projects\".\"updated_at\""},
-	DeletedAt:      whereHelpernull_Time{field: "\"schema_project\".\"projects\".\"deleted_at\""},
+	ID:              whereHelperstring{field: "\"project\".\"projects\".\"id\""},
+	CampaignID:      whereHelperstring{field: "\"project\".\"projects\".\"campaign_id\""},
+	Name:            whereHelperstring{field: "\"project\".\"projects\".\"name\""},
+	Description:     whereHelpernull_String{field: "\"project\".\"projects\".\"description\""},
+	Brand:           whereHelpernull_String{field: "\"project\".\"projects\".\"brand\""},
+	EntityType:      whereHelperEntityType{field: "\"project\".\"projects\".\"entity_type\""},
+	EntityName:      whereHelperstring{field: "\"project\".\"projects\".\"entity_name\""},
+	DomainTypeCode:  whereHelperstring{field: "\"project\".\"projects\".\"domain_type_code\""},
+	Status:          whereHelperProjectStatus{field: "\"project\".\"projects\".\"status\""},
+	ConfigStatus:    whereHelperNullProjectConfigStatus{field: "\"project\".\"projects\".\"config_status\""},
+	CreatedBy:       whereHelperstring{field: "\"project\".\"projects\".\"created_by\""},
+	FavoriteUserIds: whereHelpertypes_StringArray{field: "\"project\".\"projects\".\"favorite_user_ids\""},
+	CreatedAt:       whereHelpernull_Time{field: "\"project\".\"projects\".\"created_at\""},
+	UpdatedAt:       whereHelpernull_Time{field: "\"project\".\"projects\".\"updated_at\""},
+	DeletedAt:       whereHelpernull_Time{field: "\"project\".\"projects\".\"deleted_at\""},
 }
 
 // ProjectRels is where relationship names are stored.
@@ -309,9 +317,9 @@ func (r *projectR) GetProjectsCrisisConfig() *ProjectsCrisisConfig {
 type projectL struct{}
 
 var (
-	projectAllColumns            = []string{"id", "campaign_id", "name", "description", "brand", "entity_type", "entity_name", "status", "config_status", "created_by", "created_at", "updated_at", "deleted_at"}
+	projectAllColumns            = []string{"id", "campaign_id", "name", "description", "brand", "entity_type", "entity_name", "domain_type_code", "status", "config_status", "created_by", "favorite_user_ids", "created_at", "updated_at", "deleted_at"}
 	projectColumnsWithoutDefault = []string{"campaign_id", "name", "entity_name", "created_by"}
-	projectColumnsWithDefault    = []string{"id", "description", "brand", "entity_type", "status", "config_status", "created_at", "updated_at", "deleted_at"}
+	projectColumnsWithDefault    = []string{"id", "description", "brand", "entity_type", "domain_type_code", "status", "config_status", "favorite_user_ids", "created_at", "updated_at", "deleted_at"}
 	projectPrimaryKeyColumns     = []string{"id"}
 	projectGeneratedColumns      = []string{}
 )
@@ -701,9 +709,9 @@ func (projectL) LoadCampaign(ctx context.Context, e boil.ContextExecutor, singul
 	}
 
 	query := NewQuery(
-		qm.From(`schema_project.campaigns`),
-		qm.WhereIn(`schema_project.campaigns.id in ?`, argsSlice...),
-		qmhelper.WhereIsNull(`schema_project.campaigns.deleted_at`),
+		qm.From(`project.campaigns`),
+		qm.WhereIn(`project.campaigns.id in ?`, argsSlice...),
+		qmhelper.WhereIsNull(`project.campaigns.deleted_at`),
 	)
 	if mods != nil {
 		mods.Apply(query)
@@ -820,8 +828,8 @@ func (projectL) LoadProjectsCrisisConfig(ctx context.Context, e boil.ContextExec
 	}
 
 	query := NewQuery(
-		qm.From(`schema_project.projects_crisis_config`),
-		qm.WhereIn(`schema_project.projects_crisis_config.project_id in ?`, argsSlice...),
+		qm.From(`project.projects_crisis_config`),
+		qm.WhereIn(`project.projects_crisis_config.project_id in ?`, argsSlice...),
 	)
 	if mods != nil {
 		mods.Apply(query)
@@ -893,7 +901,7 @@ func (o *Project) SetCampaign(ctx context.Context, exec boil.ContextExecutor, in
 	}
 
 	updateQuery := fmt.Sprintf(
-		"UPDATE \"schema_project\".\"projects\" SET %s WHERE %s",
+		"UPDATE \"project\".\"projects\" SET %s WHERE %s",
 		strmangle.SetParamNames("\"", "\"", 1, []string{"campaign_id"}),
 		strmangle.WhereClause("\"", "\"", 2, projectPrimaryKeyColumns),
 	)
@@ -942,7 +950,7 @@ func (o *Project) SetProjectsCrisisConfig(ctx context.Context, exec boil.Context
 		}
 	} else {
 		updateQuery := fmt.Sprintf(
-			"UPDATE \"schema_project\".\"projects_crisis_config\" SET %s WHERE %s",
+			"UPDATE \"project\".\"projects_crisis_config\" SET %s WHERE %s",
 			strmangle.SetParamNames("\"", "\"", 1, []string{"project_id"}),
 			strmangle.WhereClause("\"", "\"", 2, projectsCrisisConfigPrimaryKeyColumns),
 		)
@@ -980,10 +988,10 @@ func (o *Project) SetProjectsCrisisConfig(ctx context.Context, exec boil.Context
 
 // Projects retrieves all the records using an executor.
 func Projects(mods ...qm.QueryMod) projectQuery {
-	mods = append(mods, qm.From("\"schema_project\".\"projects\""), qmhelper.WhereIsNull("\"schema_project\".\"projects\".\"deleted_at\""))
+	mods = append(mods, qm.From("\"project\".\"projects\""), qmhelper.WhereIsNull("\"project\".\"projects\".\"deleted_at\""))
 	q := NewQuery(mods...)
 	if len(queries.GetSelect(q)) == 0 {
-		queries.SetSelect(q, []string{"\"schema_project\".\"projects\".*"})
+		queries.SetSelect(q, []string{"\"project\".\"projects\".*"})
 	}
 
 	return projectQuery{q}
@@ -999,7 +1007,7 @@ func FindProject(ctx context.Context, exec boil.ContextExecutor, iD string, sele
 		sel = strings.Join(strmangle.IdentQuoteSlice(dialect.LQ, dialect.RQ, selectCols), ",")
 	}
 	query := fmt.Sprintf(
-		"select %s from \"schema_project\".\"projects\" where \"id\"=$1 and \"deleted_at\" is null", sel,
+		"select %s from \"project\".\"projects\" where \"id\"=$1 and \"deleted_at\" is null", sel,
 	)
 
 	q := queries.Raw(query, iD)
@@ -1066,9 +1074,9 @@ func (o *Project) Insert(ctx context.Context, exec boil.ContextExecutor, columns
 			return err
 		}
 		if len(wl) != 0 {
-			cache.query = fmt.Sprintf("INSERT INTO \"schema_project\".\"projects\" (\"%s\") %%sVALUES (%s)%%s", strings.Join(wl, "\",\""), strmangle.Placeholders(dialect.UseIndexPlaceholders, len(wl), 1, 1))
+			cache.query = fmt.Sprintf("INSERT INTO \"project\".\"projects\" (\"%s\") %%sVALUES (%s)%%s", strings.Join(wl, "\",\""), strmangle.Placeholders(dialect.UseIndexPlaceholders, len(wl), 1, 1))
 		} else {
-			cache.query = "INSERT INTO \"schema_project\".\"projects\" %sDEFAULT VALUES%s"
+			cache.query = "INSERT INTO \"project\".\"projects\" %sDEFAULT VALUES%s"
 		}
 
 		var queryOutput, queryReturning string
@@ -1140,7 +1148,7 @@ func (o *Project) Update(ctx context.Context, exec boil.ContextExecutor, columns
 			return 0, errors.New("sqlboiler: unable to update projects, could not build whitelist")
 		}
 
-		cache.query = fmt.Sprintf("UPDATE \"schema_project\".\"projects\" SET %s WHERE %s",
+		cache.query = fmt.Sprintf("UPDATE \"project\".\"projects\" SET %s WHERE %s",
 			strmangle.SetParamNames("\"", "\"", 1, wl),
 			strmangle.WhereClause("\"", "\"", len(wl)+1, projectPrimaryKeyColumns),
 		)
@@ -1221,7 +1229,7 @@ func (o ProjectSlice) UpdateAll(ctx context.Context, exec boil.ContextExecutor, 
 		args = append(args, pkeyArgs...)
 	}
 
-	sql := fmt.Sprintf("UPDATE \"schema_project\".\"projects\" SET %s WHERE %s",
+	sql := fmt.Sprintf("UPDATE \"project\".\"projects\" SET %s WHERE %s",
 		strmangle.SetParamNames("\"", "\"", 1, colNames),
 		strmangle.WhereClauseRepeated(string(dialect.LQ), string(dialect.RQ), len(colNames)+1, projectPrimaryKeyColumns, len(o)))
 
@@ -1325,7 +1333,7 @@ func (o *Project) Upsert(ctx context.Context, exec boil.ContextExecutor, updateO
 			conflict = make([]string, len(projectPrimaryKeyColumns))
 			copy(conflict, projectPrimaryKeyColumns)
 		}
-		cache.query = buildUpsertQueryPostgres(dialect, "\"schema_project\".\"projects\"", updateOnConflict, ret, update, conflict, insert, opts...)
+		cache.query = buildUpsertQueryPostgres(dialect, "\"project\".\"projects\"", updateOnConflict, ret, update, conflict, insert, opts...)
 
 		cache.valueMapping, err = queries.BindMapping(projectType, projectMapping, insert)
 		if err != nil {
@@ -1389,12 +1397,12 @@ func (o *Project) Delete(ctx context.Context, exec boil.ContextExecutor, hardDel
 	)
 	if hardDelete {
 		args = queries.ValuesFromMapping(reflect.Indirect(reflect.ValueOf(o)), projectPrimaryKeyMapping)
-		sql = "DELETE FROM \"schema_project\".\"projects\" WHERE \"id\"=$1"
+		sql = "DELETE FROM \"project\".\"projects\" WHERE \"id\"=$1"
 	} else {
 		currTime := time.Now().In(boil.GetLocation())
 		o.DeletedAt = null.TimeFrom(currTime)
 		wl := []string{"deleted_at"}
-		sql = fmt.Sprintf("UPDATE \"schema_project\".\"projects\" SET %s WHERE \"id\"=$2",
+		sql = fmt.Sprintf("UPDATE \"project\".\"projects\" SET %s WHERE \"id\"=$2",
 			strmangle.SetParamNames("\"", "\"", 1, wl),
 		)
 		valueMapping, err := queries.BindMapping(projectType, projectMapping, append(wl, projectPrimaryKeyColumns...))
@@ -1475,7 +1483,7 @@ func (o ProjectSlice) DeleteAll(ctx context.Context, exec boil.ContextExecutor, 
 			pkeyArgs := queries.ValuesFromMapping(reflect.Indirect(reflect.ValueOf(obj)), projectPrimaryKeyMapping)
 			args = append(args, pkeyArgs...)
 		}
-		sql = "DELETE FROM \"schema_project\".\"projects\" WHERE " +
+		sql = "DELETE FROM \"project\".\"projects\" WHERE " +
 			strmangle.WhereClauseRepeated(string(dialect.LQ), string(dialect.RQ), 1, projectPrimaryKeyColumns, len(o))
 	} else {
 		currTime := time.Now().In(boil.GetLocation())
@@ -1485,7 +1493,7 @@ func (o ProjectSlice) DeleteAll(ctx context.Context, exec boil.ContextExecutor, 
 			obj.DeletedAt = null.TimeFrom(currTime)
 		}
 		wl := []string{"deleted_at"}
-		sql = fmt.Sprintf("UPDATE \"schema_project\".\"projects\" SET %s WHERE "+
+		sql = fmt.Sprintf("UPDATE \"project\".\"projects\" SET %s WHERE "+
 			strmangle.WhereClauseRepeated(string(dialect.LQ), string(dialect.RQ), 2, projectPrimaryKeyColumns, len(o)),
 			strmangle.SetParamNames("\"", "\"", 1, wl),
 		)
@@ -1544,7 +1552,7 @@ func (o *ProjectSlice) ReloadAll(ctx context.Context, exec boil.ContextExecutor)
 		args = append(args, pkeyArgs...)
 	}
 
-	sql := "SELECT \"schema_project\".\"projects\".* FROM \"schema_project\".\"projects\" WHERE " +
+	sql := "SELECT \"project\".\"projects\".* FROM \"project\".\"projects\" WHERE " +
 		strmangle.WhereClauseRepeated(string(dialect.LQ), string(dialect.RQ), 1, projectPrimaryKeyColumns, len(*o)) +
 		"and \"deleted_at\" is null"
 
@@ -1563,7 +1571,7 @@ func (o *ProjectSlice) ReloadAll(ctx context.Context, exec boil.ContextExecutor)
 // ProjectExists checks if the Project row exists.
 func ProjectExists(ctx context.Context, exec boil.ContextExecutor, iD string) (bool, error) {
 	var exists bool
-	sql := "select exists(select 1 from \"schema_project\".\"projects\" where \"id\"=$1 and \"deleted_at\" is null limit 1)"
+	sql := "select exists(select 1 from \"project\".\"projects\" where \"id\"=$1 and \"deleted_at\" is null limit 1)"
 
 	if boil.IsDebug(ctx) {
 		writer := boil.DebugWriterFrom(ctx)

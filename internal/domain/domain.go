@@ -3,7 +3,7 @@
 // analysis-srv publishes the available domain list to Redis on startup.
 // This package reads that data so project-srv can validate domain_type_code
 // and expose a domain list endpoint without a direct DB dependency on
-// schema_analysis.
+// the analysis schema.
 package domain
 
 import (

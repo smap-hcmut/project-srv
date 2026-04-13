@@ -151,14 +151,14 @@ var ProjectsCrisisConfigWhere = struct {
 	CreatedAt       whereHelpernull_Time
 	UpdatedAt       whereHelpernull_Time
 }{
-	ProjectID:       whereHelperstring{field: "\"schema_project\".\"projects_crisis_config\".\"project_id\""},
-	Status:          whereHelperNullCrisisStatus{field: "\"schema_project\".\"projects_crisis_config\".\"status\""},
-	KeywordsRules:   whereHelpernull_JSON{field: "\"schema_project\".\"projects_crisis_config\".\"keywords_rules\""},
-	VolumeRules:     whereHelpernull_JSON{field: "\"schema_project\".\"projects_crisis_config\".\"volume_rules\""},
-	SentimentRules:  whereHelpernull_JSON{field: "\"schema_project\".\"projects_crisis_config\".\"sentiment_rules\""},
-	InfluencerRules: whereHelpernull_JSON{field: "\"schema_project\".\"projects_crisis_config\".\"influencer_rules\""},
-	CreatedAt:       whereHelpernull_Time{field: "\"schema_project\".\"projects_crisis_config\".\"created_at\""},
-	UpdatedAt:       whereHelpernull_Time{field: "\"schema_project\".\"projects_crisis_config\".\"updated_at\""},
+	ProjectID:       whereHelperstring{field: "\"project\".\"projects_crisis_config\".\"project_id\""},
+	Status:          whereHelperNullCrisisStatus{field: "\"project\".\"projects_crisis_config\".\"status\""},
+	KeywordsRules:   whereHelpernull_JSON{field: "\"project\".\"projects_crisis_config\".\"keywords_rules\""},
+	VolumeRules:     whereHelpernull_JSON{field: "\"project\".\"projects_crisis_config\".\"volume_rules\""},
+	SentimentRules:  whereHelpernull_JSON{field: "\"project\".\"projects_crisis_config\".\"sentiment_rules\""},
+	InfluencerRules: whereHelpernull_JSON{field: "\"project\".\"projects_crisis_config\".\"influencer_rules\""},
+	CreatedAt:       whereHelpernull_Time{field: "\"project\".\"projects_crisis_config\".\"created_at\""},
+	UpdatedAt:       whereHelpernull_Time{field: "\"project\".\"projects_crisis_config\".\"updated_at\""},
 }
 
 // ProjectsCrisisConfigRels is where relationship names are stored.
@@ -579,9 +579,9 @@ func (projectsCrisisConfigL) LoadProject(ctx context.Context, e boil.ContextExec
 	}
 
 	query := NewQuery(
-		qm.From(`schema_project.projects`),
-		qm.WhereIn(`schema_project.projects.id in ?`, argsSlice...),
-		qmhelper.WhereIsNull(`schema_project.projects.deleted_at`),
+		qm.From(`project.projects`),
+		qm.WhereIn(`project.projects.id in ?`, argsSlice...),
+		qmhelper.WhereIsNull(`project.projects.deleted_at`),
 	)
 	if mods != nil {
 		mods.Apply(query)
@@ -654,7 +654,7 @@ func (o *ProjectsCrisisConfig) SetProject(ctx context.Context, exec boil.Context
 	}
 
 	updateQuery := fmt.Sprintf(
-		"UPDATE \"schema_project\".\"projects_crisis_config\" SET %s WHERE %s",
+		"UPDATE \"project\".\"projects_crisis_config\" SET %s WHERE %s",
 		strmangle.SetParamNames("\"", "\"", 1, []string{"project_id"}),
 		strmangle.WhereClause("\"", "\"", 2, projectsCrisisConfigPrimaryKeyColumns),
 	)
@@ -691,10 +691,10 @@ func (o *ProjectsCrisisConfig) SetProject(ctx context.Context, exec boil.Context
 
 // ProjectsCrisisConfigs retrieves all the records using an executor.
 func ProjectsCrisisConfigs(mods ...qm.QueryMod) projectsCrisisConfigQuery {
-	mods = append(mods, qm.From("\"schema_project\".\"projects_crisis_config\""))
+	mods = append(mods, qm.From("\"project\".\"projects_crisis_config\""))
 	q := NewQuery(mods...)
 	if len(queries.GetSelect(q)) == 0 {
-		queries.SetSelect(q, []string{"\"schema_project\".\"projects_crisis_config\".*"})
+		queries.SetSelect(q, []string{"\"project\".\"projects_crisis_config\".*"})
 	}
 
 	return projectsCrisisConfigQuery{q}
@@ -710,7 +710,7 @@ func FindProjectsCrisisConfig(ctx context.Context, exec boil.ContextExecutor, pr
 		sel = strings.Join(strmangle.IdentQuoteSlice(dialect.LQ, dialect.RQ, selectCols), ",")
 	}
 	query := fmt.Sprintf(
-		"select %s from \"schema_project\".\"projects_crisis_config\" where \"project_id\"=$1", sel,
+		"select %s from \"project\".\"projects_crisis_config\" where \"project_id\"=$1", sel,
 	)
 
 	q := queries.Raw(query, projectID)
@@ -777,9 +777,9 @@ func (o *ProjectsCrisisConfig) Insert(ctx context.Context, exec boil.ContextExec
 			return err
 		}
 		if len(wl) != 0 {
-			cache.query = fmt.Sprintf("INSERT INTO \"schema_project\".\"projects_crisis_config\" (\"%s\") %%sVALUES (%s)%%s", strings.Join(wl, "\",\""), strmangle.Placeholders(dialect.UseIndexPlaceholders, len(wl), 1, 1))
+			cache.query = fmt.Sprintf("INSERT INTO \"project\".\"projects_crisis_config\" (\"%s\") %%sVALUES (%s)%%s", strings.Join(wl, "\",\""), strmangle.Placeholders(dialect.UseIndexPlaceholders, len(wl), 1, 1))
 		} else {
-			cache.query = "INSERT INTO \"schema_project\".\"projects_crisis_config\" %sDEFAULT VALUES%s"
+			cache.query = "INSERT INTO \"project\".\"projects_crisis_config\" %sDEFAULT VALUES%s"
 		}
 
 		var queryOutput, queryReturning string
@@ -851,7 +851,7 @@ func (o *ProjectsCrisisConfig) Update(ctx context.Context, exec boil.ContextExec
 			return 0, errors.New("sqlboiler: unable to update projects_crisis_config, could not build whitelist")
 		}
 
-		cache.query = fmt.Sprintf("UPDATE \"schema_project\".\"projects_crisis_config\" SET %s WHERE %s",
+		cache.query = fmt.Sprintf("UPDATE \"project\".\"projects_crisis_config\" SET %s WHERE %s",
 			strmangle.SetParamNames("\"", "\"", 1, wl),
 			strmangle.WhereClause("\"", "\"", len(wl)+1, projectsCrisisConfigPrimaryKeyColumns),
 		)
@@ -932,7 +932,7 @@ func (o ProjectsCrisisConfigSlice) UpdateAll(ctx context.Context, exec boil.Cont
 		args = append(args, pkeyArgs...)
 	}
 
-	sql := fmt.Sprintf("UPDATE \"schema_project\".\"projects_crisis_config\" SET %s WHERE %s",
+	sql := fmt.Sprintf("UPDATE \"project\".\"projects_crisis_config\" SET %s WHERE %s",
 		strmangle.SetParamNames("\"", "\"", 1, colNames),
 		strmangle.WhereClauseRepeated(string(dialect.LQ), string(dialect.RQ), len(colNames)+1, projectsCrisisConfigPrimaryKeyColumns, len(o)))
 
@@ -1036,7 +1036,7 @@ func (o *ProjectsCrisisConfig) Upsert(ctx context.Context, exec boil.ContextExec
 			conflict = make([]string, len(projectsCrisisConfigPrimaryKeyColumns))
 			copy(conflict, projectsCrisisConfigPrimaryKeyColumns)
 		}
-		cache.query = buildUpsertQueryPostgres(dialect, "\"schema_project\".\"projects_crisis_config\"", updateOnConflict, ret, update, conflict, insert, opts...)
+		cache.query = buildUpsertQueryPostgres(dialect, "\"project\".\"projects_crisis_config\"", updateOnConflict, ret, update, conflict, insert, opts...)
 
 		cache.valueMapping, err = queries.BindMapping(projectsCrisisConfigType, projectsCrisisConfigMapping, insert)
 		if err != nil {
@@ -1095,7 +1095,7 @@ func (o *ProjectsCrisisConfig) Delete(ctx context.Context, exec boil.ContextExec
 	}
 
 	args := queries.ValuesFromMapping(reflect.Indirect(reflect.ValueOf(o)), projectsCrisisConfigPrimaryKeyMapping)
-	sql := "DELETE FROM \"schema_project\".\"projects_crisis_config\" WHERE \"project_id\"=$1"
+	sql := "DELETE FROM \"project\".\"projects_crisis_config\" WHERE \"project_id\"=$1"
 
 	if boil.IsDebug(ctx) {
 		writer := boil.DebugWriterFrom(ctx)
@@ -1160,7 +1160,7 @@ func (o ProjectsCrisisConfigSlice) DeleteAll(ctx context.Context, exec boil.Cont
 		args = append(args, pkeyArgs...)
 	}
 
-	sql := "DELETE FROM \"schema_project\".\"projects_crisis_config\" WHERE " +
+	sql := "DELETE FROM \"project\".\"projects_crisis_config\" WHERE " +
 		strmangle.WhereClauseRepeated(string(dialect.LQ), string(dialect.RQ), 1, projectsCrisisConfigPrimaryKeyColumns, len(o))
 
 	if boil.IsDebug(ctx) {
@@ -1215,7 +1215,7 @@ func (o *ProjectsCrisisConfigSlice) ReloadAll(ctx context.Context, exec boil.Con
 		args = append(args, pkeyArgs...)
 	}
 
-	sql := "SELECT \"schema_project\".\"projects_crisis_config\".* FROM \"schema_project\".\"projects_crisis_config\" WHERE " +
+	sql := "SELECT \"project\".\"projects_crisis_config\".* FROM \"project\".\"projects_crisis_config\" WHERE " +
 		strmangle.WhereClauseRepeated(string(dialect.LQ), string(dialect.RQ), 1, projectsCrisisConfigPrimaryKeyColumns, len(*o))
 
 	q := queries.Raw(sql, args...)
@@ -1233,7 +1233,7 @@ func (o *ProjectsCrisisConfigSlice) ReloadAll(ctx context.Context, exec boil.Con
 // ProjectsCrisisConfigExists checks if the ProjectsCrisisConfig row exists.
 func ProjectsCrisisConfigExists(ctx context.Context, exec boil.ContextExecutor, projectID string) (bool, error) {
 	var exists bool
-	sql := "select exists(select 1 from \"schema_project\".\"projects_crisis_config\" where \"project_id\"=$1 limit 1)"
+	sql := "select exists(select 1 from \"project\".\"projects_crisis_config\" where \"project_id\"=$1 limit 1)"
 
 	if boil.IsDebug(ctx) {
 		writer := boil.DebugWriterFrom(ctx)
