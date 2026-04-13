@@ -1,6 +1,10 @@
 package microservice
 
-import "time"
+import (
+	"time"
+
+	"github.com/smap-hcmut/shared-libs/go/contracts"
+)
 
 // IngestConfig is runtime config for the ingest microservice client.
 type IngestConfig struct {
@@ -9,34 +13,13 @@ type IngestConfig struct {
 	InternalKey string
 }
 
-// ActivationReadinessError describes one readiness blocker from ingest internal API.
-type ActivationReadinessError struct {
-	Code         string
-	Message      string
-	DataSourceID string
-	TargetID     string
-}
-
-type ActivationReadinessCommand string
+// Type aliases for shared contract types used by the ingest HTTP client.
+type ActivationReadinessError = contracts.ActivationReadinessError
+type ActivationReadinessCommand = contracts.ActivationReadinessCommand
+type ActivationReadinessInput = contracts.ActivationReadinessInput
+type ActivationReadiness = contracts.ActivationReadiness
 
 const (
-	ActivationReadinessCommandActivate ActivationReadinessCommand = "activate"
-	ActivationReadinessCommandResume   ActivationReadinessCommand = "resume"
+	ActivationReadinessCommandActivate = contracts.ActivationReadinessCommandActivate
+	ActivationReadinessCommandResume   = contracts.ActivationReadinessCommandResume
 )
-
-type ActivationReadinessInput struct {
-	ProjectID string
-	Command   ActivationReadinessCommand
-}
-
-// ActivationReadiness is the readiness payload returned from ingest internal API.
-type ActivationReadiness struct {
-	ProjectID                string
-	DataSourceCount          int
-	HasDatasource            bool
-	PassiveUnconfirmedCount  int
-	MissingTargetDryrunCount int
-	FailedTargetDryrunCount  int
-	CanProceed               bool
-	Errors                   []ActivationReadinessError
-}

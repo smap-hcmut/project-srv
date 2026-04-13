@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"project-srv/pkg/microservice"
 	"strings"
+
+	"github.com/smap-hcmut/shared-libs/go/contracts"
 )
 
 func (uc *implUseCase) GetActivationReadiness(ctx context.Context, input microservice.ActivationReadinessInput) (microservice.ActivationReadiness, error) {
@@ -50,7 +52,7 @@ func (uc *implUseCase) GetActivationReadiness(ctx context.Context, input microse
 
 	for _, e := range dto.Errors {
 		out.Errors = append(out.Errors, microservice.ActivationReadinessError{
-			Code:         e.Code,
+			Code:         contracts.ActivationReadinessCode(e.Code),
 			Message:      e.Message,
 			DataSourceID: e.DataSourceID,
 			TargetID:     e.TargetID,

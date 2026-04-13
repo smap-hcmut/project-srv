@@ -4,6 +4,7 @@ import (
 	"project-srv/internal/model"
 	"time"
 
+	"github.com/smap-hcmut/shared-libs/go/contracts"
 	"github.com/smap-hcmut/shared-libs/go/paginator"
 )
 
@@ -76,36 +77,25 @@ type ActivationReadiness struct {
 	Errors                   []ActivationReadinessError
 }
 
-type ActivationReadinessCommand string
+// Type aliases for shared contract types.
+type ActivationReadinessCommand = contracts.ActivationReadinessCommand
+type ActivationReadinessCode = contracts.ActivationReadinessCode
+type ActivationReadinessError = contracts.ActivationReadinessError
+type ActivationReadinessInput = contracts.ActivationReadinessInput
 
 const (
-	ActivationReadinessCommandActivate ActivationReadinessCommand = "activate"
-	ActivationReadinessCommandResume   ActivationReadinessCommand = "resume"
+	ActivationReadinessCommandActivate = contracts.ActivationReadinessCommandActivate
+	ActivationReadinessCommandResume   = contracts.ActivationReadinessCommandResume
 )
-
-type ActivationReadinessInput struct {
-	ProjectID string
-	Command   ActivationReadinessCommand
-}
-
-type ActivationReadinessCode string
 
 const (
-	ActivationReadinessCodeDatasourceRequired   ActivationReadinessCode = "DATASOURCE_REQUIRED"
-	ActivationReadinessCodePassiveUnconfirmed   ActivationReadinessCode = "PASSIVE_UNCONFIRMED"
-	ActivationReadinessCodeTargetDryrunMissing  ActivationReadinessCode = "TARGET_DRYRUN_MISSING"
-	ActivationReadinessCodeTargetDryrunFailed   ActivationReadinessCode = "TARGET_DRYRUN_FAILED"
-	ActivationReadinessCodeActiveTargetRequired ActivationReadinessCode = "ACTIVE_TARGET_REQUIRED"
-	ActivationReadinessCodeDatasourceStatus     ActivationReadinessCode = "DATASOURCE_STATUS_INVALID"
+	ActivationReadinessCodeDatasourceRequired   = contracts.ReadinessCodeDatasourceRequired
+	ActivationReadinessCodePassiveUnconfirmed   = contracts.ReadinessCodePassiveUnconfirmed
+	ActivationReadinessCodeTargetDryrunMissing  = contracts.ReadinessCodeTargetDryrunMissing
+	ActivationReadinessCodeTargetDryrunFailed   = contracts.ReadinessCodeTargetDryrunFailed
+	ActivationReadinessCodeActiveTargetRequired = contracts.ReadinessCodeActiveTargetRequired
+	ActivationReadinessCodeDatasourceStatus     = contracts.ReadinessCodeDatasourceStatus
 )
-
-// ActivationReadinessError describes one readiness blocker.
-type ActivationReadinessError struct {
-	Code         ActivationReadinessCode
-	Message      string
-	DataSourceID string
-	TargetID     string
-}
 
 // LifecycleEventName is a typed event name for project lifecycle.
 type LifecycleEventName string
