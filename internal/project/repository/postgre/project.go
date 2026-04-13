@@ -280,24 +280,6 @@ func (r *implRepository) Update(ctx context.Context, opt repository.UpdateOption
 	return r.fetchProjectByID(ctx, opt.ID)
 }
 
-func (r *implRepository) DomainTypeExists(ctx context.Context, code string) (bool, error) {
-	query := `
-		SELECT EXISTS (
-			SELECT 1
-			FROM schema_project.domain_types
-			WHERE code = $1 AND is_active = TRUE
-		)
-	`
-
-	var exists bool
-	if err := r.db.QueryRowContext(ctx, query, strings.TrimSpace(code)).Scan(&exists); err != nil {
-		r.l.Errorf(ctx, "project.repository.DomainTypeExists.QueryRowContext: %v", err)
-		return false, repository.ErrFailedToGet
-	}
-
-	return exists, nil
-}
-
 func (r *implRepository) UpdateStatus(ctx context.Context, opt repository.UpdateStatusOptions) (model.Project, error) {
 	if len(opt.ExpectedStatuses) > 0 {
 		now := time.Now()

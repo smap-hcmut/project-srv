@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"project-srv/internal/campaign"
+	"project-srv/internal/domain"
 	"project-srv/internal/project"
 	projectproducer "project-srv/internal/project/delivery/kafka/producer"
 	repo "project-srv/internal/project/repository"
@@ -13,6 +14,7 @@ import (
 type implUseCase struct {
 	l          log.Logger
 	repo       repo.Repository
+	domainRepo domain.Repository
 	campaignUC campaign.UseCase
 	ingest     microservice.IngestUseCase
 	publisher  projectproducer.Producer
@@ -22,6 +24,7 @@ type implUseCase struct {
 func New(
 	l log.Logger,
 	r repo.Repository,
+	domainRepo domain.Repository,
 	campaignUC campaign.UseCase,
 	ingest microservice.IngestUseCase,
 	publisher projectproducer.Producer,
@@ -29,6 +32,7 @@ func New(
 	return &implUseCase{
 		l:          l,
 		repo:       r,
+		domainRepo: domainRepo,
 		campaignUC: campaignUC,
 		ingest:     ingest,
 		publisher:  publisher,

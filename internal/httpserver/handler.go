@@ -9,6 +9,7 @@ import (
 	crisishttp "project-srv/internal/crisis/delivery/http"
 	crisisrepo "project-srv/internal/crisis/repository/postgre"
 	crisisuc "project-srv/internal/crisis/usecase"
+	"project-srv/internal/domain"
 	"project-srv/internal/model"
 	projecthttp "project-srv/internal/project/delivery/http"
 	projectkafkaproducer "project-srv/internal/project/delivery/kafka/producer"
@@ -45,9 +46,10 @@ func (srv HTTPServer) mapHandlers() error {
 
 	// Project module
 	projectRepo := projectrepo.New(srv.postgresDB, srv.l)
+	domainRepo := domain.NewRepository(srv.mainRedisClient, srv.l)
 	ingestSrv := ingestsrv.New(srv.l, srv.microservice.Ingest.BaseURL, srv.microservice.Ingest.TimeoutMS, srv.internalKey)
 	lifecyclePublisher := projectkafkaproducer.New(srv.l, srv.kafkaProducer)
-	projectUC := projectuc.New(srv.l, projectRepo, campaignUC, ingestSrv, lifecyclePublisher)
+	projectUC := projectuc.New(srv.l, projectRepo, domainRepo, campaignUC, ingestSrv, lifecyclePublisher)
 	projectHandler := projecthttp.New(srv.l, projectUC, srv.discord)
 
 	// Crisis Config module

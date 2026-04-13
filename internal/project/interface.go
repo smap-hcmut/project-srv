@@ -2,6 +2,8 @@ package project
 
 import (
 	"context"
+
+	"project-srv/internal/domain"
 )
 
 // UseCase defines the business logic interface for Project operations.
@@ -13,6 +15,7 @@ type UseCase interface {
 	Favorite(ctx context.Context, id string) error
 	Unfavorite(ctx context.Context, id string) error
 	Delete(ctx context.Context, id string) error
+	ListDomains(ctx context.Context) ([]domain.Domain, error)
 
 	LifecycleManager
 }

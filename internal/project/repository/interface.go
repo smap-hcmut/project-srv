@@ -14,7 +14,6 @@ type Repository interface {
 	Get(ctx context.Context, opt GetOptions) ([]model.Project, paginator.Paginator, error)
 	Update(ctx context.Context, opt UpdateOptions) (model.Project, error)
 	UpdateStatus(ctx context.Context, opt UpdateStatusOptions) (model.Project, error)
-	DomainTypeExists(ctx context.Context, code string) (bool, error)
 	Favorite(ctx context.Context, id, userID string) error
 	Unfavorite(ctx context.Context, id, userID string) error
 	Archive(ctx context.Context, id string) error

@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"project-srv/internal/domain"
 	"project-srv/internal/model"
 	"project-srv/internal/project"
 	repo "project-srv/internal/project/repository"
@@ -31,9 +32,9 @@ func (uc *implUseCase) Create(ctx context.Context, input project.CreateInput) (p
 		uc.l.Warnf(ctx, "project.usecase.Create: domain_type_code is required")
 		return project.CreateOutput{}, project.ErrDomainTypeRequired
 	}
-	exists, err := uc.repo.DomainTypeExists(ctx, input.DomainTypeCode)
+	exists, err := uc.domainRepo.Exists(ctx, input.DomainTypeCode)
 	if err != nil {
-		uc.l.Errorf(ctx, "project.usecase.Create.repo.DomainTypeExists: domain_type_code=%s err=%v", input.DomainTypeCode, err)
+		uc.l.Errorf(ctx, "project.usecase.Create.domainRepo.Exists: domain_type_code=%s err=%v", input.DomainTypeCode, err)
 		return project.CreateOutput{}, project.ErrCreateFailed
 	}
 	if !exists {
@@ -158,9 +159,9 @@ func (uc *implUseCase) Update(ctx context.Context, input project.UpdateInput) (p
 		}
 	}
 	if strings.TrimSpace(input.DomainTypeCode) != "" {
-		exists, err := uc.repo.DomainTypeExists(ctx, input.DomainTypeCode)
+		exists, err := uc.domainRepo.Exists(ctx, input.DomainTypeCode)
 		if err != nil {
-			uc.l.Errorf(ctx, "project.usecase.Update.repo.DomainTypeExists: domain_type_code=%s err=%v", input.DomainTypeCode, err)
+			uc.l.Errorf(ctx, "project.usecase.Update.domainRepo.Exists: domain_type_code=%s err=%v", input.DomainTypeCode, err)
 			return project.UpdateOutput{}, project.ErrUpdateFailed
 		}
 		if !exists {
@@ -271,4 +272,14 @@ func (uc *implUseCase) Delete(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+// ListDomains returns all active domains from the cross-service domain registry.
+func (uc *implUseCase) ListDomains(ctx context.Context) ([]domain.Domain, error) {
+	domains, err := uc.domainRepo.ListActive(ctx)
+	if err != nil {
+		uc.l.Errorf(ctx, "project.usecase.ListDomains.domainRepo.ListActive: %v", err)
+		return nil, project.ErrListFailed
+	}
+	return domains, nil
 }

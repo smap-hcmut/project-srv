@@ -449,3 +449,23 @@ func (h *handler) InternalDetail(c *gin.Context) {
 
 	response.OK(c, h.newDetailResp(o))
 }
+
+// @Summary List available domains
+// @Description Return all active domains from the cross-service domain registry
+// @Tags Domain
+// @Produce json
+// @Success 200 {object} response.Resp
+// @Failure 500 {object} response.Resp
+// @Router /domains [get]
+func (h *handler) ListDomains(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	domains, err := h.uc.ListDomains(ctx)
+	if err != nil {
+		h.l.Errorf(ctx, "project.delivery.ListDomains.uc.ListDomains: %v", err)
+		response.Error(c, h.mapError(err), h.discord)
+		return
+	}
+
+	response.OK(c, domains)
+}

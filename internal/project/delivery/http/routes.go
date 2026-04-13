@@ -8,6 +8,13 @@ import (
 
 // RegisterRoutes maps project routes to the given router group.
 func (h *handler) RegisterRoutes(r *gin.RouterGroup, mw *middleware.Middleware) {
+	// Domain registry — available domains for project creation
+	domains := r.Group("/domains")
+	domains.Use(mw.Auth())
+	{
+		domains.GET("", h.ListDomains)
+	}
+
 	// Nested under campaign — uses :id (same wildcard as campaign routes)
 	campaigns := r.Group("/campaigns")
 	campaigns.Use(mw.Auth())
