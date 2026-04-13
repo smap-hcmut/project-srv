@@ -10,7 +10,7 @@ import (
 
 // Delivery-layer HTTP errors.
 var (
-	errNotFound          = &pkgErrors.HTTPError{Code: 150001, Message: "Campaign not found", StatusCode: http.StatusBadRequest}
+	errNotFound          = &pkgErrors.HTTPError{Code: 150001, Message: "Campaign not found", StatusCode: http.StatusNotFound}
 	errNameRequired      = &pkgErrors.HTTPError{Code: 150002, Message: "Campaign name is required", StatusCode: http.StatusBadRequest}
 	errInvalidStatus     = &pkgErrors.HTTPError{Code: 150003, Message: "Invalid campaign status", StatusCode: http.StatusBadRequest}
 	errInvalidSort       = &pkgErrors.HTTPError{Code: 150012, Message: "Invalid campaign sort", StatusCode: http.StatusBadRequest}

@@ -10,7 +10,7 @@ import (
 
 // Delivery-layer HTTP errors.
 var (
-	errNotFound                = &pkgErrors.HTTPError{Code: 160001, Message: "Crisis config not found", StatusCode: http.StatusBadRequest}
+	errNotFound                = &pkgErrors.HTTPError{Code: 160001, Message: "Crisis config not found", StatusCode: http.StatusNotFound}
 	errProjectInvalid          = &pkgErrors.HTTPError{Code: 160002, Message: "Invalid project ID", StatusCode: http.StatusBadRequest}
 	errUpsertFailed            = &pkgErrors.HTTPError{Code: 160003, Message: "Failed to upsert crisis config", StatusCode: http.StatusInternalServerError}
 	errDeleteFailed            = &pkgErrors.HTTPError{Code: 160004, Message: "Failed to delete crisis config", StatusCode: http.StatusInternalServerError}

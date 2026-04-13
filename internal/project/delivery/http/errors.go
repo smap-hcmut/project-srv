@@ -11,10 +11,10 @@ import (
 
 // Delivery-layer HTTP errors for project lifecycle and CRUD.
 var (
-	errNotFound                     = &pkgErrors.HTTPError{Code: 160001, Message: "Project not found", StatusCode: http.StatusBadRequest}
+	errNotFound                     = &pkgErrors.HTTPError{Code: 160001, Message: "Project not found", StatusCode: http.StatusNotFound}
 	errNameRequired                 = &pkgErrors.HTTPError{Code: 160002, Message: "Project name is required", StatusCode: http.StatusBadRequest}
 	errCampaignRequired             = &pkgErrors.HTTPError{Code: 160003, Message: "Campaign ID is required", StatusCode: http.StatusBadRequest}
-	errCampaignNotFound             = &pkgErrors.HTTPError{Code: 160004, Message: "Campaign not found", StatusCode: http.StatusBadRequest}
+	errCampaignNotFound             = &pkgErrors.HTTPError{Code: 160004, Message: "Campaign not found", StatusCode: http.StatusNotFound}
 	errInvalidStatus                = &pkgErrors.HTTPError{Code: 160005, Message: "Invalid project status", StatusCode: http.StatusBadRequest}
 	errInvalidEntity                = &pkgErrors.HTTPError{Code: 160006, Message: "Invalid entity type", StatusCode: http.StatusBadRequest}
 	errDomainTypeRequired           = &pkgErrors.HTTPError{Code: 160034, Message: "Domain type is required", StatusCode: http.StatusBadRequest}
