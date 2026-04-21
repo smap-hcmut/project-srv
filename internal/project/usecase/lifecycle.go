@@ -51,7 +51,7 @@ func (uc *implUseCase) Activate(ctx context.Context, id string) (project.Activat
 	if err != nil {
 		uc.l.Errorf(ctx, "project.usecase.Activate.repo.UpdateStatus: id=%s err=%v", current.ID, err)
 		if err == repo.ErrNotFound {
-			uc.l.Warnf(ctx, "project.usecase.Activate: id=%s not found during update", current.ID)
+			uc.l.Errorf(ctx, "project.usecase.Activate: id=%s not found during update — data integrity issue", current.ID)
 			return project.ActivateOutput{}, project.ErrNotFound
 		}
 		if err == repo.ErrStatusConflict {

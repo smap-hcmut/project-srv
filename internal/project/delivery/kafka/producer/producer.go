@@ -11,7 +11,7 @@ import (
 // PublishLifecycleEvent publishes one project lifecycle event to Kafka.
 func (p *implProducer) PublishLifecycleEvent(ctx context.Context, event project.LifecycleEvent) error {
 	if p.producer == nil {
-		p.logger.Warnf(ctx, "project.delivery.kafka.producer.PublishLifecycleEvent: producer is nil")
+		p.logger.Errorf(ctx, "project.delivery.kafka.producer.PublishLifecycleEvent: producer is nil")
 		return nil
 	}
 

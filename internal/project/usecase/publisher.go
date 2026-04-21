@@ -17,7 +17,7 @@ func (uc *implUseCase) publishLifecycleEvent(ctx context.Context, eventName proj
 
 	triggeredBy, success := auth.GetUserIDFromContext(ctx)
 	if !success {
-		uc.l.Warnf(ctx, "project.usecase.publishLifecycleEvent: failed to get user from context, using empty string as triggered_by")
+		uc.l.Errorf(ctx, "project.usecase.publishLifecycleEvent: failed to get user from context, using empty string as triggered_by")
 	}
 
 	return uc.publisher.PublishLifecycleEvent(ctx, project.LifecycleEvent{

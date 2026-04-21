@@ -45,7 +45,7 @@ func (uc *implUseCase) Create(ctx context.Context, input project.CreateInput) (p
 	// Validate campaign exists
 	_, err = uc.campaignUC.Detail(ctx, input.CampaignID)
 	if err != nil {
-		uc.l.Warnf(ctx, "project.usecase.Create.campaignUC.Detail: campaign_id=%s err=%v", input.CampaignID, err)
+		uc.l.Errorf(ctx, "project.usecase.Create.campaignUC.Detail: campaign_id=%s err=%v", input.CampaignID, err)
 		return project.CreateOutput{}, project.ErrCampaignNotFound
 	}
 
