@@ -10,7 +10,7 @@ require (
 	github.com/gin-gonic/gin v1.11.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/google/uuid v1.6.0
-	github.com/smap-hcmut/shared-libs/go v1.0.11
+	github.com/smap-hcmut/shared-libs/go v1.0.12
 	github.com/spf13/viper v1.12.0
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.1
