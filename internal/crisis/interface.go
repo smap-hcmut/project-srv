@@ -4,6 +4,7 @@ import (
 	"context"
 )
 
+//go:generate mockery --name=UseCase
 // UseCase defines the business logic interface for Crisis Config operations.
 type UseCase interface {
 	// Crisis Config CRUD

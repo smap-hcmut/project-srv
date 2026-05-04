@@ -25,6 +25,7 @@ type Domain struct {
 	DisplayName string `json:"display_name"`
 }
 
+//go:generate mockery --name=Repository
 // Repository defines read-only access to the domain registry.
 type Repository interface {
 	// ListActive returns all domains currently published by analysis-srv.

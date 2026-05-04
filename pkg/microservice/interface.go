@@ -2,6 +2,7 @@ package microservice
 
 import "context"
 
+//go:generate mockery --name=IngestUseCase
 // IngestUseCase defines internal ingest lifecycle operations consumed by project-srv.
 type IngestUseCase interface {
 	GetActivationReadiness(ctx context.Context, input ActivationReadinessInput) (ActivationReadiness, error)

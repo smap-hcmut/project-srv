@@ -21,4 +21,11 @@ run: swagger ## Run the project service
 	@echo "Running the application"
 	@go run cmd/server/main.go
 
+test: ## Run tests with coverage
+	@echo "Running tests..."
+	@go test -mod=readonly -coverprofile=coverage.out -failfast -timeout 5m ./internal/... ./pkg/...
+	@grep -v 'mock_' coverage.out | grep -v 'internal/sqlboiler' | grep -v 'internal/httpserver' | grep -v 'internal/consumer' > c.out
+	@GOFLAGS=-mod=readonly go tool cover -func=c.out
+	@rm -f *.out
+
 .DEFAULT_GOAL := help

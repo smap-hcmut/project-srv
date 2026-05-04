@@ -6,6 +6,7 @@ import (
 	"project-srv/internal/domain"
 )
 
+//go:generate mockery --name=UseCase
 // UseCase defines the business logic interface for Project operations.
 type UseCase interface {
 	Create(ctx context.Context, input CreateInput) (CreateOutput, error)

@@ -4,6 +4,7 @@ import (
 	"context"
 )
 
+//go:generate mockery --name=UseCase
 // UseCase defines the business logic interface for Campaign operations.
 type UseCase interface {
 	// Campaign CRUD

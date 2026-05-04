@@ -8,6 +8,7 @@ import (
 	"github.com/smap-hcmut/shared-libs/go/log"
 )
 
+//go:generate mockery --name=Producer
 // Producer publishes project lifecycle events.
 type Producer interface {
 	PublishLifecycleEvent(ctx context.Context, event project.LifecycleEvent) error

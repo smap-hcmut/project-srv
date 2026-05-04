@@ -6,6 +6,7 @@ import (
 	"project-srv/internal/model"
 )
 
+//go:generate mockery --name=Repository
 // Repository defines the data access interface for Crisis Config.
 type Repository interface {
 	Upsert(ctx context.Context, opt UpsertOptions) (model.CrisisConfig, error)

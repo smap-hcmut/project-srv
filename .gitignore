@@ -13,6 +13,9 @@ bin/
 *.out
 coverage.out
 
+# Generated mocks
+**/mock_*.go
+
 # Dependency directories
 vendor/
 
