@@ -7,6 +7,7 @@ import (
 // UpsertInput is the input for creating or updating a crisis config.
 type UpsertInput struct {
 	ProjectID         string
+	Status            *model.CrisisStatus
 	KeywordsTrigger   *model.KeywordsTrigger
 	VolumeTrigger     *model.VolumeTrigger
 	SentimentTrigger  *model.SentimentTrigger
@@ -21,4 +22,19 @@ type UpsertOutput struct {
 // DetailOutput is the output for getting crisis config detail.
 type DetailOutput struct {
 	CrisisConfig model.CrisisConfig
+}
+
+// ApplyRuntimeInput applies crisis status to ingest runtime crawl mode.
+type ApplyRuntimeInput struct {
+	ProjectID string
+	Status    *model.CrisisStatus
+	Reason    string
+	EventRef  string
+}
+
+type ApplyRuntimeOutput struct {
+	ProjectID               string
+	CrisisStatus            model.CrisisStatus
+	AppliedCrawlMode        string
+	AffectedDataSourceCount int
 }

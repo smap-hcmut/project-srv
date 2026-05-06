@@ -58,7 +58,7 @@ func (srv HTTPServer) mapHandlers() error {
 
 	// Crisis Config module
 	crisisRepo := crisisrepo.New(srv.postgresDB, srv.l)
-	crisisUC := crisisuc.New(srv.l, crisisRepo, projectUC)
+	crisisUC := crisisuc.New(srv.l, crisisRepo, projectUC, ingestSrv)
 	crisisHandler := crisishttp.New(srv.l, crisisUC, srv.discord)
 
 	// Map routes

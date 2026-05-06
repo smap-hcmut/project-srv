@@ -23,3 +23,16 @@ const (
 	ActivationReadinessCommandActivate = contracts.ActivationReadinessCommandActivate
 	ActivationReadinessCommandResume   = contracts.ActivationReadinessCommandResume
 )
+
+type UpdateProjectCrawlModeInput struct {
+	ProjectID   string
+	CrawlMode   string
+	TriggerType string
+	Reason      string
+	EventRef    string
+}
+
+type UpdateProjectCrawlModeOutput struct {
+	ProjectID               string
+	AffectedDataSourceCount int
+}

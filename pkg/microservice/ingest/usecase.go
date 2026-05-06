@@ -102,7 +102,51 @@ func (uc *implUseCase) Resume(ctx context.Context, projectID string) error {
 	return nil
 }
 
+func (uc *implUseCase) UpdateProjectCrawlMode(ctx context.Context, input microservice.UpdateProjectCrawlModeInput) (microservice.UpdateProjectCrawlModeOutput, error) {
+	projectID := strings.TrimSpace(input.ProjectID)
+	endpoint := uc.buildEndpoint(fmt.Sprintf("/projects/%s/crawl-mode", url.PathEscape(projectID)))
+
+	payload := map[string]string{
+		"crawl_mode":   strings.TrimSpace(input.CrawlMode),
+		"trigger_type": strings.TrimSpace(input.TriggerType),
+		"reason":       strings.TrimSpace(input.Reason),
+		"event_ref":    strings.TrimSpace(input.EventRef),
+	}
+
+	body, status, err := uc.doRequestWithBody(ctx, http.MethodPost, endpoint, payload)
+	if err != nil {
+		return microservice.UpdateProjectCrawlModeOutput{}, err
+	}
+	if status != http.StatusOK {
+		return microservice.UpdateProjectCrawlModeOutput{}, mapStatusError(status, body)
+	}
+
+	var envelope responseEnvelope
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return microservice.UpdateProjectCrawlModeOutput{}, fmt.Errorf("%w: unmarshal project crawl mode envelope: %v", microservice.ErrRequestFailed, err)
+	}
+
+	var dto projectCrawlModeRespDTO
+	if err := json.Unmarshal(envelope.Data, &dto); err != nil {
+		return microservice.UpdateProjectCrawlModeOutput{}, fmt.Errorf("%w: unmarshal project crawl mode data: %v", microservice.ErrRequestFailed, err)
+	}
+
+	out := microservice.UpdateProjectCrawlModeOutput{
+		ProjectID:               strings.TrimSpace(dto.ProjectID),
+		AffectedDataSourceCount: dto.AffectedDataSourceCount,
+	}
+	if out.ProjectID == "" {
+		out.ProjectID = projectID
+	}
+
+	return out, nil
+}
+
 func (uc *implUseCase) doRequest(ctx context.Context, method, endpoint string) ([]byte, int, error) {
+	return uc.doRequestWithBody(ctx, method, endpoint, nil)
+}
+
+func (uc *implUseCase) doRequestWithBody(ctx context.Context, method, endpoint string, reqBody interface{}) ([]byte, int, error) {
 	headers := map[string]string{
 		"Accept": "application/json",
 	}
@@ -118,7 +162,7 @@ func (uc *implUseCase) doRequest(ctx context.Context, method, endpoint string) (
 		}
 		return body, status, nil
 	case http.MethodPost:
-		body, status, err := uc.client.Post(ctx, endpoint, nil, headers)
+		body, status, err := uc.client.Post(ctx, endpoint, reqBody, headers)
 		if err != nil {
 			return nil, status, fmt.Errorf("%w: %v", microservice.ErrRequestFailed, err)
 		}

@@ -3,6 +3,7 @@ package http
 import (
 	"project-srv/internal/crisis"
 	"project-srv/internal/model"
+	"strings"
 )
 
 // --- Request DTOs ---
@@ -69,6 +70,7 @@ type influencerTriggerReq struct {
 
 // upsertReq represents crisis config create/update request
 type upsertReq struct {
+	Status            string                `json:"status,omitempty" example:"WARNING" enums:"NORMAL,WARNING,CRITICAL"`
 	KeywordsTrigger   *keywordsTriggerReq   `json:"keywords_trigger,omitempty"`   // Keyword-based trigger (optional)
 	VolumeTrigger     *volumeTriggerReq     `json:"volume_trigger,omitempty"`     // Volume-based trigger (optional)
 	SentimentTrigger  *sentimentTriggerReq  `json:"sentiment_trigger,omitempty"`  // Sentiment-based trigger (optional)
@@ -76,6 +78,10 @@ type upsertReq struct {
 }
 
 func (r upsertReq) validate() error {
+	if strings.TrimSpace(r.Status) != "" && !isValidCrisisStatus(r.Status) {
+		return errInvalidCrisisStatus
+	}
+
 	// At least one trigger must be provided
 	if r.KeywordsTrigger == nil && r.VolumeTrigger == nil && r.SentimentTrigger == nil && r.InfluencerTrigger == nil {
 		return errNoTrigger
@@ -135,6 +141,10 @@ func (r upsertReq) validate() error {
 func (r upsertReq) toInput(projectID string) crisis.UpsertInput {
 	input := crisis.UpsertInput{
 		ProjectID: projectID,
+	}
+	if strings.TrimSpace(r.Status) != "" {
+		status := model.CrisisStatus(canonicalCrisisStatus(r.Status))
+		input.Status = &status
 	}
 
 	if r.KeywordsTrigger != nil {
@@ -206,6 +216,48 @@ func (r upsertReq) toInput(projectID string) crisis.UpsertInput {
 	}
 
 	return input
+}
+
+type applyRuntimeReq struct {
+	Status   string `json:"status,omitempty" example:"CRITICAL" enums:"NORMAL,WARNING,CRITICAL"`
+	Reason   string `json:"reason,omitempty" example:"apply runtime from crisis pipeline"`
+	EventRef string `json:"event_ref,omitempty" example:"incident-20260506-001"`
+}
+
+func (r applyRuntimeReq) validate() error {
+	if strings.TrimSpace(r.Status) == "" {
+		return nil
+	}
+	if !isValidCrisisStatus(r.Status) {
+		return errInvalidCrisisStatus
+	}
+	return nil
+}
+
+func (r applyRuntimeReq) toInput(projectID string) crisis.ApplyRuntimeInput {
+	input := crisis.ApplyRuntimeInput{
+		ProjectID: strings.TrimSpace(projectID),
+		Reason:    strings.TrimSpace(r.Reason),
+		EventRef:  strings.TrimSpace(r.EventRef),
+	}
+	if strings.TrimSpace(r.Status) != "" {
+		status := model.CrisisStatus(canonicalCrisisStatus(r.Status))
+		input.Status = &status
+	}
+	return input
+}
+
+func isValidCrisisStatus(status string) bool {
+	switch model.CrisisStatus(canonicalCrisisStatus(status)) {
+	case model.CrisisStatusNormal, model.CrisisStatusWarning, model.CrisisStatusCritical:
+		return true
+	default:
+		return false
+	}
+}
+
+func canonicalCrisisStatus(status string) string {
+	return strings.ToUpper(strings.TrimSpace(status))
 }
 
 // --- Response DTOs ---
@@ -292,6 +344,13 @@ type detailResp struct {
 	CrisisConfig crisisConfigResp `json:"crisis_config"` // Crisis config details
 }
 
+type applyRuntimeResp struct {
+	ProjectID               string `json:"project_id" example:"550e8400-e29b-41d4-a716-446655440002"`
+	CrisisStatus            string `json:"crisis_status" example:"CRITICAL" enums:"NORMAL,WARNING,CRITICAL"`
+	AppliedCrawlMode        string `json:"applied_crawl_mode" example:"CRISIS" enums:"SLEEP,NORMAL,CRISIS"`
+	AffectedDataSourceCount int    `json:"affected_datasource_count" example:"3"`
+}
+
 // --- Response Mappers (receiver on handler) ---
 
 func (h *handler) newUpsertResp(o crisis.UpsertOutput) upsertResp {
@@ -303,6 +362,15 @@ func (h *handler) newUpsertResp(o crisis.UpsertOutput) upsertResp {
 func (h *handler) newDetailResp(o crisis.DetailOutput) detailResp {
 	return detailResp{
 		CrisisConfig: toCrisisConfigResp(o.CrisisConfig),
+	}
+}
+
+func (h *handler) newApplyRuntimeResp(o crisis.ApplyRuntimeOutput) applyRuntimeResp {
+	return applyRuntimeResp{
+		ProjectID:               o.ProjectID,
+		CrisisStatus:            string(o.CrisisStatus),
+		AppliedCrawlMode:        o.AppliedCrawlMode,
+		AffectedDataSourceCount: o.AffectedDataSourceCount,
 	}
 }
 

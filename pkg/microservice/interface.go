@@ -8,4 +8,5 @@ type IngestUseCase interface {
 	Activate(ctx context.Context, projectID string) error
 	Pause(ctx context.Context, projectID string) error
 	Resume(ctx context.Context, projectID string) error
+	UpdateProjectCrawlMode(ctx context.Context, input UpdateProjectCrawlModeInput) (UpdateProjectCrawlModeOutput, error)
 }

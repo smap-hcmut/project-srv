@@ -81,3 +81,35 @@ func (h *handler) Delete(c *gin.Context) {
 
 	response.OK(c, nil)
 }
+
+// @Summary Apply crisis runtime
+// @Description Internal API to apply crisis status into ingest crawl mode orchestration
+// @Tags CrisisConfig
+// @Accept json
+// @Produce json
+// @Param project_id path string true "Project ID"
+// @Param body body applyRuntimeReq false "Runtime apply request"
+// @Success 200 {object} applyRuntimeResp
+// @Failure 400 {object} response.Resp
+// @Failure 500 {object} response.Resp
+// @Router /internal/projects/{project_id}/crisis-config/apply-runtime [post]
+func (h *handler) ApplyRuntime(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	req, err := h.processApplyRuntimeReq(c)
+	if err != nil {
+		h.l.Warnf(ctx, "crisis.delivery.ApplyRuntime.processApplyRuntimeReq: %v", err)
+		response.Error(c, err, h.discord)
+		return
+	}
+
+	projectID := c.Param("project_id")
+	o, err := h.uc.ApplyRuntime(ctx, req.toInput(projectID))
+	if err != nil {
+		h.l.Errorf(ctx, "crisis.delivery.ApplyRuntime.uc.ApplyRuntime: project_id=%s err=%v", projectID, err)
+		response.Error(c, h.mapError(err), h.discord)
+		return
+	}
+
+	response.OK(c, h.newApplyRuntimeResp(o))
+}

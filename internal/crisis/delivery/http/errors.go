@@ -24,6 +24,8 @@ var (
 	errVolumeRulesRequired     = &pkgErrors.HTTPError{Code: 160012, Message: "Enabled volume trigger requires at least 1 rule", StatusCode: http.StatusBadRequest}
 	errSentimentRulesRequired  = &pkgErrors.HTTPError{Code: 160013, Message: "Enabled sentiment trigger requires at least 1 rule", StatusCode: http.StatusBadRequest}
 	errInfluencerRulesRequired = &pkgErrors.HTTPError{Code: 160014, Message: "Enabled influencer trigger requires at least 1 rule", StatusCode: http.StatusBadRequest}
+	errInvalidCrisisStatus     = &pkgErrors.HTTPError{Code: 160015, Message: "Invalid crisis status", StatusCode: http.StatusBadRequest}
+	errApplyFailed             = &pkgErrors.HTTPError{Code: 160016, Message: "Failed to apply crisis runtime", StatusCode: http.StatusInternalServerError}
 )
 
 // mapError maps UseCase domain errors to delivery HTTP errors.
@@ -37,6 +39,10 @@ func (h *handler) mapError(err error) error {
 		return errUpsertFailed
 	case crisis.ErrDeleteFailed:
 		return errDeleteFailed
+	case crisis.ErrInvalidStatus:
+		return errInvalidCrisisStatus
+	case crisis.ErrApplyFailed:
+		return errApplyFailed
 	default:
 		panic(err)
 	}
