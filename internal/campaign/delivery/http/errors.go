@@ -45,6 +45,12 @@ func (h *handler) mapError(err error) error {
 		return errDeleteFailed
 	case campaign.ErrListFailed:
 		return errListFailed
+	case campaign.ErrPauseFailed:
+		return errUpdateFailed
+	case campaign.ErrResumeFailed:
+		return errUpdateFailed
+	case campaign.ErrArchiveFailed:
+		return errUpdateFailed
 	default:
 		panic(err)
 	}

@@ -12,5 +12,8 @@ var (
 	ErrCreateFailed     = errors.New("failed to create campaign")
 	ErrUpdateFailed     = errors.New("failed to update campaign")
 	ErrDeleteFailed     = errors.New("failed to delete campaign")
+	ErrPauseFailed      = errors.New("failed to pause campaign")
+	ErrResumeFailed     = errors.New("failed to resume campaign")
 	ErrListFailed       = errors.New("failed to list campaigns")
+	ErrArchiveFailed    = errors.New("failed to archive campaign")
 )

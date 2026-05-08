@@ -202,7 +202,8 @@ func (h *handler) Unfavorite(c *gin.Context) {
 }
 
 // @Summary Archive a campaign
-// @Description Soft-delete a campaign by ID
+// @Description Pause all active projects in the campaign, cancel ongoing runtime jobs,
+//              then soft-delete the campaign by ID (hide from active campaign list).
 // @Tags Campaign
 // @Produce json
 // @Param id path string true "Campaign ID"
@@ -216,6 +217,50 @@ func (h *handler) Archive(c *gin.Context) {
 
 	if err := h.uc.Archive(ctx, id); err != nil {
 		h.l.Errorf(ctx, "campaign.delivery.Archive.uc.Archive: id=%s err=%v", id, err)
+		response.Error(c, h.mapError(err), h.discord)
+		return
+	}
+
+	response.OK(c, nil)
+}
+
+// @Summary Pause all projects in a campaign
+// @Description Pause all active projects under the campaign and mark campaign as paused.
+// @Tags Campaign
+// @Produce json
+// @Param id path string true "Campaign ID"
+// @Success 200 {object} response.Resp
+// @Failure 400 {object} response.Resp
+// @Failure 500 {object} response.Resp
+// @Router /campaigns/{id}/pause [post]
+func (h *handler) Pause(c *gin.Context) {
+	ctx := c.Request.Context()
+	id := c.Param("id")
+
+	if err := h.uc.Pause(ctx, id); err != nil {
+		h.l.Errorf(ctx, "campaign.delivery.Pause.uc.Pause: id=%s err=%v", id, err)
+		response.Error(c, h.mapError(err), h.discord)
+		return
+	}
+
+	response.OK(c, nil)
+}
+
+// @Summary Resume campaign projects
+// @Description Resume paused projects under the campaign and mark campaign as active.
+// @Tags Campaign
+// @Produce json
+// @Param id path string true "Campaign ID"
+// @Success 200 {object} response.Resp
+// @Failure 400 {object} response.Resp
+// @Failure 500 {object} response.Resp
+// @Router /campaigns/{id}/resume [post]
+func (h *handler) Resume(c *gin.Context) {
+	ctx := c.Request.Context()
+	id := c.Param("id")
+
+	if err := h.uc.Resume(ctx, id); err != nil {
+		h.l.Errorf(ctx, "campaign.delivery.Resume.uc.Resume: id=%s err=%v", id, err)
 		response.Error(c, h.mapError(err), h.discord)
 		return
 	}

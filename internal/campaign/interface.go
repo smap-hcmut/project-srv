@@ -11,6 +11,8 @@ type UseCase interface {
 	Detail(ctx context.Context, id string) (DetailOutput, error)
 	List(ctx context.Context, input ListInput) (ListOutput, error)
 	Update(ctx context.Context, input UpdateInput) (UpdateOutput, error)
+	Pause(ctx context.Context, id string) error
+	Resume(ctx context.Context, id string) error
 	Favorite(ctx context.Context, id string) error
 	Unfavorite(ctx context.Context, id string) error
 	Archive(ctx context.Context, id string) error

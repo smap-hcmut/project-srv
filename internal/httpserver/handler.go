@@ -45,19 +45,19 @@ func (srv HTTPServer) mapHandlers() error {
 
 	// Campaign module
 	campaignRepo := campaignrepo.New(srv.postgresDB, srv.l)
-	campaignUC := campaignuc.New(srv.l, campaignRepo)
+	projectRepo := projectrepo.New(srv.postgresDB, srv.l)
+	ingestSrv := ingestsrv.New(srv.l, srv.microservice.Ingest.BaseURL, srv.microservice.Ingest.TimeoutMS, srv.internalKey)
+	campaignUC := campaignuc.New(srv.l, campaignRepo, projectRepo, ingestSrv)
 	campaignHandler := campaignhttp.New(srv.l, campaignUC, srv.discord)
 
 	// Project module
-	projectRepo := projectrepo.New(srv.postgresDB, srv.l)
 	domainRepo := domain.NewRepository(srv.mainRedisClient, srv.l)
-	ingestSrv := ingestsrv.New(srv.l, srv.microservice.Ingest.BaseURL, srv.microservice.Ingest.TimeoutMS, srv.internalKey)
 	lifecyclePublisher := projectkafkaproducer.New(srv.l, srv.kafkaProducer)
-	projectUC := projectuc.New(srv.l, projectRepo, domainRepo, campaignUC, ingestSrv, lifecyclePublisher)
+	crisisRepo := crisisrepo.New(srv.postgresDB, srv.l)
+	projectUC := projectuc.New(srv.l, projectRepo, domainRepo, campaignUC, ingestSrv, lifecyclePublisher, crisisRepo)
 	projectHandler := projecthttp.New(srv.l, projectUC, srv.discord)
 
 	// Crisis Config module
-	crisisRepo := crisisrepo.New(srv.postgresDB, srv.l)
 	crisisUC := crisisuc.New(srv.l, crisisRepo, projectUC, ingestSrv)
 	crisisHandler := crisishttp.New(srv.l, crisisUC, srv.discord)
 

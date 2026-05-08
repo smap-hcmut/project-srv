@@ -17,6 +17,8 @@ func (h *handler) RegisterRoutes(r *gin.RouterGroup, mw *middleware.Middleware) 
 		campaigns.PUT("/:id", h.Update)
 		campaigns.POST("/:id/favorite", h.Favorite)
 		campaigns.DELETE("/:id/favorite", h.Unfavorite)
+		campaigns.POST("/:id/pause", h.Pause)
+		campaigns.POST("/:id/resume", h.Resume)
 		campaigns.DELETE("/:id", h.Archive)
 	}
 }
