@@ -115,8 +115,10 @@ func TestDetail(t *testing.T) {
 
 func TestUpsert(t *testing.T) {
 	ctx := context.Background()
+	status := model.CrisisStatusWarning
 	opt := repository.UpsertOptions{
 		ProjectID:        "project-1",
+		Status:           &status,
 		KeywordsTrigger:  &model.KeywordsTrigger{Enabled: true, Logic: "AND", Groups: []model.KeywordGroup{{Name: "Pin", Keywords: []string{"pin"}, Weight: 10}}},
 		VolumeTrigger:    &model.VolumeTrigger{Enabled: true, Metric: "MENTIONS", Rules: []model.VolumeRule{{Level: "CRITICAL", ThresholdPercentGrowth: 150, ComparisonWindowHours: 1}}},
 		SentimentTrigger: &model.SentimentTrigger{Enabled: true, Rules: []model.SentimentRule{{Type: "NEGATIVE_SPIKE"}}},
@@ -186,11 +188,11 @@ func TestUpsert(t *testing.T) {
 			if tc.mock.findErr != nil {
 				mockDB.ExpectQuery(findQuery).WithArgs(tc.input.ProjectID).WillReturnError(tc.mock.findErr)
 				if tc.mock.findErr == sql.ErrNoRows {
-					expect := mockDB.ExpectQuery(`INSERT INTO "project"\."projects_crisis_config"`)
+					expect := mockDB.ExpectExec(`INSERT INTO "project"\."projects_crisis_config"`)
 					if tc.mock.insertErr != nil {
 						expect.WillReturnError(tc.mock.insertErr)
 					} else {
-						expect.WillReturnRows(sqlmock.NewRows([]string{"status"}).AddRow("NORMAL"))
+						expect.WillReturnResult(sqlmock.NewResult(0, 1))
 					}
 				}
 			} else {

@@ -8,6 +8,8 @@ import (
 	"project-srv/internal/project"
 )
 
+var marshalLifecycleEvent = json.Marshal
+
 // PublishLifecycleEvent publishes one project lifecycle event to Kafka.
 func (p *implProducer) PublishLifecycleEvent(ctx context.Context, event project.LifecycleEvent) error {
 	if p.producer == nil {
@@ -15,7 +17,7 @@ func (p *implProducer) PublishLifecycleEvent(ctx context.Context, event project.
 		return nil
 	}
 
-	payload, err := json.Marshal(event)
+	payload, err := marshalLifecycleEvent(event)
 	if err != nil {
 		p.logger.Errorf(ctx, "project.delivery.kafka.producer.PublishLifecycleEvent: marshal event=%s err=%v", event.EventName, err)
 		return fmt.Errorf("marshal lifecycle event: %w", err)

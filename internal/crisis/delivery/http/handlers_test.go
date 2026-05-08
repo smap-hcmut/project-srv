@@ -201,3 +201,82 @@ func TestDelete(t *testing.T) {
 		})
 	}
 }
+
+func TestApplyRuntime(t *testing.T) {
+	type mockApplyRuntime struct {
+		isCalled bool
+		input    crisis.ApplyRuntimeInput
+		output   crisis.ApplyRuntimeOutput
+		err      error
+	}
+	type mockData struct {
+		applyRuntime mockApplyRuntime
+	}
+
+	status := model.CrisisStatusCritical
+	tcs := map[string]struct {
+		input  string
+		mock   mockData
+		output int
+		err    error
+	}{
+		"success": {
+			input: `{"status":" critical ","reason":" reason ","event_ref":" event-1 "}`,
+			mock: mockData{applyRuntime: mockApplyRuntime{
+				isCalled: true,
+				input:    crisis.ApplyRuntimeInput{ProjectID: "project-1", Status: &status, Reason: "reason", EventRef: "event-1"},
+				output:   crisis.ApplyRuntimeOutput{ProjectID: "project-1", CrisisStatus: model.CrisisStatusCritical, AppliedCrawlMode: "CRISIS", AffectedDataSourceCount: 2},
+			}},
+			output: http.StatusOK,
+		},
+		"empty_body_success": {
+			input: "",
+			mock: mockData{applyRuntime: mockApplyRuntime{
+				isCalled: true,
+				input:    crisis.ApplyRuntimeInput{ProjectID: "project-1"},
+				output:   crisis.ApplyRuntimeOutput{ProjectID: "project-1", CrisisStatus: model.CrisisStatusNormal, AppliedCrawlMode: "NORMAL"},
+			}},
+			output: http.StatusOK,
+		},
+		"wrong_body": {
+			input:  `{`,
+			output: http.StatusBadRequest,
+		},
+		"invalid_status": {
+			input:  `{"status":"BAD"}`,
+			output: http.StatusBadRequest,
+		},
+		"uc_invalid_status": {
+			input: `{"status":"WARNING"}`,
+			mock: mockData{applyRuntime: mockApplyRuntime{
+				isCalled: true,
+				input:    crisis.ApplyRuntimeInput{ProjectID: "project-1", Status: func() *model.CrisisStatus { s := model.CrisisStatusWarning; return &s }()},
+				err:      crisis.ErrInvalidStatus,
+			}},
+			output: http.StatusBadRequest,
+		},
+		"uc_apply_failed": {
+			input: `{"status":"WARNING"}`,
+			mock: mockData{applyRuntime: mockApplyRuntime{
+				isCalled: true,
+				input:    crisis.ApplyRuntimeInput{ProjectID: "project-1", Status: func() *model.CrisisStatus { s := model.CrisisStatusWarning; return &s }()},
+				err:      crisis.ErrApplyFailed,
+			}},
+			output: http.StatusInternalServerError,
+		},
+	}
+
+	for name, tc := range tcs {
+		t.Run(name, func(t *testing.T) {
+			h, uc := newTestHandler(t)
+			if tc.mock.applyRuntime.isCalled {
+				uc.EXPECT().ApplyRuntime(context.Background(), tc.mock.applyRuntime.input).Return(tc.mock.applyRuntime.output, tc.mock.applyRuntime.err)
+			}
+			c, w := newTestContext(http.MethodPost, "/internal/projects/project-1/crisis-config/apply-runtime", tc.input, gin.Params{{Key: "project_id", Value: "project-1"}})
+
+			h.ApplyRuntime(c)
+
+			require.Equal(t, tc.output, w.Code)
+		})
+	}
+}

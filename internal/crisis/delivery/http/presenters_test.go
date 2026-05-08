@@ -24,6 +24,8 @@ func TestMapError(t *testing.T) {
 		"project_invalid": {input: crisis.ErrProjectInvalid, output: errProjectInvalid},
 		"upsert_failed":   {input: crisis.ErrUpsertFailed, output: errUpsertFailed},
 		"delete_failed":   {input: crisis.ErrDeleteFailed, output: errDeleteFailed},
+		"invalid_status":  {input: crisis.ErrInvalidStatus, output: errInvalidCrisisStatus},
+		"apply_failed":    {input: crisis.ErrApplyFailed, output: errApplyFailed},
 	}
 
 	for name, tc := range tcs {
@@ -70,6 +72,13 @@ func TestUpsertReqValidate(t *testing.T) {
 	}{
 		"success_all": {
 			input: upsertReq{KeywordsTrigger: &validKeyword, VolumeTrigger: &validVolume, SentimentTrigger: &validSentiment, InfluencerTrigger: &validInfluencer},
+		},
+		"success_with_status": {
+			input: upsertReq{Status: " warning ", KeywordsTrigger: &validKeyword},
+		},
+		"invalid_status": {
+			input: upsertReq{Status: "BAD", KeywordsTrigger: &validKeyword},
+			err:   errInvalidCrisisStatus,
 		},
 		"no_trigger": {
 			err: errNoTrigger,
@@ -130,6 +139,7 @@ func TestUpsertReqToInput(t *testing.T) {
 	}{
 		"all_triggers": {
 			input: upsertReq{
+				Status:            "warning",
 				KeywordsTrigger:   &keywordsTriggerReq{Enabled: true, Logic: "AND", Groups: []keywordGroupReq{{Name: "Pin", Keywords: []string{"pin"}, Weight: 10}}},
 				VolumeTrigger:     &volumeTriggerReq{Enabled: true, Metric: "MENTIONS", Rules: []volumeRuleReq{{Level: "CRITICAL", ThresholdPercentGrowth: 150, ComparisonWindowHours: 1, Baseline: "PREVIOUS_PERIOD"}}},
 				SentimentTrigger:  &sentimentTriggerReq{Enabled: true, MinSampleSize: 10, Rules: []sentimentRuleReq{{Type: "NEGATIVE_SPIKE", ThresholdPercent: 25, CriticalAspects: []string{"quality"}, NegativeThresholdPercent: 50}}},
@@ -144,10 +154,85 @@ func TestUpsertReqToInput(t *testing.T) {
 			output := tc.input.toInput("project-1")
 
 			require.Equal(t, tc.output.ProjectID, output.ProjectID)
+			require.NotNil(t, output.Status)
 			require.NotNil(t, output.KeywordsTrigger)
 			require.NotNil(t, output.VolumeTrigger)
 			require.NotNil(t, output.SentimentTrigger)
 			require.NotNil(t, output.InfluencerTrigger)
+		})
+	}
+}
+
+func TestApplyRuntimeReqValidate(t *testing.T) {
+	tcs := map[string]struct {
+		input  applyRuntimeReq
+		mock   struct{}
+		output struct{}
+		err    error
+	}{
+		"empty_status": {},
+		"normal":       {input: applyRuntimeReq{Status: " normal "}},
+		"warning":      {input: applyRuntimeReq{Status: "WARNING"}},
+		"critical":     {input: applyRuntimeReq{Status: "CRITICAL"}},
+		"invalid":      {input: applyRuntimeReq{Status: "BAD"}, err: errInvalidCrisisStatus},
+	}
+
+	for name, tc := range tcs {
+		t.Run(name, func(t *testing.T) {
+			err := tc.input.validate()
+
+			if tc.err != nil {
+				require.Equal(t, tc.err, err)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestApplyRuntimeReqToInput(t *testing.T) {
+	status := model.CrisisStatusCritical
+	tcs := map[string]struct {
+		input  applyRuntimeReq
+		mock   struct{}
+		output crisis.ApplyRuntimeInput
+		err    error
+	}{
+		"with_status": {
+			input:  applyRuntimeReq{Status: " critical ", Reason: " reason ", EventRef: " event-1 "},
+			output: crisis.ApplyRuntimeInput{ProjectID: "project-1", Status: &status, Reason: "reason", EventRef: "event-1"},
+		},
+		"without_status": {
+			input:  applyRuntimeReq{Reason: " reason "},
+			output: crisis.ApplyRuntimeInput{ProjectID: "project-1", Reason: "reason"},
+		},
+	}
+
+	for name, tc := range tcs {
+		t.Run(name, func(t *testing.T) {
+			output := tc.input.toInput(" project-1 ")
+
+			require.Equal(t, tc.output, output)
+		})
+	}
+}
+
+func TestNewApplyRuntimeResp(t *testing.T) {
+	h, _ := newTestHandler(t)
+	tcs := map[string]struct {
+		input  crisis.ApplyRuntimeOutput
+		mock   struct{}
+		output applyRuntimeResp
+		err    error
+	}{
+		"success": {
+			input:  crisis.ApplyRuntimeOutput{ProjectID: "project-1", CrisisStatus: model.CrisisStatusCritical, AppliedCrawlMode: "CRISIS", AffectedDataSourceCount: 2},
+			output: applyRuntimeResp{ProjectID: "project-1", CrisisStatus: "CRITICAL", AppliedCrawlMode: "CRISIS", AffectedDataSourceCount: 2},
+		},
+	}
+	for name, tc := range tcs {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.output, h.newApplyRuntimeResp(tc.input))
 		})
 	}
 }

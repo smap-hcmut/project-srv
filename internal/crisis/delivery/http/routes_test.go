@@ -18,7 +18,7 @@ func TestRegisterRoutes(t *testing.T) {
 	}{
 		"success": {
 			input:  "/api",
-			output: 3,
+			output: 4,
 		},
 	}
 
@@ -36,6 +36,7 @@ func TestRegisterRoutes(t *testing.T) {
 			requireRoute(t, routes, http.MethodPut, "/api/projects/:project_id/crisis-config")
 			requireRoute(t, routes, http.MethodGet, "/api/projects/:project_id/crisis-config")
 			requireRoute(t, routes, http.MethodDelete, "/api/projects/:project_id/crisis-config")
+			requireRoute(t, routes, http.MethodPost, "/api/internal/projects/:project_id/crisis-config/apply-runtime")
 		})
 	}
 }

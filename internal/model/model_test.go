@@ -6,6 +6,7 @@ import (
 
 	"project-srv/internal/sqlboiler"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/aarondl/null/v8"
 	"github.com/stretchr/testify/require"
 )
@@ -161,6 +162,41 @@ func TestNewProjectFromDB(t *testing.T) {
 	}
 }
 
+func TestNewProjectFromDBWithCampaignRelation(t *testing.T) {
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	tcs := map[string]struct {
+		input  struct{}
+		mock   struct{}
+		output *Project
+		err    error
+	}{
+		"success": {
+			output: &Project{ID: "project-1", CampaignID: "campaign-1", Campaign: &Campaign{ID: "campaign-1", Name: "Campaign A"}},
+		},
+	}
+
+	for name, tc := range tcs {
+		t.Run(name, func(t *testing.T) {
+			db, mockDB, err := sqlmock.New()
+			require.NoError(t, err)
+			defer db.Close()
+			mockDB.ExpectExec(`UPDATE "project"\."projects" SET`).WillReturnResult(sqlmock.NewResult(0, 1))
+			row := &sqlboiler.Project{ID: "project-1", CampaignID: "campaign-1", Name: "Project A", EntityType: sqlboiler.EntityTypeProduct, EntityName: "VF8", DomainTypeCode: "ev", Status: sqlboiler.ProjectStatusPENDING, CreatedAt: null.TimeFrom(now), UpdatedAt: null.TimeFrom(now)}
+			campaign := &sqlboiler.Campaign{ID: "campaign-1", Name: "Campaign A"}
+			require.NoError(t, row.SetCampaign(t.Context(), db, false, campaign))
+
+			output := NewProjectFromDB(row)
+
+			require.Equal(t, tc.output.ID, output.ID)
+			require.Equal(t, tc.output.CampaignID, output.CampaignID)
+			require.NotNil(t, output.Campaign)
+			require.Equal(t, tc.output.Campaign.ID, output.Campaign.ID)
+			require.NoError(t, mockDB.ExpectationsWereMet())
+		})
+	}
+}
+
 func TestNewCrisisConfigFromDB(t *testing.T) {
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
@@ -200,6 +236,38 @@ func TestNewCrisisConfigFromDB(t *testing.T) {
 			output := NewCrisisConfigFromDB(tc.input)
 
 			require.Equal(t, tc.output, output)
+		})
+	}
+}
+
+func TestNewCrisisConfigFromDBWithProjectRelation(t *testing.T) {
+	tcs := map[string]struct {
+		input  struct{}
+		mock   struct{}
+		output *CrisisConfig
+		err    error
+	}{
+		"success": {
+			output: &CrisisConfig{ProjectID: "project-1", Project: &Project{ID: "project-1"}},
+		},
+	}
+
+	for name, tc := range tcs {
+		t.Run(name, func(t *testing.T) {
+			db, mockDB, err := sqlmock.New()
+			require.NoError(t, err)
+			defer db.Close()
+			mockDB.ExpectExec(`UPDATE "project"\."projects_crisis_config" SET`).WillReturnResult(sqlmock.NewResult(0, 1))
+			row := &sqlboiler.ProjectsCrisisConfig{ProjectID: "project-1"}
+			project := &sqlboiler.Project{ID: "project-1", Name: "Project A", EntityType: sqlboiler.EntityTypeProduct, EntityName: "VF8", DomainTypeCode: "ev", Status: sqlboiler.ProjectStatusPENDING}
+			require.NoError(t, row.SetProject(t.Context(), db, false, project))
+
+			output := NewCrisisConfigFromDB(row)
+
+			require.Equal(t, tc.output.ProjectID, output.ProjectID)
+			require.NotNil(t, output.Project)
+			require.Equal(t, tc.output.Project.ID, output.Project.ID)
+			require.NoError(t, mockDB.ExpectationsWereMet())
 		})
 	}
 }

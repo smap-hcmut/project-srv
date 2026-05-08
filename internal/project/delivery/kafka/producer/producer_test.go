@@ -90,6 +90,10 @@ func TestPublishLifecycleEvent(t *testing.T) {
 			mock:  mockData{publish: mockPublish{isCalled: true, err: errors.New("kafka error")}},
 			err:   errors.New("kafka error"),
 		},
+		"marshal_error": {
+			input: event,
+			err:   errors.New("marshal error"),
+		},
 	}
 
 	for name, tc := range tcs {
@@ -97,6 +101,13 @@ func TestPublishLifecycleEvent(t *testing.T) {
 			p, kafkaProducer := newTestProducer(t)
 			if tc.mock.nilProducer {
 				p.producer = nil
+			}
+			if name == "marshal_error" {
+				original := marshalLifecycleEvent
+				marshalLifecycleEvent = func(any) ([]byte, error) {
+					return nil, tc.err
+				}
+				t.Cleanup(func() { marshalLifecycleEvent = original })
 			}
 			if tc.mock.publish.isCalled {
 				kafkaProducer.EXPECT().PublishWithContext(ctx, []byte(tc.input.ProjectID), mock.MatchedBy(func(payload []byte) bool {
@@ -114,7 +125,7 @@ func TestPublishLifecycleEvent(t *testing.T) {
 			err := p.PublishLifecycleEvent(ctx, tc.input)
 
 			if tc.err != nil {
-				require.EqualError(t, err, tc.err.Error())
+				require.ErrorContains(t, err, tc.err.Error())
 				return
 			}
 			require.NoError(t, err)

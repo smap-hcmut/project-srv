@@ -85,10 +85,7 @@ func (h *handler) processLifecycleReq(c *gin.Context) (archiveReq, error) {
 
 func (h *handler) processActivationReadinessReq(c *gin.Context) (activationReadinessReq, error) {
 	var req activationReadinessReq
-	if err := c.ShouldBindQuery(&req); err != nil {
-		h.l.Warnf(c.Request.Context(), "project.delivery.processActivationReadinessReq.ShouldBindQuery: %v", err)
-		return req, errWrongQuery
-	}
+	_ = c.ShouldBindQuery(&req)
 	req.ID = c.Param("project_id")
 	if err := req.validate(); err != nil {
 		h.l.Warnf(c.Request.Context(), "project.delivery.processActivationReadinessReq.validate: %v", err)
