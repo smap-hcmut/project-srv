@@ -36,6 +36,9 @@ func (r *implRepository) create(ctx context.Context, opt repository.UpsertOption
 	row := &sqlboiler.ProjectsCrisisConfig{
 		ProjectID: opt.ProjectID,
 	}
+	if opt.Status != nil {
+		row.Status = sqlboiler.NullCrisisStatusFrom(sqlboiler.CrisisStatus(*opt.Status))
+	}
 
 	if opt.KeywordsTrigger != nil {
 		b, _ := json.Marshal(opt.KeywordsTrigger)
@@ -67,6 +70,9 @@ func (r *implRepository) create(ctx context.Context, opt repository.UpsertOption
 }
 
 func (r *implRepository) update(ctx context.Context, row *sqlboiler.ProjectsCrisisConfig, opt repository.UpsertOptions) (model.CrisisConfig, error) {
+	if opt.Status != nil {
+		row.Status = sqlboiler.NullCrisisStatusFrom(sqlboiler.CrisisStatus(*opt.Status))
+	}
 	if opt.KeywordsTrigger != nil {
 		b, _ := json.Marshal(opt.KeywordsTrigger)
 		row.KeywordsRules = null.JSONFrom(b)

@@ -11,4 +11,5 @@ type UseCase interface {
 	Upsert(ctx context.Context, input UpsertInput) (UpsertOutput, error)
 	Detail(ctx context.Context, projectID string) (DetailOutput, error)
 	Delete(ctx context.Context, projectID string) error
+	ApplyRuntime(ctx context.Context, input ApplyRuntimeInput) (ApplyRuntimeOutput, error)
 }

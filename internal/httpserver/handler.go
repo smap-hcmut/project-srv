@@ -58,7 +58,7 @@ func (srv HTTPServer) mapHandlers() error {
 
 	// Crisis Config module
 	crisisRepo := crisisrepo.New(srv.postgresDB, srv.l)
-	crisisUC := crisisuc.New(srv.l, crisisRepo, projectUC)
+	crisisUC := crisisuc.New(srv.l, crisisRepo, projectUC, ingestSrv)
 	crisisHandler := crisishttp.New(srv.l, crisisUC, srv.discord)
 
 	// Map routes
@@ -98,8 +98,13 @@ func (srv HTTPServer) mapHandlers() error {
 		}
 
 		projectIDs := make([]string, len(projOut.Projects))
+		projects := make([]gin.H, len(projOut.Projects))
 		for i, p := range projOut.Projects {
 			projectIDs[i] = p.ID
+			projects[i] = gin.H{
+				"id":   p.ID,
+				"name": p.Name,
+			}
 		}
 
 		// Return flat response that knowledge-srv can unmarshal directly into Campaign{ID, Name, ProjectIDs}
@@ -107,6 +112,7 @@ func (srv HTTPServer) mapHandlers() error {
 			"id":          campOut.Campaign.ID,
 			"name":        campOut.Campaign.Name,
 			"project_ids": projectIDs,
+			"projects":    projects,
 		})
 	})
 

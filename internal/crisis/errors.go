@@ -8,4 +8,6 @@ var (
 	ErrProjectInvalid = errors.New("invalid project id")
 	ErrUpsertFailed   = errors.New("failed to upsert crisis config")
 	ErrDeleteFailed   = errors.New("failed to delete crisis config")
+	ErrInvalidStatus  = errors.New("invalid crisis status")
+	ErrApplyFailed    = errors.New("failed to apply crisis runtime")
 )

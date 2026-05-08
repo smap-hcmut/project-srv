@@ -40,3 +40,8 @@ type readinessErrorRespDTO struct {
 	DataSourceID string `json:"datasource_id,omitempty"`
 	TargetID     string `json:"target_id,omitempty"`
 }
+
+type projectCrawlModeRespDTO struct {
+	ProjectID               string `json:"project_id"`
+	AffectedDataSourceCount int    `json:"affected_datasource_count"`
+}
