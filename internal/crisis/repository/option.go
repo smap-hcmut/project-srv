@@ -10,4 +10,5 @@ type UpsertOptions struct {
 	VolumeTrigger     *model.VolumeTrigger
 	SentimentTrigger  *model.SentimentTrigger
 	InfluencerTrigger *model.InfluencerTrigger
+	ResponsePolicy    *model.CrisisResponsePolicy
 }

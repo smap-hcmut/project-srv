@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"project-srv/internal/crisis"
-	"project-srv/internal/model"
 	repo "project-srv/internal/crisis/repository"
+	"project-srv/internal/model"
 	"project-srv/pkg/microservice"
 )
 
@@ -41,6 +41,7 @@ func (uc *implUseCase) Upsert(ctx context.Context, input crisis.UpsertInput) (cr
 		VolumeTrigger:     input.VolumeTrigger,
 		SentimentTrigger:  input.SentimentTrigger,
 		InfluencerTrigger: input.InfluencerTrigger,
+		ResponsePolicy:    input.ResponsePolicy,
 	}
 
 	result, err := uc.repo.Upsert(ctx, opt)
@@ -66,6 +67,35 @@ func (uc *implUseCase) Detail(ctx context.Context, projectID string) (crisis.Det
 	}
 
 	return crisis.DetailOutput{CrisisConfig: result}, nil
+}
+
+func (uc *implUseCase) RuntimeConfig(ctx context.Context, projectID string) (crisis.RuntimeConfigOutput, error) {
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		uc.l.Warnf(ctx, "crisis.usecase.RuntimeConfig: empty project_id")
+		return crisis.RuntimeConfigOutput{}, crisis.ErrNotFound
+	}
+
+	projectDetail, err := uc.projectUC.Detail(ctx, projectID)
+	if err != nil {
+		uc.l.Warnf(ctx, "crisis.usecase.RuntimeConfig.projectUC.Detail: project_id=%s err=%v", projectID, err)
+		return crisis.RuntimeConfigOutput{}, crisis.ErrProjectInvalid
+	}
+
+	detail, err := uc.Detail(ctx, projectID)
+	if err != nil {
+		uc.l.Warnf(ctx, "crisis.usecase.RuntimeConfig.Detail: project_id=%s err=%v", projectID, err)
+		return crisis.RuntimeConfigOutput{}, err
+	}
+
+	p := projectDetail.Project
+	return crisis.RuntimeConfigOutput{
+		ProjectID:    projectID,
+		ProjectName:  p.Name,
+		CampaignID:   p.CampaignID,
+		OwnerUserID:  p.CreatedBy,
+		CrisisConfig: detail.CrisisConfig,
+	}, nil
 }
 
 // Delete removes a crisis config by project ID.
@@ -104,13 +134,16 @@ func (uc *implUseCase) ApplyRuntime(ctx context.Context, input crisis.ApplyRunti
 		return crisis.ApplyRuntimeOutput{}, err
 	}
 
-	status := detail.CrisisConfig.Status
+	level := model.CrisisRuntimeLevel(detail.CrisisConfig.Status)
 	if input.Status != nil {
-		status = *input.Status
+		level = model.CrisisRuntimeLevel(*input.Status)
 	}
-	normalizedStatus, err := uc.normalizeStatus(status)
+	if input.CrisisLevel != nil {
+		level = *input.CrisisLevel
+	}
+	normalizedLevel, err := uc.normalizeRuntimeLevel(level)
 	if err != nil {
-		uc.l.Warnf(ctx, "crisis.usecase.ApplyRuntime: invalid status=%s", status)
+		uc.l.Warnf(ctx, "crisis.usecase.ApplyRuntime: invalid level=%s", level)
 		return crisis.ApplyRuntimeOutput{}, crisis.ErrInvalidStatus
 	}
 
@@ -119,10 +152,10 @@ func (uc *implUseCase) ApplyRuntime(ctx context.Context, input crisis.ApplyRunti
 		return crisis.ApplyRuntimeOutput{}, crisis.ErrApplyFailed
 	}
 
-	crawlMode := uc.mapStatusToCrawlMode(normalizedStatus)
+	crawlMode := uc.mapLevelToCrawlMode(normalizedLevel, detail.CrisisConfig.ResponsePolicy)
 	reason := strings.TrimSpace(input.Reason)
 	if reason == "" {
-		reason = fmt.Sprintf("crisis runtime apply status=%s", normalizedStatus)
+		reason = fmt.Sprintf("crisis runtime apply level=%s", normalizedLevel)
 	}
 
 	ingestOut, err := uc.ingest.UpdateProjectCrawlMode(ctx, microservice.UpdateProjectCrawlModeInput{
@@ -143,27 +176,69 @@ func (uc *implUseCase) ApplyRuntime(ctx context.Context, input crisis.ApplyRunti
 
 	return crisis.ApplyRuntimeOutput{
 		ProjectID:               projectID,
-		CrisisStatus:            normalizedStatus,
+		CrisisStatus:            uc.mapLevelToStatus(normalizedLevel),
+		CrisisLevel:             normalizedLevel,
 		AppliedCrawlMode:        crawlMode,
 		AffectedDataSourceCount: ingestOut.AffectedDataSourceCount,
+		NoopReason:              ingestOut.NoopReason,
 	}, nil
 }
 
 func (uc *implUseCase) normalizeStatus(status model.CrisisStatus) (model.CrisisStatus, error) {
 	s := model.CrisisStatus(strings.ToUpper(strings.TrimSpace(string(status))))
 	switch s {
-	case model.CrisisStatusNormal, model.CrisisStatusWarning, model.CrisisStatusCritical:
+	case model.CrisisStatusNormal, model.CrisisStatusWatch, model.CrisisStatusWarning, model.CrisisStatusCritical:
 		return s, nil
 	default:
 		return "", crisis.ErrInvalidStatus
 	}
 }
 
-func (uc *implUseCase) mapStatusToCrawlMode(status model.CrisisStatus) string {
-	switch status {
-	case model.CrisisStatusWarning, model.CrisisStatusCritical:
-		return "CRISIS"
+func (uc *implUseCase) normalizeRuntimeLevel(level model.CrisisRuntimeLevel) (model.CrisisRuntimeLevel, error) {
+	l := model.CrisisRuntimeLevel(strings.ToUpper(strings.TrimSpace(string(level))))
+	switch l {
+	case model.CrisisRuntimeLevelNone, model.CrisisRuntimeLevelNormal, model.CrisisRuntimeLevelWatch, model.CrisisRuntimeLevelWarning, model.CrisisRuntimeLevelCritical:
+		return l, nil
 	default:
+		return "", crisis.ErrInvalidStatus
+	}
+}
+
+func (uc *implUseCase) mapLevelToStatus(level model.CrisisRuntimeLevel) model.CrisisStatus {
+	switch level {
+	case model.CrisisRuntimeLevelWatch:
+		return model.CrisisStatusWatch
+	case model.CrisisRuntimeLevelWarning:
+		return model.CrisisStatusWarning
+	case model.CrisisRuntimeLevelCritical:
+		return model.CrisisStatusCritical
+	default:
+		return model.CrisisStatusNormal
+	}
+}
+
+func (uc *implUseCase) mapLevelToCrawlMode(level model.CrisisRuntimeLevel, policy model.CrisisResponsePolicy) string {
+	policy = policy.WithDefaults()
+	if !policy.AdaptiveCrawl.Enabled {
 		return "NORMAL"
+	}
+	if crisisLevelRank(level) >= crisisLevelRank(model.CrisisRuntimeLevel(policy.AdaptiveCrawl.TriggerLevel)) {
+		return "CRISIS"
+	}
+	return "NORMAL"
+}
+
+func crisisLevelRank(level model.CrisisRuntimeLevel) int {
+	switch model.CrisisRuntimeLevel(strings.ToUpper(strings.TrimSpace(string(level)))) {
+	case model.CrisisRuntimeLevelCritical:
+		return 4
+	case model.CrisisRuntimeLevelWarning:
+		return 3
+	case model.CrisisRuntimeLevelWatch:
+		return 2
+	case model.CrisisRuntimeLevelNormal:
+		return 1
+	default:
+		return 0
 	}
 }

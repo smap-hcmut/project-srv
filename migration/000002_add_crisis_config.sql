@@ -1,12 +1,12 @@
 -- Create ENUM for Crisis Status
-CREATE TYPE project.crisis_status AS ENUM ('NORMAL', 'WARNING', 'CRITICAL');
+CREATE TYPE project.crisis_status AS ENUM ('NORMAL', 'WATCH', 'WARNING', 'CRITICAL');
 
 -- project_crisis_config table
 -- Stores crisis detection rules for each project
 CREATE TABLE IF NOT EXISTS project.projects_crisis_config (
     project_id UUID PRIMARY KEY REFERENCES project.projects(id) ON DELETE CASCADE,
     
-    -- Crisis Status: NORMAL, WARNING, CRITICAL
+    -- Crisis Status: NORMAL, WATCH, WARNING, CRITICAL
     status project.crisis_status DEFAULT 'NORMAL',
     
     -- Keyword Rules (JSONB)
@@ -24,6 +24,22 @@ CREATE TABLE IF NOT EXISTS project.projects_crisis_config (
     -- Influencer Rules (JSONB)
     -- { "min_followers": 50000, "viral_share_count": 1000 }
     influencer_rules JSONB,
+
+    -- Response policy (JSONB)
+    -- Controls adaptive crawling and user notification thresholds independently.
+    response_policy JSONB DEFAULT '{
+      "adaptive_crawl": {
+        "enabled": true,
+        "trigger_level": "WATCH",
+        "cooldown_minutes": 30
+      },
+      "notification": {
+        "enabled": true,
+        "trigger_level": "WARNING",
+        "repeat_cooldown_minutes": 60,
+        "ops_alert_on_critical": true
+      }
+    }'::jsonb,
 
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

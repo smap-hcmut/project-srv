@@ -68,13 +68,32 @@ type influencerTriggerReq struct {
 	Rules   []influencerRuleReq `json:"rules"`                             // Influencer rules
 }
 
+type adaptiveCrawlPolicyReq struct {
+	Enabled         bool   `json:"enabled" example:"true"`
+	TriggerLevel    string `json:"trigger_level" example:"WATCH" enums:"WATCH,WARNING,CRITICAL"`
+	CooldownMinutes int    `json:"cooldown_minutes" example:"30"`
+}
+
+type notificationPolicyReq struct {
+	Enabled               bool   `json:"enabled" example:"true"`
+	TriggerLevel          string `json:"trigger_level" example:"WARNING" enums:"WARNING,CRITICAL"`
+	RepeatCooldownMinutes int    `json:"repeat_cooldown_minutes" example:"60"`
+	OpsAlertOnCritical    bool   `json:"ops_alert_on_critical" example:"true"`
+}
+
+type responsePolicyReq struct {
+	AdaptiveCrawl adaptiveCrawlPolicyReq `json:"adaptive_crawl"`
+	Notification  notificationPolicyReq  `json:"notification"`
+}
+
 // upsertReq represents crisis config create/update request
 type upsertReq struct {
-	Status            string                `json:"status,omitempty" example:"WARNING" enums:"NORMAL,WARNING,CRITICAL"`
+	Status            string                `json:"status,omitempty" example:"WARNING" enums:"NORMAL,WATCH,WARNING,CRITICAL"`
 	KeywordsTrigger   *keywordsTriggerReq   `json:"keywords_trigger,omitempty"`   // Keyword-based trigger (optional)
 	VolumeTrigger     *volumeTriggerReq     `json:"volume_trigger,omitempty"`     // Volume-based trigger (optional)
 	SentimentTrigger  *sentimentTriggerReq  `json:"sentiment_trigger,omitempty"`  // Sentiment-based trigger (optional)
 	InfluencerTrigger *influencerTriggerReq `json:"influencer_trigger,omitempty"` // Influencer-based trigger (optional)
+	ResponsePolicy    *responsePolicyReq    `json:"response_policy,omitempty"`    // Runtime response policy
 }
 
 func (r upsertReq) validate() error {
@@ -132,6 +151,15 @@ func (r upsertReq) validate() error {
 			if rule.Type == "" {
 				return errInvalidInfluencerRule
 			}
+		}
+	}
+
+	if r.ResponsePolicy != nil {
+		if strings.TrimSpace(r.ResponsePolicy.AdaptiveCrawl.TriggerLevel) != "" && !isValidRuntimeLevel(r.ResponsePolicy.AdaptiveCrawl.TriggerLevel) {
+			return errInvalidCrisisStatus
+		}
+		if strings.TrimSpace(r.ResponsePolicy.Notification.TriggerLevel) != "" && !isValidRuntimeLevel(r.ResponsePolicy.Notification.TriggerLevel) {
+			return errInvalidCrisisStatus
 		}
 	}
 
@@ -215,20 +243,38 @@ func (r upsertReq) toInput(projectID string) crisis.UpsertInput {
 		}
 	}
 
+	if r.ResponsePolicy != nil {
+		policy := model.CrisisResponsePolicy{
+			AdaptiveCrawl: model.AdaptiveCrawlPolicy{
+				Enabled:         r.ResponsePolicy.AdaptiveCrawl.Enabled,
+				TriggerLevel:    canonicalCrisisStatus(r.ResponsePolicy.AdaptiveCrawl.TriggerLevel),
+				CooldownMinutes: r.ResponsePolicy.AdaptiveCrawl.CooldownMinutes,
+			},
+			Notification: model.NotificationPolicy{
+				Enabled:               r.ResponsePolicy.Notification.Enabled,
+				TriggerLevel:          canonicalCrisisStatus(r.ResponsePolicy.Notification.TriggerLevel),
+				RepeatCooldownMinutes: r.ResponsePolicy.Notification.RepeatCooldownMinutes,
+				OpsAlertOnCritical:    r.ResponsePolicy.Notification.OpsAlertOnCritical,
+			},
+		}.WithDefaults()
+		input.ResponsePolicy = &policy
+	}
+
 	return input
 }
 
 type applyRuntimeReq struct {
-	Status   string `json:"status,omitempty" example:"CRITICAL" enums:"NORMAL,WARNING,CRITICAL"`
-	Reason   string `json:"reason,omitempty" example:"apply runtime from crisis pipeline"`
-	EventRef string `json:"event_ref,omitempty" example:"incident-20260506-001"`
+	Status      string `json:"status,omitempty" example:"CRITICAL" enums:"NORMAL,WATCH,WARNING,CRITICAL"`
+	CrisisLevel string `json:"crisis_level,omitempty" example:"WATCH" enums:"NONE,NORMAL,WATCH,WARNING,CRITICAL"`
+	Reason      string `json:"reason,omitempty" example:"apply runtime from crisis pipeline"`
+	EventRef    string `json:"event_ref,omitempty" example:"incident-20260506-001"`
 }
 
 func (r applyRuntimeReq) validate() error {
-	if strings.TrimSpace(r.Status) == "" {
-		return nil
+	if strings.TrimSpace(r.Status) != "" && !isValidCrisisStatus(r.Status) {
+		return errInvalidCrisisStatus
 	}
-	if !isValidCrisisStatus(r.Status) {
+	if strings.TrimSpace(r.CrisisLevel) != "" && !isValidRuntimeLevel(r.CrisisLevel) {
 		return errInvalidCrisisStatus
 	}
 	return nil
@@ -244,12 +290,25 @@ func (r applyRuntimeReq) toInput(projectID string) crisis.ApplyRuntimeInput {
 		status := model.CrisisStatus(canonicalCrisisStatus(r.Status))
 		input.Status = &status
 	}
+	if strings.TrimSpace(r.CrisisLevel) != "" {
+		level := model.CrisisRuntimeLevel(canonicalCrisisStatus(r.CrisisLevel))
+		input.CrisisLevel = &level
+	}
 	return input
 }
 
 func isValidCrisisStatus(status string) bool {
 	switch model.CrisisStatus(canonicalCrisisStatus(status)) {
-	case model.CrisisStatusNormal, model.CrisisStatusWarning, model.CrisisStatusCritical:
+	case model.CrisisStatusNormal, model.CrisisStatusWatch, model.CrisisStatusWarning, model.CrisisStatusCritical:
+		return true
+	default:
+		return false
+	}
+}
+
+func isValidRuntimeLevel(level string) bool {
+	switch model.CrisisRuntimeLevel(canonicalCrisisStatus(level)) {
+	case model.CrisisRuntimeLevelNone, model.CrisisRuntimeLevelNormal, model.CrisisRuntimeLevelWatch, model.CrisisRuntimeLevelWarning, model.CrisisRuntimeLevelCritical:
 		return true
 	default:
 		return false
@@ -322,16 +381,35 @@ type influencerTriggerResp struct {
 	Rules   []influencerRuleResp `json:"rules"`
 }
 
+type adaptiveCrawlPolicyResp struct {
+	Enabled         bool   `json:"enabled" example:"true"`
+	TriggerLevel    string `json:"trigger_level" example:"WATCH"`
+	CooldownMinutes int    `json:"cooldown_minutes" example:"30"`
+}
+
+type notificationPolicyResp struct {
+	Enabled               bool   `json:"enabled" example:"true"`
+	TriggerLevel          string `json:"trigger_level" example:"WARNING"`
+	RepeatCooldownMinutes int    `json:"repeat_cooldown_minutes" example:"60"`
+	OpsAlertOnCritical    bool   `json:"ops_alert_on_critical" example:"true"`
+}
+
+type responsePolicyResp struct {
+	AdaptiveCrawl adaptiveCrawlPolicyResp `json:"adaptive_crawl"`
+	Notification  notificationPolicyResp  `json:"notification"`
+}
+
 // crisisConfigResp represents complete crisis config in API responses
 type crisisConfigResp struct {
-	ProjectID         string                `json:"project_id" example:"550e8400-e29b-41d4-a716-446655440002"`  // Project UUID
-	Status            string                `json:"status" example:"ACTIVE" enums:"ACTIVE,INACTIVE,MONITORING"` // Config status
-	KeywordsTrigger   keywordsTriggerResp   `json:"keywords_trigger"`                                           // Keywords trigger config
-	VolumeTrigger     volumeTriggerResp     `json:"volume_trigger"`                                             // Volume trigger config
-	SentimentTrigger  sentimentTriggerResp  `json:"sentiment_trigger"`                                          // Sentiment trigger config
-	InfluencerTrigger influencerTriggerResp `json:"influencer_trigger"`                                         // Influencer trigger config
-	CreatedAt         string                `json:"created_at" example:"2026-02-18T00:00:00Z"`                  // Creation timestamp
-	UpdatedAt         string                `json:"updated_at" example:"2026-02-18T00:00:00Z"`                  // Last update timestamp
+	ProjectID         string                `json:"project_id" example:"550e8400-e29b-41d4-a716-446655440002"` // Project UUID
+	Status            string                `json:"status" example:"NORMAL" enums:"NORMAL,WATCH,WARNING,CRITICAL"`
+	KeywordsTrigger   keywordsTriggerResp   `json:"keywords_trigger"`   // Keywords trigger config
+	VolumeTrigger     volumeTriggerResp     `json:"volume_trigger"`     // Volume trigger config
+	SentimentTrigger  sentimentTriggerResp  `json:"sentiment_trigger"`  // Sentiment trigger config
+	InfluencerTrigger influencerTriggerResp `json:"influencer_trigger"` // Influencer trigger config
+	ResponsePolicy    responsePolicyResp    `json:"response_policy"`    // Runtime response policy
+	CreatedAt         string                `json:"created_at" example:"2026-02-18T00:00:00Z"`
+	UpdatedAt         string                `json:"updated_at" example:"2026-02-18T00:00:00Z"`
 }
 
 // upsertResp wraps crisis config upsert response
@@ -344,11 +422,21 @@ type detailResp struct {
 	CrisisConfig crisisConfigResp `json:"crisis_config"` // Crisis config details
 }
 
+type runtimeConfigResp struct {
+	ProjectID    string           `json:"project_id"`
+	ProjectName  string           `json:"project_name"`
+	CampaignID   string           `json:"campaign_id"`
+	OwnerUserID  string           `json:"owner_user_id"`
+	CrisisConfig crisisConfigResp `json:"crisis_config"`
+}
+
 type applyRuntimeResp struct {
 	ProjectID               string `json:"project_id" example:"550e8400-e29b-41d4-a716-446655440002"`
-	CrisisStatus            string `json:"crisis_status" example:"CRITICAL" enums:"NORMAL,WARNING,CRITICAL"`
+	CrisisStatus            string `json:"crisis_status" example:"CRITICAL" enums:"NORMAL,WATCH,WARNING,CRITICAL"`
+	CrisisLevel             string `json:"crisis_level" example:"WATCH" enums:"NONE,NORMAL,WATCH,WARNING,CRITICAL"`
 	AppliedCrawlMode        string `json:"applied_crawl_mode" example:"CRISIS" enums:"SLEEP,NORMAL,CRISIS"`
 	AffectedDataSourceCount int    `json:"affected_datasource_count" example:"3"`
+	NoopReason              string `json:"noop_reason,omitempty" example:"already target mode or no eligible crawl datasource"`
 }
 
 // --- Response Mappers (receiver on handler) ---
@@ -365,12 +453,24 @@ func (h *handler) newDetailResp(o crisis.DetailOutput) detailResp {
 	}
 }
 
+func (h *handler) newRuntimeConfigResp(o crisis.RuntimeConfigOutput) runtimeConfigResp {
+	return runtimeConfigResp{
+		ProjectID:    o.ProjectID,
+		ProjectName:  o.ProjectName,
+		CampaignID:   o.CampaignID,
+		OwnerUserID:  o.OwnerUserID,
+		CrisisConfig: toCrisisConfigResp(o.CrisisConfig),
+	}
+}
+
 func (h *handler) newApplyRuntimeResp(o crisis.ApplyRuntimeOutput) applyRuntimeResp {
 	return applyRuntimeResp{
 		ProjectID:               o.ProjectID,
 		CrisisStatus:            string(o.CrisisStatus),
+		CrisisLevel:             string(o.CrisisLevel),
 		AppliedCrawlMode:        o.AppliedCrawlMode,
 		AffectedDataSourceCount: o.AffectedDataSourceCount,
+		NoopReason:              o.NoopReason,
 	}
 }
 
@@ -443,6 +543,19 @@ func toCrisisConfigResp(c model.CrisisConfig) crisisConfigResp {
 			Enabled: c.InfluencerTrigger.Enabled,
 			Logic:   c.InfluencerTrigger.Logic,
 			Rules:   infRules,
+		},
+		ResponsePolicy: responsePolicyResp{
+			AdaptiveCrawl: adaptiveCrawlPolicyResp{
+				Enabled:         c.ResponsePolicy.WithDefaults().AdaptiveCrawl.Enabled,
+				TriggerLevel:    c.ResponsePolicy.WithDefaults().AdaptiveCrawl.TriggerLevel,
+				CooldownMinutes: c.ResponsePolicy.WithDefaults().AdaptiveCrawl.CooldownMinutes,
+			},
+			Notification: notificationPolicyResp{
+				Enabled:               c.ResponsePolicy.WithDefaults().Notification.Enabled,
+				TriggerLevel:          c.ResponsePolicy.WithDefaults().Notification.TriggerLevel,
+				RepeatCooldownMinutes: c.ResponsePolicy.WithDefaults().Notification.RepeatCooldownMinutes,
+				OpsAlertOnCritical:    c.ResponsePolicy.WithDefaults().Notification.OpsAlertOnCritical,
+			},
 		},
 		CreatedAt: c.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt: c.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),

@@ -35,4 +35,5 @@ type UpdateProjectCrawlModeInput struct {
 type UpdateProjectCrawlModeOutput struct {
 	ProjectID               string
 	AffectedDataSourceCount int
+	NoopReason              string
 }

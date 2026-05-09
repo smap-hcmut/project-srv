@@ -134,6 +134,7 @@ func (uc *implUseCase) UpdateProjectCrawlMode(ctx context.Context, input microse
 	out := microservice.UpdateProjectCrawlModeOutput{
 		ProjectID:               strings.TrimSpace(dto.ProjectID),
 		AffectedDataSourceCount: dto.AffectedDataSourceCount,
+		NoopReason:              strings.TrimSpace(dto.NoopReason),
 	}
 	if out.ProjectID == "" {
 		out.ProjectID = projectID

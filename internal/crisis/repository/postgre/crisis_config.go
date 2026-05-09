@@ -56,6 +56,12 @@ func (r *implRepository) create(ctx context.Context, opt repository.UpsertOption
 		b, _ := json.Marshal(opt.InfluencerTrigger)
 		row.InfluencerRules = null.JSONFrom(b)
 	}
+	policy := model.DefaultCrisisResponsePolicy()
+	if opt.ResponsePolicy != nil {
+		policy = opt.ResponsePolicy.WithDefaults()
+	}
+	b, _ := json.Marshal(policy)
+	row.ResponsePolicy = null.JSONFrom(b)
 
 	row.CreatedAt = null.TimeFrom(time.Now())
 	row.UpdatedAt = null.TimeFrom(time.Now())
@@ -88,6 +94,11 @@ func (r *implRepository) update(ctx context.Context, row *sqlboiler.ProjectsCris
 	if opt.InfluencerTrigger != nil {
 		b, _ := json.Marshal(opt.InfluencerTrigger)
 		row.InfluencerRules = null.JSONFrom(b)
+	}
+	if opt.ResponsePolicy != nil {
+		policy := opt.ResponsePolicy.WithDefaults()
+		b, _ := json.Marshal(policy)
+		row.ResponsePolicy = null.JSONFrom(b)
 	}
 
 	row.UpdatedAt = null.TimeFrom(time.Now())

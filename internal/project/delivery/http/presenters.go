@@ -227,19 +227,20 @@ func (r favoriteListReq) toInput() project.ListInput {
 // --- Response DTOs ---
 
 type projectResp struct {
-	ID             string `json:"id" example:"550e8400-e29b-41d4-a716-446655440002"`
-	CampaignID     string `json:"campaign_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Name           string `json:"name" example:"VinFast VF8 Monitoring"`
-	Description    string `json:"description,omitempty" example:"Monitor discussions about VF8 electric SUV"`
-	Brand          string `json:"brand,omitempty" example:"VinFast"`
-	EntityType     string `json:"entity_type" example:"product" enums:"product,campaign,service,competitor,topic"`
-	EntityName     string `json:"entity_name" example:"VF8"`
-	DomainTypeCode string `json:"domain_type_code" example:"ev"`
-	Status         string `json:"status" example:"PENDING" enums:"PENDING,ACTIVE,PAUSED,ARCHIVED"`
-	IsFavorite     bool   `json:"is_favorite" example:"false"`
-	CreatedBy      string `json:"created_by" example:"550e8400-e29b-41d4-a716-446655440001"`
-	CreatedAt      string `json:"created_at" example:"2026-02-18T00:00:00Z"`
-	UpdatedAt      string `json:"updated_at" example:"2026-02-18T00:00:00Z"`
+	ID             string              `json:"id" example:"550e8400-e29b-41d4-a716-446655440002"`
+	CampaignID     string              `json:"campaign_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Name           string              `json:"name" example:"VinFast VF8 Monitoring"`
+	Description    string              `json:"description,omitempty" example:"Monitor discussions about VF8 electric SUV"`
+	Brand          string              `json:"brand,omitempty" example:"VinFast"`
+	EntityType     string              `json:"entity_type" example:"product" enums:"product,campaign,service,competitor,topic"`
+	EntityName     string              `json:"entity_name" example:"VF8"`
+	DomainTypeCode string              `json:"domain_type_code" example:"ev"`
+	Status         string              `json:"status" example:"PENDING" enums:"PENDING,ACTIVE,PAUSED,ARCHIVED"`
+	IsFavorite     bool                `json:"is_favorite" example:"false"`
+	CreatedBy      string              `json:"created_by" example:"550e8400-e29b-41d4-a716-446655440001"`
+	CreatedAt      string              `json:"created_at" example:"2026-02-18T00:00:00Z"`
+	UpdatedAt      string              `json:"updated_at" example:"2026-02-18T00:00:00Z"`
+	CrisisConfig   *model.CrisisConfig `json:"crisis_config,omitempty"`
 }
 
 type createResp struct {
@@ -353,6 +354,9 @@ func (h *handler) toProjectResp(p model.Project) projectResp {
 	}
 	if p.Brand != "" {
 		resp.Brand = p.Brand
+	}
+	if p.CrisisConfig != nil {
+		resp.CrisisConfig = p.CrisisConfig
 	}
 
 	return resp

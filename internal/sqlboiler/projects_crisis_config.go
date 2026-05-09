@@ -30,6 +30,7 @@ type ProjectsCrisisConfig struct {
 	VolumeRules     null.JSON        `boil:"volume_rules" json:"volume_rules,omitempty" toml:"volume_rules" yaml:"volume_rules,omitempty"`
 	SentimentRules  null.JSON        `boil:"sentiment_rules" json:"sentiment_rules,omitempty" toml:"sentiment_rules" yaml:"sentiment_rules,omitempty"`
 	InfluencerRules null.JSON        `boil:"influencer_rules" json:"influencer_rules,omitempty" toml:"influencer_rules" yaml:"influencer_rules,omitempty"`
+	ResponsePolicy  null.JSON        `boil:"response_policy" json:"response_policy,omitempty" toml:"response_policy" yaml:"response_policy,omitempty"`
 	CreatedAt       null.Time        `boil:"created_at" json:"created_at,omitempty" toml:"created_at" yaml:"created_at,omitempty"`
 	UpdatedAt       null.Time        `boil:"updated_at" json:"updated_at,omitempty" toml:"updated_at" yaml:"updated_at,omitempty"`
 
@@ -44,6 +45,7 @@ var ProjectsCrisisConfigColumns = struct {
 	VolumeRules     string
 	SentimentRules  string
 	InfluencerRules string
+	ResponsePolicy  string
 	CreatedAt       string
 	UpdatedAt       string
 }{
@@ -53,6 +55,7 @@ var ProjectsCrisisConfigColumns = struct {
 	VolumeRules:     "volume_rules",
 	SentimentRules:  "sentiment_rules",
 	InfluencerRules: "influencer_rules",
+	ResponsePolicy:  "response_policy",
 	CreatedAt:       "created_at",
 	UpdatedAt:       "updated_at",
 }
@@ -64,6 +67,7 @@ var ProjectsCrisisConfigTableColumns = struct {
 	VolumeRules     string
 	SentimentRules  string
 	InfluencerRules string
+	ResponsePolicy  string
 	CreatedAt       string
 	UpdatedAt       string
 }{
@@ -73,6 +77,7 @@ var ProjectsCrisisConfigTableColumns = struct {
 	VolumeRules:     "projects_crisis_config.volume_rules",
 	SentimentRules:  "projects_crisis_config.sentiment_rules",
 	InfluencerRules: "projects_crisis_config.influencer_rules",
+	ResponsePolicy:  "projects_crisis_config.response_policy",
 	CreatedAt:       "projects_crisis_config.created_at",
 	UpdatedAt:       "projects_crisis_config.updated_at",
 }
@@ -148,6 +153,7 @@ var ProjectsCrisisConfigWhere = struct {
 	VolumeRules     whereHelpernull_JSON
 	SentimentRules  whereHelpernull_JSON
 	InfluencerRules whereHelpernull_JSON
+	ResponsePolicy  whereHelpernull_JSON
 	CreatedAt       whereHelpernull_Time
 	UpdatedAt       whereHelpernull_Time
 }{
@@ -157,6 +163,7 @@ var ProjectsCrisisConfigWhere = struct {
 	VolumeRules:     whereHelpernull_JSON{field: "\"project\".\"projects_crisis_config\".\"volume_rules\""},
 	SentimentRules:  whereHelpernull_JSON{field: "\"project\".\"projects_crisis_config\".\"sentiment_rules\""},
 	InfluencerRules: whereHelpernull_JSON{field: "\"project\".\"projects_crisis_config\".\"influencer_rules\""},
+	ResponsePolicy:  whereHelpernull_JSON{field: "\"project\".\"projects_crisis_config\".\"response_policy\""},
 	CreatedAt:       whereHelpernull_Time{field: "\"project\".\"projects_crisis_config\".\"created_at\""},
 	UpdatedAt:       whereHelpernull_Time{field: "\"project\".\"projects_crisis_config\".\"updated_at\""},
 }
@@ -198,9 +205,9 @@ func (r *projectsCrisisConfigR) GetProject() *Project {
 type projectsCrisisConfigL struct{}
 
 var (
-	projectsCrisisConfigAllColumns            = []string{"project_id", "status", "keywords_rules", "volume_rules", "sentiment_rules", "influencer_rules", "created_at", "updated_at"}
+	projectsCrisisConfigAllColumns            = []string{"project_id", "status", "keywords_rules", "volume_rules", "sentiment_rules", "influencer_rules", "response_policy", "created_at", "updated_at"}
 	projectsCrisisConfigColumnsWithoutDefault = []string{"project_id"}
-	projectsCrisisConfigColumnsWithDefault    = []string{"status", "keywords_rules", "volume_rules", "sentiment_rules", "influencer_rules", "created_at", "updated_at"}
+	projectsCrisisConfigColumnsWithDefault    = []string{"status", "keywords_rules", "volume_rules", "sentiment_rules", "influencer_rules", "response_policy", "created_at", "updated_at"}
 	projectsCrisisConfigPrimaryKeyColumns     = []string{"project_id"}
 	projectsCrisisConfigGeneratedColumns      = []string{}
 )

@@ -51,7 +51,7 @@ COPY --link --from=builder /usr/share/zoneinfo/Asia/Ho_Chi_Minh /usr/share/zonei
 COPY --link --from=builder /usr/share/zoneinfo/UTC /usr/share/zoneinfo/UTC
 ENV TZ=Asia/Ho_Chi_Minh
 
-COPY --link --from=builder --chown=nonroot:nonroot /app/project-srv .
+COPY --link --from=builder --chown=65532:65532 /app/project-srv .
 
 USER nonroot:nonroot
 

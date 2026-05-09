@@ -385,6 +385,7 @@ type CrisisStatus string
 // Enum values for CrisisStatus
 const (
 	CrisisStatusNORMAL   CrisisStatus = "NORMAL"
+	CrisisStatusWATCH    CrisisStatus = "WATCH"
 	CrisisStatusWARNING  CrisisStatus = "WARNING"
 	CrisisStatusCRITICAL CrisisStatus = "CRITICAL"
 )
@@ -392,6 +393,7 @@ const (
 func AllCrisisStatus() []CrisisStatus {
 	return []CrisisStatus{
 		CrisisStatusNORMAL,
+		CrisisStatusWATCH,
 		CrisisStatusWARNING,
 		CrisisStatusCRITICAL,
 	}
@@ -399,7 +401,7 @@ func AllCrisisStatus() []CrisisStatus {
 
 func (e CrisisStatus) IsValid() error {
 	switch e {
-	case CrisisStatusNORMAL, CrisisStatusWARNING, CrisisStatusCRITICAL:
+	case CrisisStatusNORMAL, CrisisStatusWATCH, CrisisStatusWARNING, CrisisStatusCRITICAL:
 		return nil
 	default:
 		return errors.New("enum is not valid")
@@ -414,10 +416,12 @@ func (e CrisisStatus) Ordinal() int {
 	switch e {
 	case CrisisStatusNORMAL:
 		return 0
-	case CrisisStatusWARNING:
+	case CrisisStatusWATCH:
 		return 1
-	case CrisisStatusCRITICAL:
+	case CrisisStatusWARNING:
 		return 2
+	case CrisisStatusCRITICAL:
+		return 3
 
 	default:
 		panic(errors.New("enum is not valid"))

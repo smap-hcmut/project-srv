@@ -12,8 +12,20 @@ type CrisisStatus string
 
 const (
 	CrisisStatusNormal   CrisisStatus = "NORMAL"
+	CrisisStatusWatch    CrisisStatus = "WATCH"
 	CrisisStatusWarning  CrisisStatus = "WARNING"
 	CrisisStatusCritical CrisisStatus = "CRITICAL"
+)
+
+// CrisisRuntimeLevel includes the transient NONE level used by analysis runtime.
+type CrisisRuntimeLevel string
+
+const (
+	CrisisRuntimeLevelNone     CrisisRuntimeLevel = "NONE"
+	CrisisRuntimeLevelNormal   CrisisRuntimeLevel = "NORMAL"
+	CrisisRuntimeLevelWatch    CrisisRuntimeLevel = "WATCH"
+	CrisisRuntimeLevelWarning  CrisisRuntimeLevel = "WARNING"
+	CrisisRuntimeLevelCritical CrisisRuntimeLevel = "CRITICAL"
 )
 
 // --- Keywords Trigger ---
@@ -84,18 +96,75 @@ type InfluencerTrigger struct {
 	Rules   []InfluencerRule `json:"rules"`
 }
 
+// --- Response Policy ---
+
+type AdaptiveCrawlPolicy struct {
+	Enabled         bool   `json:"enabled"`
+	TriggerLevel    string `json:"trigger_level"`    // "WATCH" | "WARNING" | "CRITICAL"
+	CooldownMinutes int    `json:"cooldown_minutes"` // minimum time between runtime changes
+}
+
+type NotificationPolicy struct {
+	Enabled               bool   `json:"enabled"`
+	TriggerLevel          string `json:"trigger_level"` // "WARNING" | "CRITICAL"
+	RepeatCooldownMinutes int    `json:"repeat_cooldown_minutes"`
+	OpsAlertOnCritical    bool   `json:"ops_alert_on_critical"`
+}
+
+type CrisisResponsePolicy struct {
+	AdaptiveCrawl AdaptiveCrawlPolicy `json:"adaptive_crawl"`
+	Notification  NotificationPolicy  `json:"notification"`
+}
+
+func DefaultCrisisResponsePolicy() CrisisResponsePolicy {
+	return CrisisResponsePolicy{
+		AdaptiveCrawl: AdaptiveCrawlPolicy{
+			Enabled:         true,
+			TriggerLevel:    string(CrisisRuntimeLevelWatch),
+			CooldownMinutes: 30,
+		},
+		Notification: NotificationPolicy{
+			Enabled:               true,
+			TriggerLevel:          string(CrisisRuntimeLevelWarning),
+			RepeatCooldownMinutes: 60,
+			OpsAlertOnCritical:    true,
+		},
+	}
+}
+
+func (p CrisisResponsePolicy) WithDefaults() CrisisResponsePolicy {
+	defaults := DefaultCrisisResponsePolicy()
+	if p == (CrisisResponsePolicy{}) {
+		return defaults
+	}
+	if p.AdaptiveCrawl.TriggerLevel == "" {
+		p.AdaptiveCrawl.TriggerLevel = defaults.AdaptiveCrawl.TriggerLevel
+	}
+	if p.AdaptiveCrawl.CooldownMinutes <= 0 {
+		p.AdaptiveCrawl.CooldownMinutes = defaults.AdaptiveCrawl.CooldownMinutes
+	}
+	if p.Notification.TriggerLevel == "" {
+		p.Notification.TriggerLevel = defaults.Notification.TriggerLevel
+	}
+	if p.Notification.RepeatCooldownMinutes <= 0 {
+		p.Notification.RepeatCooldownMinutes = defaults.Notification.RepeatCooldownMinutes
+	}
+	return p
+}
+
 // --- Crisis Config ---
 
 // CrisisConfig represents the crisis detection configuration for a project.
 type CrisisConfig struct {
-	ProjectID         string            `json:"project_id"`
-	Status            CrisisStatus      `json:"status"`
-	KeywordsTrigger   KeywordsTrigger   `json:"keywords_trigger"`
-	VolumeTrigger     VolumeTrigger     `json:"volume_trigger"`
-	SentimentTrigger  SentimentTrigger  `json:"sentiment_trigger"`
-	InfluencerTrigger InfluencerTrigger `json:"influencer_trigger"`
-	CreatedAt         time.Time         `json:"created_at"`
-	UpdatedAt         time.Time         `json:"updated_at"`
+	ProjectID         string               `json:"project_id"`
+	Status            CrisisStatus         `json:"status"`
+	KeywordsTrigger   KeywordsTrigger      `json:"keywords_trigger"`
+	VolumeTrigger     VolumeTrigger        `json:"volume_trigger"`
+	SentimentTrigger  SentimentTrigger     `json:"sentiment_trigger"`
+	InfluencerTrigger InfluencerTrigger    `json:"influencer_trigger"`
+	ResponsePolicy    CrisisResponsePolicy `json:"response_policy"`
+	CreatedAt         time.Time            `json:"created_at"`
+	UpdatedAt         time.Time            `json:"updated_at"`
 
 	// Relations
 	Project *Project `json:"project,omitempty"`
@@ -108,8 +177,9 @@ func NewCrisisConfigFromDB(db *sqlboiler.ProjectsCrisisConfig) *CrisisConfig {
 	}
 
 	c := &CrisisConfig{
-		ProjectID: db.ProjectID,
-		Status:    CrisisStatusNormal, // Default
+		ProjectID:      db.ProjectID,
+		Status:         CrisisStatusNormal, // Default
+		ResponsePolicy: DefaultCrisisResponsePolicy(),
 	}
 
 	if db.Status.Valid {
@@ -135,6 +205,10 @@ func NewCrisisConfigFromDB(db *sqlboiler.ProjectsCrisisConfig) *CrisisConfig {
 	}
 	if db.InfluencerRules.Valid {
 		_ = json.Unmarshal(db.InfluencerRules.JSON, &c.InfluencerTrigger)
+	}
+	if db.ResponsePolicy.Valid {
+		_ = json.Unmarshal(db.ResponsePolicy.JSON, &c.ResponsePolicy)
+		c.ResponsePolicy = c.ResponsePolicy.WithDefaults()
 	}
 
 	// Load relation if eagerly loaded

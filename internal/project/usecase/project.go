@@ -69,7 +69,7 @@ func (uc *implUseCase) Create(ctx context.Context, input project.CreateInput) (p
 		uc.l.Errorf(ctx, "project.usecase.Create.repo.Create: %v", err)
 		return project.CreateOutput{}, project.ErrCreateFailed
 	}
-	uc.ensureCrisisConfig(ctx, result.ID, result.DomainTypeCode)
+	result = uc.attachCrisisConfig(ctx, result)
 	result = uc.favoriteProjectForUser(result, userID)
 
 	return project.CreateOutput{Project: result}, nil
@@ -92,7 +92,7 @@ func (uc *implUseCase) Detail(ctx context.Context, id string) (project.DetailOut
 		}
 		return project.DetailOutput{}, project.ErrDetailFailed
 	}
-	uc.ensureCrisisConfig(ctx, result.ID, result.DomainTypeCode)
+	result = uc.attachCrisisConfig(ctx, result)
 	userID, _ := auth.GetUserIDFromContext(ctx)
 	result = uc.favoriteProjectForUser(result, userID)
 
@@ -138,6 +138,7 @@ func (uc *implUseCase) List(ctx context.Context, input project.ListInput) (proje
 		return project.ListOutput{}, project.ErrListFailed
 	}
 	for i := range projects {
+		projects[i] = uc.attachCrisisConfig(ctx, projects[i])
 		projects[i] = uc.favoriteProjectForUser(projects[i], userID)
 	}
 

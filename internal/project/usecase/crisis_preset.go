@@ -23,6 +23,21 @@ func (uc *implUseCase) ensureCrisisConfig(ctx context.Context, projectID, domain
 	}
 }
 
+func (uc *implUseCase) attachCrisisConfig(ctx context.Context, p model.Project) model.Project {
+	if uc.crisisRepo == nil || p.ID == "" {
+		return p
+	}
+
+	uc.ensureCrisisConfig(ctx, p.ID, p.DomainTypeCode)
+	cfg, err := uc.crisisRepo.Detail(ctx, p.ID)
+	if err != nil {
+		uc.l.Warnf(ctx, "project.usecase.attachCrisisConfig.Detail: project_id=%s err=%v", p.ID, err)
+		return p
+	}
+	p.CrisisConfig = &cfg
+	return p
+}
+
 func buildCrisisPreset(projectID, domainTypeCode string) repository.UpsertOptions {
 	switch strings.ToLower(strings.TrimSpace(domainTypeCode)) {
 	case "ahamove":
@@ -89,6 +104,7 @@ func buildDefaultCrisisPreset(projectID string) repository.UpsertOptions {
 			},
 		},
 	}
+	responsePolicy := model.DefaultCrisisResponsePolicy()
 
 	return repository.UpsertOptions{
 		ProjectID:         projectID,
@@ -97,6 +113,7 @@ func buildDefaultCrisisPreset(projectID string) repository.UpsertOptions {
 		VolumeTrigger:     &volume,
 		SentimentTrigger:  &sentiment,
 		InfluencerTrigger: &influencer,
+		ResponsePolicy:    &responsePolicy,
 	}
 }
 

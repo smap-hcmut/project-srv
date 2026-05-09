@@ -18,6 +18,7 @@ func (h *handler) RegisterRoutes(r *gin.RouterGroup, mw *middleware.Middleware) 
 	internalProjects := r.Group("/internal/projects")
 	internalProjects.Use(mw.InternalAuth())
 	{
+		internalProjects.GET("/:project_id/crisis-config", h.RuntimeConfig)
 		internalProjects.POST("/:project_id/crisis-config/apply-runtime", h.ApplyRuntime)
 	}
 }

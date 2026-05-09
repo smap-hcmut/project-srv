@@ -44,4 +44,5 @@ type readinessErrorRespDTO struct {
 type projectCrawlModeRespDTO struct {
 	ProjectID               string `json:"project_id"`
 	AffectedDataSourceCount int    `json:"affected_datasource_count"`
+	NoopReason              string `json:"noop_reason,omitempty"`
 }

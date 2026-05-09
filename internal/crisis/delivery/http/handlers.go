@@ -60,6 +60,29 @@ func (h *handler) Detail(c *gin.Context) {
 	response.OK(c, h.newDetailResp(o))
 }
 
+// @Summary Get internal crisis runtime config
+// @Description Return project crisis config plus routing metadata for analysis runtime
+// @Tags CrisisConfig
+// @Produce json
+// @Param project_id path string true "Project ID"
+// @Success 200 {object} runtimeConfigResp
+// @Failure 400 {object} response.Resp
+// @Failure 500 {object} response.Resp
+// @Router /internal/projects/{project_id}/crisis-config [get]
+func (h *handler) RuntimeConfig(c *gin.Context) {
+	ctx := c.Request.Context()
+	projectID := c.Param("project_id")
+
+	o, err := h.uc.RuntimeConfig(ctx, projectID)
+	if err != nil {
+		h.l.Errorf(ctx, "crisis.delivery.RuntimeConfig.uc.RuntimeConfig: project_id=%s err=%v", projectID, err)
+		response.Error(c, h.mapError(err), h.discord)
+		return
+	}
+
+	response.OK(c, h.newRuntimeConfigResp(o))
+}
+
 // @Summary Delete crisis config
 // @Description Remove crisis detection config for a project
 // @Tags CrisisConfig

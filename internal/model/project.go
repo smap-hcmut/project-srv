@@ -61,7 +61,8 @@ type Project struct {
 	UpdatedAt       time.Time           `json:"updated_at"`
 
 	// Relations
-	Campaign *Campaign `json:"campaign,omitempty"`
+	Campaign     *Campaign     `json:"campaign,omitempty"`
+	CrisisConfig *CrisisConfig `json:"crisis_config,omitempty"`
 }
 
 func IsValidProjectStatus(status string) bool {
