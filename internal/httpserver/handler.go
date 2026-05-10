@@ -12,6 +12,9 @@ import (
 	crisisuc "project-srv/internal/crisis/usecase"
 	"project-srv/internal/domain"
 	"project-srv/internal/model"
+	ontologyhttp "project-srv/internal/ontology/delivery/http"
+	ontologyrepo "project-srv/internal/ontology/repository/redis"
+	ontologyuc "project-srv/internal/ontology/usecase"
 	"project-srv/internal/project"
 	projecthttp "project-srv/internal/project/delivery/http"
 	projectkafkaproducer "project-srv/internal/project/delivery/kafka/producer"
@@ -61,11 +64,17 @@ func (srv HTTPServer) mapHandlers() error {
 	crisisUC := crisisuc.New(srv.l, crisisRepo, projectUC, ingestSrv)
 	crisisHandler := crisishttp.New(srv.l, crisisUC, srv.discord)
 
+	// Project ontology/signal rules module
+	ontologyRepo := ontologyrepo.New(srv.mainRedisClient, srv.l)
+	ontologyUC := ontologyuc.New(srv.l, ontologyRepo, projectUC)
+	ontologyHandler := ontologyhttp.New(srv.l, ontologyUC, srv.discord)
+
 	// Map routes
 	apiV1 := srv.gin.Group(model.APIV1Prefix)
 	campaignHandler.RegisterRoutes(apiV1, mw)
 	projectHandler.RegisterRoutes(apiV1, mw)
 	crisisHandler.RegisterRoutes(apiV1, mw)
+	ontologyHandler.RegisterRoutes(apiV1, mw)
 
 	internalAPI := apiV1.Group("/internal")
 	projectHandler.RegisterInternalRoutes(internalAPI, mw)
