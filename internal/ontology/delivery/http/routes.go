@@ -10,9 +10,9 @@ func (h *handler) RegisterRoutes(r *gin.RouterGroup, mw *middleware.Middleware) 
 	projects.Use(mw.Auth())
 	{
 		projects.GET("/:project_id/ontology-rules", h.Detail)
-		projects.PUT("/:project_id/ontology-rules", h.Upsert)
-		projects.POST("/:project_id/ontology-rules/test", h.Test)
-		projects.DELETE("/:project_id/ontology-rules", h.Delete)
+		projects.PUT("/:project_id/ontology-rules", mw.AdminOnly(), h.Upsert)
+		projects.POST("/:project_id/ontology-rules/test", mw.AdminOnly(), h.Test)
+		projects.DELETE("/:project_id/ontology-rules", mw.AdminOnly(), h.Delete)
 	}
 
 	internalProjects := r.Group("/internal/projects")

@@ -19,7 +19,7 @@ func (h *handler) RegisterRoutes(r *gin.RouterGroup, mw *middleware.Middleware) 
 	campaigns := r.Group("/campaigns")
 	campaigns.Use(mw.Auth())
 	{
-		campaigns.POST("/:id/projects", h.Create)
+		campaigns.POST("/:id/projects", mw.AdminOnly(), h.Create)
 		campaigns.GET("/:id/projects", h.List)
 	}
 
@@ -29,16 +29,16 @@ func (h *handler) RegisterRoutes(r *gin.RouterGroup, mw *middleware.Middleware) 
 	{
 		projects.GET("/favorites", h.ListFavorites)
 		projects.GET("/:project_id", h.Detail)
-		projects.PUT("/:project_id", h.Update)
+		projects.PUT("/:project_id", mw.AdminOnly(), h.Update)
 		projects.POST("/:project_id/favorite", h.Favorite)
 		projects.DELETE("/:project_id/favorite", h.Unfavorite)
 		projects.GET("/:project_id/activation-readiness", h.ActivationReadiness)
-		projects.POST("/:project_id/activate", h.Activate)
-		projects.POST("/:project_id/pause", h.Pause)
-		projects.POST("/:project_id/resume", h.Resume)
-		projects.POST("/:project_id/archive", h.Archive)
-		projects.POST("/:project_id/unarchive", h.Unarchive)
-		projects.DELETE("/:project_id", h.Delete)
+		projects.POST("/:project_id/activate", mw.AdminOnly(), h.Activate)
+		projects.POST("/:project_id/pause", mw.AdminOnly(), h.Pause)
+		projects.POST("/:project_id/resume", mw.AdminOnly(), h.Resume)
+		projects.POST("/:project_id/archive", mw.AdminOnly(), h.Archive)
+		projects.POST("/:project_id/unarchive", mw.AdminOnly(), h.Unarchive)
+		projects.DELETE("/:project_id", mw.AdminOnly(), h.Delete)
 	}
 }
 

@@ -10,9 +10,9 @@ func (h *handler) RegisterRoutes(r *gin.RouterGroup, mw *middleware.Middleware) 
 	projects := r.Group("/projects")
 	projects.Use(mw.Auth())
 	{
-		projects.PUT("/:project_id/crisis-config", h.Upsert)
+		projects.PUT("/:project_id/crisis-config", mw.AdminOnly(), h.Upsert)
 		projects.GET("/:project_id/crisis-config", h.Detail)
-		projects.DELETE("/:project_id/crisis-config", h.Delete)
+		projects.DELETE("/:project_id/crisis-config", mw.AdminOnly(), h.Delete)
 	}
 
 	internalProjects := r.Group("/internal/projects")
