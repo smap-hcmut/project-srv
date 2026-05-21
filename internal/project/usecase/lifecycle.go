@@ -61,10 +61,6 @@ func (uc *implUseCase) Activate(ctx context.Context, id string) (project.Activat
 		return project.ActivateOutput{}, project.ErrUpdateFailed
 	}
 
-	if err := uc.publishLifecycleEvent(ctx, project.ProjectLifecycleEventActivated, updated); err != nil {
-		uc.l.Errorf(ctx, "project.usecase.Activate.publishLifecycleEvent: id=%s event=%s err=%v", updated.ID, project.ProjectLifecycleEventActivated, err)
-	}
-
 	return project.ActivateOutput{Project: updated}, nil
 }
 

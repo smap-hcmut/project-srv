@@ -37,7 +37,11 @@ type KeywordGroup struct {
 	Weight   int      `json:"weight"`
 }
 
-// KeywordsTrigger defines crisis triggers based on keyword matching.
+// KeywordsTrigger stores marketing issue keyword groups for project-level brand risk.
+//
+// [RESERVED] The current analysis crisis scorer does not use this field as a
+// direct CRISIS_ALERT gate. The groups are still saved for issue taxonomy,
+// presets, and future keyword-driven crisis scoring.
 type KeywordsTrigger struct {
 	Enabled bool           `json:"enabled"`
 	Logic   string         `json:"logic"` // "OR" | "AND"
@@ -48,16 +52,20 @@ type KeywordsTrigger struct {
 
 // VolumeRule defines a single volume-based rule at a specific crisis level.
 type VolumeRule struct {
-	Level                  string  `json:"level"` // "WARNING" | "CRITICAL"
+	Level                  string  `json:"level"` // [WIRED] "WARNING" | "CRITICAL"
 	ThresholdPercentGrowth float64 `json:"threshold_percent_growth"`
-	ComparisonWindowHours  int     `json:"comparison_window_hours"`
-	Baseline               string  `json:"baseline"` // e.g. "average_last_7_days"
+	ComparisonWindowHours  int     `json:"comparison_window_hours"` // [RESERVED] kept for future historical baseline scoring
+	Baseline               string  `json:"baseline"`                // [RESERVED] e.g. "average_last_7_days"
 }
 
-// VolumeTrigger defines crisis triggers based on mention volume spikes.
+// VolumeTrigger tunes the runtime issue_pressure crisis signal.
+//
+// [WIRED] rules[].threshold_percent_growth is mapped to issue_pressure
+// thresholds derived from analysis top_issues_report. Metric, comparison
+// window, and baseline are persisted but not consumed by the current scorer.
 type VolumeTrigger struct {
 	Enabled bool         `json:"enabled"`
-	Metric  string       `json:"metric"` // e.g. "mentions_count"
+	Metric  string       `json:"metric"` // [RESERVED] e.g. "mentions_count"
 	Rules   []VolumeRule `json:"rules"`
 }
 
@@ -65,16 +73,20 @@ type VolumeTrigger struct {
 
 // SentimentRule defines a single sentiment-based rule.
 type SentimentRule struct {
-	Type                     string   `json:"type"` // "negative_ratio" | "absa_aspect_alert"
-	ThresholdPercent         float64  `json:"threshold_percent,omitempty"`
-	CriticalAspects          []string `json:"critical_aspects,omitempty"`
-	NegativeThresholdPercent float64  `json:"negative_threshold_percent,omitempty"`
+	Type                     string   `json:"type"`                                 // [WIRED for NEGATIVE_SPIKE] "NEGATIVE_SPIKE" | "ASPECT_NEGATIVE"
+	ThresholdPercent         float64  `json:"threshold_percent,omitempty"`          // [WIRED for NEGATIVE_SPIKE]
+	CriticalAspects          []string `json:"critical_aspects,omitempty"`           // [RESERVED]
+	NegativeThresholdPercent float64  `json:"negative_threshold_percent,omitempty"` // [RESERVED]
 }
 
-// SentimentTrigger defines crisis triggers based on negative sentiment.
+// SentimentTrigger tunes the runtime sentiment_collapse proxy.
+//
+// [WIRED] NEGATIVE_SPIKE.threshold_percent changes the sentiment collapse
+// threshold. MinSampleSize and ASPECT_NEGATIVE fields are reserved until
+// mart-level sentiment/aspect joins are evaluated directly by analysis-srv.
 type SentimentTrigger struct {
 	Enabled       bool            `json:"enabled"`
-	MinSampleSize int             `json:"min_sample_size"`
+	MinSampleSize int             `json:"min_sample_size"` // [RESERVED]
 	Rules         []SentimentRule `json:"rules"`
 }
 
@@ -82,28 +94,36 @@ type SentimentTrigger struct {
 
 // InfluencerRule defines a single influencer-based rule.
 type InfluencerRule struct {
-	Type              string `json:"type"` // "macro_influencer" | "viral_post"
-	MinFollowers      int    `json:"min_followers,omitempty"`
-	RequiredSentiment string `json:"required_sentiment,omitempty"`
-	MinShares         int    `json:"min_shares,omitempty"`
-	MinComments       int    `json:"min_comments,omitempty"`
+	Type              string `json:"type"`                         // [WIRED for VIRAL_NEGATIVE] "HIGH_REACH" | "VIRAL_NEGATIVE"
+	MinFollowers      int    `json:"min_followers,omitempty"`      // [RESERVED]
+	RequiredSentiment string `json:"required_sentiment,omitempty"` // [RESERVED]
+	MinShares         int    `json:"min_shares,omitempty"`         // [RESERVED]
+	MinComments       int    `json:"min_comments,omitempty"`       // [WIRED for VIRAL_NEGATIVE]
 }
 
-// InfluencerTrigger defines crisis triggers based on author influence.
+// InfluencerTrigger tunes the runtime controversy_spike signal.
+//
+// [WIRED] VIRAL_NEGATIVE.min_comments changes controversy thresholds derived
+// from thread_controversy_report. HIGH_REACH, followers, shares, sentiment,
+// and logic are persisted but not consumed by the current scorer.
 type InfluencerTrigger struct {
 	Enabled bool             `json:"enabled"`
-	Logic   string           `json:"logic"` // "OR" | "AND"
+	Logic   string           `json:"logic"` // [RESERVED] "OR" | "AND"
 	Rules   []InfluencerRule `json:"rules"`
 }
 
 // --- Response Policy ---
 
+// AdaptiveCrawlPolicy controls when analysis-srv asks project-srv/ingest-srv
+// to accelerate or normalize crawl mode based on runtime crisis level.
 type AdaptiveCrawlPolicy struct {
 	Enabled         bool   `json:"enabled"`
 	TriggerLevel    string `json:"trigger_level"`    // "WATCH" | "WARNING" | "CRITICAL"
 	CooldownMinutes int    `json:"cooldown_minutes"` // minimum time between runtime changes
 }
 
+// NotificationPolicy controls when crisis assessments become user and ops
+// notifications.
 type NotificationPolicy struct {
 	Enabled               bool   `json:"enabled"`
 	TriggerLevel          string `json:"trigger_level"` // "WARNING" | "CRITICAL"
@@ -111,11 +131,15 @@ type NotificationPolicy struct {
 	OpsAlertOnCritical    bool   `json:"ops_alert_on_critical"`
 }
 
+// CrisisResponsePolicy defines runtime reactions after analysis computes a
+// crisis level for a project.
 type CrisisResponsePolicy struct {
 	AdaptiveCrawl AdaptiveCrawlPolicy `json:"adaptive_crawl"`
 	Notification  NotificationPolicy  `json:"notification"`
 }
 
+// DefaultCrisisResponsePolicy returns the default runtime reaction policy used
+// when a project has not customized adaptive crawling or notifications.
 func DefaultCrisisResponsePolicy() CrisisResponsePolicy {
 	return CrisisResponsePolicy{
 		AdaptiveCrawl: AdaptiveCrawlPolicy{
@@ -132,6 +156,7 @@ func DefaultCrisisResponsePolicy() CrisisResponsePolicy {
 	}
 }
 
+// WithDefaults fills missing response policy fields with runtime-safe defaults.
 func (p CrisisResponsePolicy) WithDefaults() CrisisResponsePolicy {
 	defaults := DefaultCrisisResponsePolicy()
 	if p == (CrisisResponsePolicy{}) {
