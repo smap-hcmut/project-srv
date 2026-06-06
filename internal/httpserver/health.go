@@ -5,6 +5,8 @@ import (
 	"github.com/smap-hcmut/shared-libs/go/response"
 )
 
+const serviceName = "project-srv"
+
 // healthCheck handles health check requests
 // @Summary Health Check
 // @Description Check if the API is healthy
@@ -18,7 +20,7 @@ func (srv HTTPServer) healthCheck(c *gin.Context) {
 		"status":  "healthy",
 		"message": "From Smap API V1 With Love",
 		"version": "1.0.0",
-		"service": "smap-project",
+		"service": serviceName,
 	})
 }
 
@@ -45,7 +47,7 @@ func (srv HTTPServer) readyCheck(c *gin.Context) {
 		"status":   "ready",
 		"message":  "From Smap API V1 With Love",
 		"version":  "1.0.0",
-		"service":  "smap-project",
+		"service":  serviceName,
 		"database": "connected",
 	})
 }
@@ -63,6 +65,6 @@ func (srv HTTPServer) liveCheck(c *gin.Context) {
 		"status":  "alive",
 		"message": "From Smap API V1 With Love",
 		"version": "1.0.0",
-		"service": "smap-project",
+		"service": serviceName,
 	})
 }

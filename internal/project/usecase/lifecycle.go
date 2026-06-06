@@ -20,6 +20,9 @@ func (uc *implUseCase) Activate(ctx context.Context, id string) (project.Activat
 		uc.l.Warnf(ctx, "project.usecase.Activate: id=%s status=%s not eligible", current.ID, current.Status)
 		return project.ActivateOutput{}, project.ErrActivateNotAllowed
 	}
+	if err := uc.ensureParentCampaignActive(ctx, current, "Activate", project.ErrActivateNotAllowed); err != nil {
+		return project.ActivateOutput{}, err
+	}
 
 	readiness, err := uc.GetActivationReadiness(ctx, project.ActivationReadinessInput{
 		ProjectID: current.ID,
@@ -121,6 +124,9 @@ func (uc *implUseCase) Resume(ctx context.Context, id string) (project.ResumeOut
 	if !model.CanResumeProjectStatus(current.Status) {
 		uc.l.Warnf(ctx, "project.usecase.Resume: id=%s status=%s not eligible", current.ID, current.Status)
 		return project.ResumeOutput{}, project.ErrResumeNotAllowed
+	}
+	if err := uc.ensureParentCampaignActive(ctx, current, "Resume", project.ErrResumeNotAllowed); err != nil {
+		return project.ResumeOutput{}, err
 	}
 
 	readiness, err := uc.GetActivationReadiness(ctx, project.ActivationReadinessInput{
@@ -297,4 +303,34 @@ func (uc *implUseCase) GetActivationReadiness(ctx context.Context, input project
 		CanProceed:               readiness.CanProceed,
 		Errors:                   errorsOut,
 	}, nil
+}
+
+func (uc *implUseCase) ensureParentCampaignActive(ctx context.Context, current model.Project, action string, blockedErr error) error {
+	if current.CampaignID == "" {
+		uc.l.Warnf(ctx, "project.usecase.%s: id=%s missing campaign_id", action, current.ID)
+		return blockedErr
+	}
+	if uc.campaignUC == nil {
+		uc.l.Errorf(ctx, "project.usecase.%s: campaign usecase is nil", action)
+		return project.ErrLifecycleManagerFailed
+	}
+
+	out, err := uc.campaignUC.Detail(ctx, current.CampaignID)
+	if err != nil {
+		uc.l.Errorf(ctx, "project.usecase.%s.campaign.Detail: project_id=%s campaign_id=%s err=%v", action, current.ID, current.CampaignID, err)
+		return blockedErr
+	}
+	if out.Campaign.Status != model.CampaignStatusActive {
+		uc.l.Warnf(
+			ctx,
+			"project.usecase.%s: project_id=%s campaign_id=%s campaign_status=%s not active",
+			action,
+			current.ID,
+			current.CampaignID,
+			out.Campaign.Status,
+		)
+		return blockedErr
+	}
+
+	return nil
 }

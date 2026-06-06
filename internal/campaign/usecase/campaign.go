@@ -422,32 +422,6 @@ func (uc *implUseCase) listCampaignProjects(ctx context.Context, campaignID, sta
 	return all, nil
 }
 
-func (uc *implUseCase) pauseProject(ctx context.Context, projectID string) error {
-	if uc.ingest == nil || uc.projectRepo == nil {
-		uc.l.Warnf(ctx, "campaign.usecase.pauseProject: dependencies missing for project_id=%s", projectID)
-		return campaign.ErrPauseFailed
-	}
-
-	if err := uc.ingest.Pause(ctx, strings.TrimSpace(projectID)); err != nil {
-		uc.l.Errorf(ctx, "campaign.usecase.pauseProject.ingest.Pause: project_id=%s err=%v", projectID, err)
-		return campaign.ErrPauseFailed
-	}
-
-	if _, err := uc.projectRepo.UpdateStatus(ctx, projectrepo.UpdateStatusOptions{
-		ID:               strings.TrimSpace(projectID),
-		Status:           string(model.ProjectStatusPaused),
-		ExpectedStatuses:  []string{string(model.ProjectStatusActive), string(model.ProjectStatusPending)},
-	}); err != nil {
-		if err == projectrepo.ErrStatusConflict || err == projectrepo.ErrNotFound {
-			return nil
-		}
-		uc.l.Errorf(ctx, "campaign.usecase.pauseProject.projectRepo.UpdateStatus: project_id=%s err=%v", projectID, err)
-		return campaign.ErrPauseFailed
-	}
-
-	return nil
-}
-
 func (uc *implUseCase) resumeProject(ctx context.Context, projectID string) error {
 	if uc.ingest == nil || uc.projectRepo == nil {
 		uc.l.Warnf(ctx, "campaign.usecase.resumeProject: dependencies missing for project_id=%s", projectID)
