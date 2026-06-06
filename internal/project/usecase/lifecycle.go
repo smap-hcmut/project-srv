@@ -9,6 +9,7 @@ import (
 	"project-srv/pkg/microservice"
 )
 
+// Activate validates runtime readiness, starts ingest runtime, and marks a pending project active.
 func (uc *implUseCase) Activate(ctx context.Context, id string) (project.ActivateOutput, error) {
 	detail, err := uc.Detail(ctx, id)
 	if err != nil {
@@ -64,6 +65,7 @@ func (uc *implUseCase) Activate(ctx context.Context, id string) (project.Activat
 	return project.ActivateOutput{Project: updated}, nil
 }
 
+// Pause stops ingest runtime for an active project and moves it to paused.
 func (uc *implUseCase) Pause(ctx context.Context, id string) (project.PauseOutput, error) {
 	detail, err := uc.Detail(ctx, id)
 	if err != nil {
@@ -109,6 +111,7 @@ func (uc *implUseCase) Pause(ctx context.Context, id string) (project.PauseOutpu
 	return project.PauseOutput{Project: updated}, nil
 }
 
+// Resume validates readiness, resumes ingest runtime, and marks a paused project active again.
 func (uc *implUseCase) Resume(ctx context.Context, id string) (project.ResumeOutput, error) {
 	detail, err := uc.Detail(ctx, id)
 	if err != nil {
@@ -167,6 +170,7 @@ func (uc *implUseCase) Resume(ctx context.Context, id string) (project.ResumeOut
 	return project.ResumeOutput{Project: updated}, nil
 }
 
+// Archive stops active runtime when needed and marks a project archived.
 func (uc *implUseCase) Archive(ctx context.Context, id string) (project.ArchiveOutput, error) {
 	detail, err := uc.Detail(ctx, id)
 	if err != nil {
@@ -209,20 +213,22 @@ func (uc *implUseCase) Archive(ctx context.Context, id string) (project.ArchiveO
 	return project.ArchiveOutput{Project: updated}, nil
 }
 
+// Unarchive restores an archived project to pending so it re-enters the normal activation flow.
 func (uc *implUseCase) Unarchive(ctx context.Context, id string) (project.UnarchiveOutput, error) {
 	detail, err := uc.Detail(ctx, id)
 	if err != nil {
 		return project.UnarchiveOutput{}, err
 	}
 	current := detail.Project
-	if !model.CanUnarchiveProjectStatus(current.Status) {
+	nextStatus, ok := unarchiveProjectStatus(current.Status)
+	if !ok {
 		uc.l.Warnf(ctx, "project.usecase.Unarchive: id=%s status=%s not eligible", current.ID, current.Status)
 		return project.UnarchiveOutput{}, project.ErrUnarchiveNotAllowed
 	}
 
 	updated, err := uc.repo.UpdateStatus(ctx, repo.UpdateStatusOptions{
 		ID:     current.ID,
-		Status: string(model.ProjectStatusPaused),
+		Status: string(nextStatus),
 	})
 	if err != nil {
 		uc.l.Errorf(ctx, "project.usecase.Unarchive.repo.UpdateStatus: id=%s err=%v", current.ID, err)
@@ -237,6 +243,14 @@ func (uc *implUseCase) Unarchive(ctx context.Context, id string) (project.Unarch
 	}
 
 	return project.UnarchiveOutput{Project: updated}, nil
+}
+
+// unarchiveProjectStatus returns the project status after restoring an archived project.
+func unarchiveProjectStatus(status model.ProjectStatus) (model.ProjectStatus, bool) {
+	if !model.CanUnarchiveProjectStatus(status) {
+		return "", false
+	}
+	return model.ProjectStatusPending, true
 }
 
 // GetActivationReadiness evaluates project readiness by querying ingest internals and local status.

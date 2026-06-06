@@ -374,7 +374,7 @@ func (h *handler) ActivationReadiness(c *gin.Context) {
 }
 
 // @Summary Unarchive a project
-// @Description Transition an archived project back into PAUSED status
+// @Description Transition an archived project back into PENDING status
 // @Tags Project
 // @Produce json
 // @Param project_id path string true "Project ID"
