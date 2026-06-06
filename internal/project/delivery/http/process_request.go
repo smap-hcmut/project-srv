@@ -40,19 +40,6 @@ func (h *handler) processListReq(c *gin.Context) (listReq, error) {
 	return req, nil
 }
 
-func (h *handler) processFavoriteListReq(c *gin.Context) (favoriteListReq, error) {
-	var req favoriteListReq
-	if err := c.ShouldBindQuery(&req); err != nil {
-		h.l.Warnf(c.Request.Context(), "project.delivery.processFavoriteListReq.ShouldBindQuery: %v", err)
-		return req, errWrongQuery
-	}
-	if err := req.validate(); err != nil {
-		h.l.Warnf(c.Request.Context(), "project.delivery.processFavoriteListReq.validate: %v", err)
-		return req, err
-	}
-	return req, nil
-}
-
 func (h *handler) processUpdateReq(c *gin.Context) (updateReq, error) {
 	var req updateReq
 	if err := c.ShouldBindJSON(&req); err != nil {

@@ -188,42 +188,6 @@ func (r listReq) toInput() project.ListInput {
 	}
 }
 
-type favoriteListReq struct {
-	paginator.PaginateQuery
-	CampaignID string `form:"campaign_id"`
-	Status     string `form:"status"`
-	Name       string `form:"name"`
-	Brand      string `form:"brand"`
-	EntityType string `form:"entity_type"`
-	Sort       string `form:"sort"`
-}
-
-func (r favoriteListReq) validate() error {
-	if r.CampaignID != "" && !isValidUUID(r.CampaignID) {
-		return errWrongQuery
-	}
-	switch r.Sort {
-	case "", "created_at_desc", "favorite_desc":
-	default:
-		return errWrongQuery
-	}
-	return nil
-}
-
-func (r favoriteListReq) toInput() project.ListInput {
-	r.PaginateQuery.Adjust()
-	return project.ListInput{
-		CampaignID:   r.CampaignID,
-		Status:       r.Status,
-		Name:         r.Name,
-		Brand:        r.Brand,
-		EntityType:   r.EntityType,
-		FavoriteOnly: true,
-		Sort:         r.Sort,
-		Paginator:    r.PaginateQuery,
-	}
-}
-
 // --- Response DTOs ---
 
 type projectResp struct {
