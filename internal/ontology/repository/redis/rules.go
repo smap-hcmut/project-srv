@@ -12,7 +12,10 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 )
 
-const keyPrefix = "smap:project:ontology-rules:"
+const (
+	keyPrefix     = "smap:project:ontology-rules:"
+	defaultRuleTTL = 7 * 24 * time.Hour
+)
 
 type storedConfig struct {
 	ProjectID string                     `json:"project_id"`
@@ -44,7 +47,7 @@ func (r *implRepository) Upsert(ctx context.Context, opt repository.UpsertOption
 		r.l.Errorf(ctx, "ontology.redis.Upsert.Marshal: project_id=%s err=%v", opt.ProjectID, err)
 		return model.ProjectOntologyRules{}, repository.ErrFailedToInsert
 	}
-	if err := r.redis.Set(ctx, key(opt.ProjectID), payload, 0); err != nil {
+	if err := r.redis.Set(ctx, key(opt.ProjectID), payload, defaultRuleTTL); err != nil {
 		r.l.Errorf(ctx, "ontology.redis.Upsert.Set: project_id=%s err=%v", opt.ProjectID, err)
 		return model.ProjectOntologyRules{}, repository.ErrFailedToInsert
 	}
