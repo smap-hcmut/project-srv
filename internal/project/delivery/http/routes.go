@@ -28,7 +28,6 @@ func (h *handler) RegisterRoutes(r *gin.RouterGroup, mw *middleware.Middleware) 
 	projects.Use(mw.Auth())
 	{
 		projects.GET("/:project_id", h.Detail)
-		projects.GET("/:project_id/access", h.Access)
 		projects.PUT("/:project_id", mw.AdminOnly(), h.Update)
 		projects.GET("/:project_id/activation-readiness", h.ActivationReadiness)
 		projects.POST("/:project_id/activate", mw.AdminOnly(), h.Activate)
@@ -45,5 +44,6 @@ func (h *handler) RegisterInternalRoutes(r *gin.RouterGroup, mw *middleware.Midd
 	projects.Use(mw.InternalAuth())
 	{
 		projects.GET("/:project_id", h.InternalDetail)
+		projects.GET("/:project_id/access", h.Access)
 	}
 }
