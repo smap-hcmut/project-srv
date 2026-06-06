@@ -337,6 +337,32 @@ func (h *handler) Delete(c *gin.Context) {
 	response.OK(c, nil)
 }
 
+// Access is a thin permission check used by sibling services
+// (knowledge-srv) to decide whether the caller may read a project's data.
+// For now the policy is: any authenticated user with a valid scope can
+// access any project they ask about. The endpoint returns 200 when the
+// scope resolves; downstream domain-level filters still apply on the
+// concrete data they fetch.
+//
+// The :project_id parameter is validated so the call hits the project,
+// but no row-level check happens here — this hook exists so callers can
+// upgrade to a real ACL table without changing knowledge-srv.
+func (h *handler) Access(c *gin.Context) {
+	ctx := c.Request.Context()
+	req, err := h.processDetailReq(c)
+	if err != nil {
+		h.l.Warnf(ctx, "project.delivery.Access.processDetailReq: %v", err)
+		response.Error(c, err, h.discord)
+		return
+	}
+	if _, err := h.uc.Detail(ctx, req.toInput()); err != nil {
+		h.l.Warnf(ctx, "project.delivery.Access.uc.Detail: id=%s err=%v", req.ID, err)
+		response.Error(c, h.mapError(err), h.discord)
+		return
+	}
+	response.OK(c, gin.H{"project_id": req.ID, "access": true})
+}
+
 func (h *handler) InternalDetail(c *gin.Context) {
 	ctx := c.Request.Context()
 
