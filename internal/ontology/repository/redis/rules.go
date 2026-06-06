@@ -13,8 +13,18 @@ import (
 )
 
 const (
-	keyPrefix     = "smap:project:ontology-rules:"
+	keyPrefix      = "smap:project:ontology-rules:"
 	defaultRuleTTL = 7 * 24 * time.Hour
+
+	// ontologyEventStream is a Redis Stream that consumers (analysis-srv)
+	// tail to invalidate their in-memory ontology cache the moment a rule
+	// changes. Publishing here removes the up-to-60s staleness window the
+	// previous HTTP cache had to live with.
+	ontologyEventStream = "smap:ontology:events"
+
+	// ontologyEventStreamMaxLen approximates the cap on stream length so
+	// long-lived deployments do not accumulate every historical change.
+	ontologyEventStreamMaxLen int64 = 5000
 )
 
 type storedConfig struct {
@@ -26,31 +36,55 @@ type storedConfig struct {
 	UpdatedAt time.Time                  `json:"updated_at"`
 }
 
+// Upsert merges the incoming rule into the existing record under WATCH so
+// concurrent edits do not last-write-wins each other. After the write
+// succeeds a `ontology:updated` event is XAdded so analysis-srv can drop its
+// 60s HTTP cache for the project immediately instead of waiting for the
+// next refresh tick.
 func (r *implRepository) Upsert(ctx context.Context, opt repository.UpsertOptions) (model.ProjectOntologyRules, error) {
-	now := time.Now().UTC()
-	existing, err := r.Detail(ctx, opt.ProjectID)
-	createdAt := now
-	if err == nil && !existing.CreatedAt.IsZero() {
-		createdAt = existing.CreatedAt
+	client := r.redis.GetClient()
+	cacheKey := key(opt.ProjectID)
+
+	var stored storedConfig
+	txErr := client.Watch(ctx, func(tx *goredis.Tx) error {
+		now := time.Now().UTC()
+		createdAt := now
+		raw, getErr := tx.Get(ctx, cacheKey).Result()
+		if getErr == nil {
+			var existing storedConfig
+			if json.Unmarshal([]byte(raw), &existing) == nil && !existing.CreatedAt.IsZero() {
+				createdAt = existing.CreatedAt
+			}
+		} else if !errors.Is(getErr, goredis.Nil) {
+			return getErr
+		}
+
+		stored = storedConfig{
+			ProjectID: opt.ProjectID,
+			Enabled:   opt.Enabled,
+			Rules:     opt.Rules,
+			UpdatedBy: opt.UpdatedBy,
+			CreatedAt: createdAt,
+			UpdatedAt: now,
+		}
+		payload, mErr := json.Marshal(stored)
+		if mErr != nil {
+			return mErr
+		}
+
+		_, execErr := tx.TxPipelined(ctx, func(pipe goredis.Pipeliner) error {
+			pipe.Set(ctx, cacheKey, payload, defaultRuleTTL)
+			return nil
+		})
+		return execErr
+	}, cacheKey)
+
+	if txErr != nil {
+		r.l.Errorf(ctx, "ontology.redis.Upsert: project_id=%s err=%v", opt.ProjectID, txErr)
+		return model.ProjectOntologyRules{}, repository.ErrFailedToInsert
 	}
 
-	stored := storedConfig{
-		ProjectID: opt.ProjectID,
-		Enabled:   opt.Enabled,
-		Rules:     opt.Rules,
-		UpdatedBy: opt.UpdatedBy,
-		CreatedAt: createdAt,
-		UpdatedAt: now,
-	}
-	payload, err := json.Marshal(stored)
-	if err != nil {
-		r.l.Errorf(ctx, "ontology.redis.Upsert.Marshal: project_id=%s err=%v", opt.ProjectID, err)
-		return model.ProjectOntologyRules{}, repository.ErrFailedToInsert
-	}
-	if err := r.redis.Set(ctx, key(opt.ProjectID), payload, defaultRuleTTL); err != nil {
-		r.l.Errorf(ctx, "ontology.redis.Upsert.Set: project_id=%s err=%v", opt.ProjectID, err)
-		return model.ProjectOntologyRules{}, repository.ErrFailedToInsert
-	}
+	r.publishOntologyEvent(ctx, opt.ProjectID, "ontology:updated")
 	return stored.toModel(), nil
 }
 
@@ -82,7 +116,27 @@ func (r *implRepository) Delete(ctx context.Context, projectID string) error {
 	if err := r.redis.Delete(ctx, key(projectID)); err != nil {
 		return repository.ErrFailedToDelete
 	}
+	r.publishOntologyEvent(ctx, projectID, "ontology:deleted")
 	return nil
+}
+
+// publishOntologyEvent pushes a Redis Stream entry so cache holders can
+// invalidate proactively. Best-effort — failures here do not roll back the
+// write that already committed because the cache TTL is the safety net.
+func (r *implRepository) publishOntologyEvent(ctx context.Context, projectID, eventType string) {
+	args := &goredis.XAddArgs{
+		Stream: ontologyEventStream,
+		MaxLen: ontologyEventStreamMaxLen,
+		Approx: true,
+		Values: map[string]interface{}{
+			"event":      eventType,
+			"project_id": projectID,
+			"emitted_at": time.Now().UTC().Format(time.RFC3339Nano),
+		},
+	}
+	if err := r.redis.GetClient().XAdd(ctx, args).Err(); err != nil {
+		r.l.Warnf(ctx, "ontology.redis.publishOntologyEvent: project_id=%s event=%s err=%v", projectID, eventType, err)
+	}
 }
 
 func (stored storedConfig) toModel() model.ProjectOntologyRules {
